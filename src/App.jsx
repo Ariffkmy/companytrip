@@ -74,7 +74,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
   return (
     <div className={`day-panel${active ? ' on' : ''}`}>
       {/* Treasure hunt button for Day 4 */}
-      {index === 3 && (
+      {index === 4 && (
         <button
           className="treasure-btn"
           onClick={onOpenTreasureHunt}
@@ -113,7 +113,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
       </div>
 
       {/* Stamp count */}
-      {index === 3 && (
+      {index === 4 && (
         <div className="rally">
           <b>Atami Treasure Hunt</b>
           <p>5 checkpoints · 90 minutes · All downhill station to sea</p>
