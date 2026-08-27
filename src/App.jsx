@@ -3,6 +3,8 @@ import schedule from './data/schedule';
 import groupRoster from './data/groupRoster';
 import TreasureHunt from './components/TreasureHunt';
 import Gallery from './components/Gallery';
+import Safety from './components/Safety';
+import Weather from './components/Weather';
 
 const KANJI = ['壱', '弐', '参', '肆', '伍'];
 
@@ -43,8 +45,11 @@ const TABS = [
   { id: 'itinerary', label: 'Itinerary', icon: '🗓️' },
   { id: 'group', label: 'Group', icon: '👥' },
   { id: 'gallery', label: 'Gallery', icon: '📸' },
+  { id: 'weather', label: 'Weather', icon: '🌦' },
   { id: 'logistics', label: 'Logistics', icon: '🚆' },
   { id: 'contact', label: 'Contact', icon: '📞' },
+  // Tinted red in the nav so it can be found without reading the labels.
+  { id: 'safety', label: 'Safety', icon: '🆘', urgent: true },
 ];
 
 function copyText(t) {
@@ -440,8 +445,12 @@ export default function App() {
             type="button"
             className={`flex-none px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t.id
-                ? 'border-ink text-ink dark:border-flame dark:text-flame'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+                ? t.urgent
+                  ? 'border-red text-red'
+                  : 'border-ink text-ink dark:border-flame dark:text-flame'
+                : t.urgent
+                  ? 'border-transparent text-red/70 active:text-red'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
             }`}
           >
             {t.icon} {t.label}
@@ -454,8 +463,10 @@ export default function App() {
         {tab === 'itinerary' && <Itinerary onOpenTreasureHunt={openTreasureHunt} />}
         {tab === 'group' && <Group />}
         {tab === 'gallery' && <Gallery />}
+        {tab === 'weather' && <Weather />}
         {tab === 'logistics' && <Logistics />}
         {tab === 'contact' && <Contact />}
+        {tab === 'safety' && <Safety />}
       </div>
     </>
   );
