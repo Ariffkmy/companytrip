@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import schedule from './data/schedule';
-import restaurants, { tagColors } from './data/restaurants';
 import groupRoster from './data/groupRoster';
 import TreasureHunt from './components/TreasureHunt';
+import Gallery from './components/Gallery';
 
 const KANJI = ['壱', '弐', '参', '肆', '伍'];
 
@@ -41,9 +41,9 @@ function ThemeToggle({ dark, onToggle }) {
 
 const TABS = [
   { id: 'itinerary', label: 'Itinerary', icon: '🗓️' },
-  { id: 'restaurants', label: 'Restaurants', icon: '🍽️' },
-  { id: 'logistics', label: 'Logistics', icon: '🚆' },
   { id: 'group', label: 'Group', icon: '👥' },
+  { id: 'gallery', label: 'Gallery', icon: '📸' },
+  { id: 'logistics', label: 'Logistics', icon: '🚆' },
   { id: 'contact', label: 'Contact', icon: '📞' },
 ];
 
@@ -208,113 +208,6 @@ function Itinerary({ onOpenTreasureHunt }) {
       {schedule.map((day, i) => (
         <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} />
       ))}
-    </section>
-  );
-}
-
-/* ── Restaurants ───────────────────────────────────── */
-function Restaurants() {
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-
-  const filters = [
-    { id: 'all', label: 'All' },
-    { id: 'halal', label: 'Halal' },
-    { id: 'pork', label: 'Pork-Free' },
-    { id: 'muslim', label: 'Muslim-Friendly' },
-    { id: 'group', label: '30 Pax' },
-  ];
-
-  const filtered = restaurants.filter((r) => {
-    const catMatch = filter === 'all' || r.tags.includes(filter);
-    const q = search.toLowerCase().trim();
-    const textMatch = !q || r.name.toLowerCase().includes(q) || r.city.toLowerCase().includes(q) || r.note.toLowerCase().includes(q);
-    return catMatch && textMatch;
-  });
-
-  const cities = [...new Set(restaurants.map((r) => r.city))];
-
-  return (
-    <section>
-      <div className="py-8 text-center">
-        <p className="text-xs text-gray-400 font-mono tracking-widest uppercase">Restaurants & Venues</p>
-        <h1 className="display text-3xl sm:text-4xl mt-2">Where <span className="text-red">to Eat</span></h1>
-      </div>
-
-      <div className="flex gap-1.5 flex-wrap mb-4">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            type="button"
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              filter === f.id ? 'bg-ink dark:bg-flame text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <input
-        placeholder="Search restaurant name, city, or cuisine..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-ink placeholder:text-gray-400 outline-none focus:border-gray-400 transition-colors mb-4"
-      />
-
-      {cities.map((city) => {
-        const cityRestos = filtered.filter((r) => r.city === city);
-        if (cityRestos.length === 0) return null;
-        return (
-          <div key={city} className="mb-6">
-            <h3 className="text-sm font-display tracking-wide text-gray-500 mb-3">
-              {city === 'Atami' ? '🌊' : city === 'Yokohama' ? '🌃' : '⛩️'} {city}
-            </h3>
-            <div className="space-y-2.5">
-              {cityRestos.map((r) => (
-                <div key={r.name} className="bg-white border border-gray-200 rounded-lg p-4 transition-shadow hover:shadow-sm">
-                  <div className="flex justify-between items-start gap-3 mb-2">
-                    <h4 className="font-display text-base tracking-wide leading-tight">{r.name}</h4>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${r.maps}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-xs text-gray-400 hover:text-sea font-medium no-underline transition-colors"
-                    >
-                      Maps ↗
-                    </a>
-                  </div>
-                  {r.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {r.tags.map((t) => {
-                        const tc = tagColors[t];
-                        return tc ? (
-                          <span key={t} className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-                            style={{ background: tc.bg, color: tc.color }}
-                          >
-                            {tc.label}
-                          </span>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                  <p className="text-sm text-gray-500 leading-relaxed">{r.note}</p>
-                  {r.address && <p className="text-xs text-gray-400 font-mono mt-1.5">📍 {r.address}</p>}
-                  {r.phone && (
-                    <p className="text-xs font-mono text-gray-500 mt-1.5">
-                      📞 {r.phone}
-                      <button onClick={() => copyText(r.phone)} type="button" className="ml-2 text-xs text-gray-400 hover:text-sea underline underline-offset-2">
-                        Copy
-                      </button>
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
     </section>
   );
 }
@@ -559,9 +452,9 @@ export default function App() {
       {/* Content */}
       <div className="max-w-[640px] mx-auto px-4 pb-12">
         {tab === 'itinerary' && <Itinerary onOpenTreasureHunt={openTreasureHunt} />}
-        {tab === 'restaurants' && <Restaurants />}
-        {tab === 'logistics' && <Logistics />}
         {tab === 'group' && <Group />}
+        {tab === 'gallery' && <Gallery />}
+        {tab === 'logistics' && <Logistics />}
         {tab === 'contact' && <Contact />}
       </div>
     </>

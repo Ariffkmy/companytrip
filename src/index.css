@@ -16,6 +16,10 @@
   --color-green: #2f6b1f;
   --color-flame: #FF7A1A;
   --color-flame-soft: #FFA45C;
+  /* Literal white, never remapped by the dark theme. For content sitting
+     on a black scrim (the gallery lightbox), where `white` would flip to
+     near-black and vanish. */
+  --color-onscrim: #FFFFFF;
 
   --font-display: "Anton", "Haettenschweiler", "Arial Narrow", Impact, sans-serif;
   --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
