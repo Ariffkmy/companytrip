@@ -23,12 +23,12 @@ const restaurants = [
 ];
 
 const tagColors = {
-  halal: { bg: 'rgba(17,104,58,.09)', color: '#11683a', border: 'rgba(17,104,58,.22)', label: 'Halal Certified' },
-  pork: { bg: 'rgba(123,92,0,.09)', color: '#7b5c00', border: 'rgba(123,92,0,.22)', label: 'Pork-Free Kitchen' },
-  muslim: { bg: 'rgba(37,92,143,.09)', color: '#255c8f', border: 'rgba(37,92,143,.22)', label: 'Muslim-Friendly' },
-  group: { bg: 'rgba(99,82,143,.09)', color: '#63528f', border: 'rgba(99,82,143,.22)', label: 'Fits 30 pax' },
-  veg: { bg: 'rgba(18,109,104,.09)', color: '#126d68', border: 'rgba(18,109,104,.22)', label: 'Vegetarian' },
-  hot: { bg: 'rgba(143,0,32,.09)', color: '#8f0020', border: 'rgba(143,0,32,.22)', label: 'Ryokan' },
+  halal: { bg: 'var(--tag-halal-bg)', color: 'var(--tag-halal-fg)', border: 'var(--tag-halal-bd)', label: 'Halal Certified' },
+  pork: { bg: 'var(--tag-pork-bg)', color: 'var(--tag-pork-fg)', border: 'var(--tag-pork-bd)', label: 'Pork-Free Kitchen' },
+  muslim: { bg: 'var(--tag-muslim-bg)', color: 'var(--tag-muslim-fg)', border: 'var(--tag-muslim-bd)', label: 'Muslim-Friendly' },
+  group: { bg: 'var(--tag-group-bg)', color: 'var(--tag-group-fg)', border: 'var(--tag-group-bd)', label: 'Fits 30 pax' },
+  veg: { bg: 'var(--tag-veg-bg)', color: 'var(--tag-veg-fg)', border: 'var(--tag-veg-bd)', label: 'Vegetarian' },
+  hot: { bg: 'var(--tag-hot-bg)', color: 'var(--tag-hot-fg)', border: 'var(--tag-hot-bd)', label: 'Ryokan' },
 };
 
 export default restaurants;

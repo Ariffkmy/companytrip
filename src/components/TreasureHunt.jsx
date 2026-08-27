@@ -21,10 +21,10 @@ const CONFIG = {
   ],
 
   teams: [
-    { id: 't1', name: 'Team Ume', colour: '#DE3B2B',
+    { id: 't1', name: 'Team Ume', colour: 'var(--red)',
       pose: { key: 'pyramid', title: 'The Human Pyramid', note: 'Three at the bottom on all fours, the rest climb on. Nobody falls.' },
       spot: { name: 'Sakimicho — detail A', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
-    { id: 't2', name: 'Team Kinomiya', colour: '#136375',
+    { id: 't2', name: 'Team Kinomiya', colour: 'var(--sea)',
       pose: { key: 'ninja', title: 'Frozen Ninja', note: 'Everyone mid-air kick, faces deadly serious. Jump on three.' },
       spot: { name: 'Sakimicho — detail B', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
     { id: 't3', name: 'Team Sun Beach', colour: '#E9A82C',
@@ -112,14 +112,14 @@ function StampSlot({ idx, done, now }) {
       <div className="ring" style={{
         position: 'absolute',
         inset: 4,
-        border: `2px dashed ${done ? 'transparent' : '#B9AF97'}`,
+        border: `2px dashed ${done ? 'transparent' : 'var(--th-dash)'}`,
         borderRadius: '50%',
-        ...(now ? { borderStyle: 'solid', borderColor: '#136375', animation: 'breathe 1.8s ease-in-out infinite' } : {}),
+        ...(now ? { borderStyle: 'solid', borderColor: 'var(--sea)', animation: 'breathe 1.8s ease-in-out infinite' } : {}),
       }} />
       <span style={{
         fontFamily: '"DM Mono", monospace',
         fontSize: 11,
-        color: now ? '#136375' : '#B9AF97',
+        color: now ? 'var(--sea)' : 'var(--th-dash)',
         fontWeight: now ? 700 : 400,
         zIndex: 1,
       }}>{idx + 1}</span>
@@ -129,14 +129,14 @@ function StampSlot({ idx, done, now }) {
           inset: 0,
           display: 'grid',
           placeItems: 'center',
-          border: '3px double #DE3B2B',
+          border: '3px double var(--red)',
           borderRadius: '50%',
-          color: '#DE3B2B',
+          color: 'var(--red)',
           fontFamily: '"Zen Kaku Gothic New", sans-serif',
           fontWeight: 900,
           fontSize: 20,
           transform: 'rotate(-9deg)',
-          boxShadow: 'inset 0 0 0 2px rgba(222,59,43,.15)',
+          boxShadow: 'inset 0 0 0 2px var(--th-stamp-glow)',
           background: 'var(--card)',
           zIndex: 2,
           animation: 'slam .45s cubic-bezier(.2,1.5,.4,1) both',
@@ -452,7 +452,7 @@ export default function TreasureHunt({ onClose }) {
               fontFamily: 'var(--display)', fontSize: 19, textTransform: 'uppercase',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{S.teamName}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#A9B6C1', letterSpacing: '.1em' }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--th-label)', letterSpacing: '.1em' }}>
               {doneCount}/5 STAMPS
             </div>
           </div>
@@ -460,13 +460,13 @@ export default function TreasureHunt({ onClose }) {
             fontFamily: '"DM Mono", monospace', fontSize: 20, fontWeight: 500,
             padding: '2px 8px', border: '2px solid var(--gold)', color: 'var(--gold)',
             borderRadius: 4,
-            ...(clockLeft() <= 300 ? { borderColor: '#DE3B2B', color: '#fff', background: '#DE3B2B', animation: 'pulse 1s infinite' } : {}),
+            ...(clockLeft() <= 300 ? { borderColor: 'var(--red)', color: '#fff', background: 'var(--red)', animation: 'pulse 1s infinite' } : {}),
           }}>
             {mmss(clockLeft())}
           </div>
           <div style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--gold)', lineHeight: 1 }}>
             {scoreOf(S)}
-            <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 9, display: 'block', color: '#A9B6C1', letterSpacing: '.1em' }}>PTS</span>
+            <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 9, display: 'block', color: 'var(--th-label)', letterSpacing: '.1em' }}>PTS</span>
           </div>
         </div>
       </div>
@@ -510,8 +510,8 @@ export default function TreasureHunt({ onClose }) {
     }
     return (
       <label style={{
-        display: 'block', width: '100%', border: '3px dashed #B9AF97', borderRadius: 8,
-        background: '#F3EEE0', padding: '20px 14px', textAlign: 'center', cursor: 'pointer',
+        display: 'block', width: '100%', border: '3px dashed var(--th-dash)', borderRadius: 8,
+        background: 'var(--th-parchment)', padding: '20px 14px', textAlign: 'center', cursor: 'pointer',
       }}>
         <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, letterSpacing: '.03em' }}>{label}</b>
         <small style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>{sub}</small>
@@ -543,12 +543,12 @@ export default function TreasureHunt({ onClose }) {
           background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
           position: 'relative', color: 'var(--card)', marginBottom: 14,
         }}>
-          <div style={{ background: '#136375', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+          <div style={{ background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
             <div dangerouslySetInnerHTML={{ __html: poseArt(t.pose.key) }} style={{ width: '78%', height: '78%', color: '#FFFCF4' }} />
           </div>
           <div style={{
             position: 'absolute', left: 12, right: 12, bottom: 9,
-            fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#A9B6C1',
+            fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
             display: 'flex', justifyContent: 'space-between', gap: 8,
           }}>
             <span>REFERENCE — {esc(t.name)}</span>
@@ -593,7 +593,7 @@ export default function TreasureHunt({ onClose }) {
           position: 'relative', color: 'var(--card)', marginBottom: 14,
         }}>
           <div style={{
-            background: '#136375', borderRadius: 3, aspectRatio: '3/2',
+            background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2',
             display: 'grid', placeItems: 'center', overflow: 'hidden',
           }}>
             <svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" style={{ width: '78%', height: '78%' }}>
@@ -606,7 +606,7 @@ export default function TreasureHunt({ onClose }) {
           </div>
           <div style={{
             position: 'absolute', left: 12, right: 12, bottom: 9,
-            fontFamily: '"DM Mono", monospace', fontSize: 11, color: '#A9B6C1',
+            fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
             display: 'flex', justifyContent: 'space-between', gap: 8,
           }}>
             <span>{esc(s.hint)}</span>
@@ -632,8 +632,8 @@ export default function TreasureHunt({ onClose }) {
           Send selfie
         </button>
         <div style={{
-          textAlign: 'center', padding: '26px 16px', border: '3px dashed #B9AF97',
-          borderRadius: 10, background: '#F3EEE0', marginTop: 14,
+          textAlign: 'center', padding: '26px 16px', border: '3px dashed var(--th-dash)',
+          borderRadius: 10, background: 'var(--th-parchment)', marginTop: 14,
         }}>
           <div style={{ fontSize: 30 }}>🔒</div>
           <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, marginTop: 6 }}>Riddle sealed</b>
@@ -828,8 +828,8 @@ export default function TreasureHunt({ onClose }) {
           </div>
         ) : (
           <label style={{
-            display: 'block', width: '100%', border: '3px dashed #B9AF97', borderRadius: 8,
-            background: '#F3EEE0', padding: '20px 14px', textAlign: 'center', cursor: 'pointer',
+            display: 'block', width: '100%', border: '3px dashed var(--th-dash)', borderRadius: 8,
+            background: 'var(--th-parchment)', padding: '20px 14px', textAlign: 'center', cursor: 'pointer',
           }}>
             <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, letterSpacing: '.03em' }}>Add your video</b>
             <small style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>Max {CONFIG.video.maxSeconds} seconds</small>
@@ -895,7 +895,7 @@ export default function TreasureHunt({ onClose }) {
         <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
           {copy.h}
         </h2>
-        <p style={{ color: '#D6DDE3' }}>{esc(copy.p)}</p>
+        <p style={{ color: 'var(--th-body-alt)' }}>{esc(copy.p)}</p>
         <button
           className="btn block sea"
           onClick={() => {
@@ -908,7 +908,7 @@ export default function TreasureHunt({ onClose }) {
         >
           Open it
         </button>
-        <p className="note" style={{ marginTop: 12, color: '#A9B6C1' }}>
+        <p className="note" style={{ marginTop: 12, color: 'var(--th-label)' }}>
           Points so far: {scoreOf(S)}. Time left: {mmss(clockLeft())}.
         </p>
       </div>
@@ -964,7 +964,7 @@ export default function TreasureHunt({ onClose }) {
             {rows.map((r, i) => (
               <li key={i} style={{
                 display: 'flex', gap: 10, alignItems: 'center', padding: '9px 0',
-                borderBottom: '1px dashed #C9C0AA', fontSize: 14,
+                borderBottom: '1px dashed var(--th-rule)', fontSize: 14,
               }}>
                 <span style={{ fontFamily: 'var(--body)', fontWeight: 900, color: 'var(--red)', width: 22 }}>{r[0]}</span>
                 <span dangerouslySetInnerHTML={{ __html: r[1] }} />
@@ -991,7 +991,7 @@ export default function TreasureHunt({ onClose }) {
           <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
             Walk it in
           </h2>
-          <p style={{ color: '#D6DDE3' }}>{esc(CONFIG.finishPoint)}</p>
+          <p style={{ color: 'var(--th-body-alt)' }}>{esc(CONFIG.finishPoint)}</p>
         </div>
         <div style={{ textAlign: 'center' }}>
           <button className="linky" onClick={() => setView('organizer')} type="button">Organiser view →</button>
@@ -1084,23 +1084,23 @@ export default function TreasureHunt({ onClose }) {
                       : 0;
                     return (
                       <tr key={i}>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed #C9C0AA', verticalAlign: 'middle' }}>
+                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
                           <b style={{ fontFamily: 'var(--body)', fontSize: 13 }}>{run.teamName}</b>
                           <br /><span className="note">{run.members || '—'}</span>
                         </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed #C9C0AA', verticalAlign: 'middle' }}>
+                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
                           {[0, 1, 2, 3, 4].map((si) => (
                             <span key={si} style={{
                               display: 'inline-block', width: 13, height: 13, borderRadius: '50%',
                               border: '2px solid var(--ink)', marginRight: 3,
-                              background: done.has(si) ? 'var(--red)' : '#EFE9DA',
+                              background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
                             }} />
                           ))}
                         </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed #C9C0AA', verticalAlign: 'middle', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
+                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
                           {run.finishedAt ? 'DONE' : mmss(left)}
                         </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed #C9C0AA', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', textAlign: 'right' }}>
                           <b className="display" style={{ fontSize: 20 }}>{scoreOf(run)}</b>
                         </td>
                       </tr>
@@ -1128,7 +1128,7 @@ export default function TreasureHunt({ onClose }) {
                   {s.cp2b && <p className="note" style={{ marginTop: 12 }}>RIDDLE — {esc(s.cp2b.answer).slice(0, 220)}</p>}
                   {s.cp3 && <p className="note">BOUGHT — {esc(s.cp3.item)} · ¥{esc(s.cp3.price || '?')}</p>}
                   {s.cp4 && <p className="note">QUIZ — {s.cp4.answers.map((a, ai) => `${ai + 1}. ${esc(a)}`).join(' · ')} <span className="tag" style={{
-                    background: s.cp4.correct ? 'rgba(143,190,126,.3)' : '#DCD3BE',
+                    background: s.cp4.correct ? 'rgba(143,190,126,.3)' : 'var(--th-slot)',
                     color: s.cp4.correct ? '#2f6b1f' : 'var(--ink-soft)',
                   }}>{s.cp4.correct} auto-marked</span></p>}
                   {s.cp5 && <p className="note">VIDEO — {esc(s.cp5.name)} · {s.cp5.seconds}s (held on the team's phone)</p>}
@@ -1169,14 +1169,13 @@ export default function TreasureHunt({ onClose }) {
   /* ── Main render ──────────────────────────────────── */
 
   return (
-    <div style={{ position: 'relative', minHeight: 300 }}>
+    <div className="relative min-h-[300px]">
       {/* Close button */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 70, display: 'flex', justifyContent: 'flex-end', padding: '6px 0' }}>
+      <div className="sticky top-0 z-70 flex justify-end py-1.5">
         <button
           onClick={onClose}
-          className="mini"
-          style={{ background: 'var(--ink)', color: 'var(--card)', border: '2px solid var(--red)' }}
           type="button"
+          className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card border-red transition-all duration-100 hover:opacity-90"
         >
           ← Back to Day 4
         </button>
