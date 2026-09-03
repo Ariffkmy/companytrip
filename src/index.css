@@ -44,6 +44,11 @@
 
   --scrollbar-thumb: #D1D5DB;
 
+  /* Shared border + hard-shadow tokens (TreasureHunt inline styles) */
+  --line: 2px solid var(--ink);
+  --hard: 3px 3px 0 var(--ink);
+  --hard-sm: 2px 2px 0 var(--ink);
+
   /* Stamp-rally parchment surfaces (TreasureHunt inline styles) */
   --th-dash: #B9AF97;
   --th-rule: #C9C0AA;
@@ -151,6 +156,100 @@
   .display { font-family: var(--font-display); letter-spacing: .02em; line-height: 1; text-transform: uppercase; }
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-ink-soft); }
   .note { font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-soft); }
+
+  /* Treasure-hunt buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--font-display); font-size: 18px; letter-spacing: .04em;
+    text-transform: uppercase; line-height: 1;
+    padding: 14px 20px;
+    color: #fff; background: var(--color-red);
+    border: var(--line); border-radius: 8px; box-shadow: var(--hard);
+    cursor: pointer; transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .btn:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: var(--hard-sm); }
+  .btn.block { display: flex; width: 100%; }
+  .btn.sea { background: var(--color-sea); }
+
+  .linky {
+    display: inline-block;
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em;
+    padding: 10px 16px; margin: 12px 0;
+    color: var(--color-ink); background: var(--color-card);
+    border: var(--line); border-radius: 8px; box-shadow: var(--hard-sm);
+    cursor: pointer; transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .linky:hover { transform: translate(-1px, -1px); box-shadow: var(--hard); }
+  .linky:active { transform: translate(1px, 1px); box-shadow: none; }
+
+  /* Treasure-hunt surfaces */
+  .card {
+    background: var(--color-card);
+    border: var(--line);
+    border-radius: 10px;
+    box-shadow: var(--hard);
+    padding: 16px;
+    margin: 12px 0;
+  }
+  .card.flag { border-top: 6px solid var(--color-red); }
+
+  .task {
+    background: var(--th-parchment);
+    border-left: 4px solid var(--color-gold);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .task p { margin: 0 0 8px; }
+  .task p:last-child { margin-bottom: 0; }
+
+  .f { display: block; }
+
+  .tag {
+    display: inline-block;
+    font-family: var(--font-mono); font-size: 10px;
+    padding: 2px 7px; margin-left: 6px;
+    border: 1px solid var(--th-rule); border-radius: 999px;
+    background: var(--th-slot); color: var(--color-ink-soft);
+  }
+
+  .mini {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 6px 10px;
+    background: var(--color-card); color: var(--color-ink);
+    border: var(--line); border-radius: 6px; box-shadow: var(--hard-sm);
+    cursor: pointer;
+  }
+  .mini:active { transform: translate(1px, 1px); box-shadow: none; }
+
+  .hero { text-align: center; }
+  .big {
+    font-family: var(--font-display);
+    font-size: clamp(38px, 12vw, 58px);
+    line-height: .92; text-transform: uppercase; letter-spacing: .01em;
+  }
+  .big em { display: block; font-style: normal; color: var(--color-red); }
+  .kana {
+    font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: .34em; color: var(--color-ink-soft);
+  }
+  .rule {
+    width: 62px; height: 4px; margin: 10px auto;
+    background: var(--color-red); border-radius: 2px;
+  }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    z-index: 90; max-width: 90vw;
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 10px 16px;
+    background: var(--color-ink); color: var(--color-card);
+    border-radius: 8px; box-shadow: var(--hard);
+  }
 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }

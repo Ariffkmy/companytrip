@@ -4,55 +4,87 @@ import { useState, useRef, useEffect, useCallback } from 'react';
    Atami Treasure Hunt — Embedded Stamp Rally Game
    ═══════════════════════════════════════════════════ */
 
-const KANJI = ['壱', '弐', '参', '肆', '伍'];
+const KANJI = ['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
+
+/* 3x3 bingo card — rows, columns, diagonals */
+const BINGO_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
 const CONFIG = {
   raceMinutes: 90,
+  stamps: 8,
   points: { checkpoint: 10, quizPerAnswer: 2 },
-
-  route: [
-    { tag: 'START', name: 'Atami Station plaza', job: 'Briefing, teams, first clue', walk: '' },
-    { tag: '1', name: 'Juraku Hotel forecourt', job: 'Copy the pose', walk: '5 min downhill' },
-    { tag: '2', name: 'Sakimicho slope', job: 'Find the spot, then the riddle', walk: '5 min' },
-    { tag: '3', name: 'Jacaranda Promenade', job: 'Buy it, try it', walk: '8 min' },
-    { tag: '4', name: 'Itokawa Promenade', job: 'Look around you', walk: '5 min' },
-    { tag: '5', name: 'Atami Water Park seafront', job: 'Team cheer', walk: '6 min' },
-    { tag: 'END', name: 'Sun Beach steps', job: 'Scores, videos, winners', walk: '3 min north' },
-  ],
 
   teams: [
     { id: 't1', name: 'Team Ume', colour: 'var(--red)',
       pose: { key: 'pyramid', title: 'The Human Pyramid', note: 'Three at the bottom on all fours, the rest climb on. Nobody falls.' },
-      spot: { name: 'Sakimicho — detail A', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
+      spot: { name: 'Spot A', hint: 'Recce photo goes here.' } },
     { id: 't2', name: 'Team Kinomiya', colour: 'var(--sea)',
       pose: { key: 'ninja', title: 'Frozen Ninja', note: 'Everyone mid-air kick, faces deadly serious. Jump on three.' },
-      spot: { name: 'Sakimicho — detail B', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
+      spot: { name: 'Spot B', hint: 'Recce photo goes here.' } },
     { id: 't3', name: 'Team Sun Beach', colour: '#E9A82C',
       pose: { key: 'nap', title: 'Synchronised Nap', note: 'All asleep standing up, heads on each other\'s shoulders.' },
-      spot: { name: 'Sakimicho — detail C', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
+      spot: { name: 'Spot C', hint: 'Recce photo goes here.' } },
     { id: 't4', name: 'Team Ropeway', colour: '#5B7F3E',
       pose: { key: 'rocket', title: 'Rocket Launch', note: 'One person crouched as the rocket, everyone else pointing at the sky.' },
-      spot: { name: 'Sakimicho — detail D', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
+      spot: { name: 'Spot D', hint: 'Recce photo goes here.' } },
     { id: 't5', name: 'Team Hanabi', colour: '#8A4B9E',
       pose: { key: 'wave', title: 'The Frozen Wave', note: 'A five-person wave caught halfway — each person at a different height.' },
-      spot: { name: 'Sakimicho — detail E', hint: 'Somewhere on the Sakimicho slope. Recce photo goes here.' } },
+      spot: { name: 'Spot E', hint: 'Recce photo goes here.' } },
   ],
 
   buy: { budgetYen: 500, brief: 'Something Japanese that nobody on your team has tried before.' },
 
   quiz: {
-    location: 'Itokawa Promenade, by the red bridge',
     questions: [
       { q: 'Something that is red. Name the object.', accept: [] },
-      { q: 'Complete the sign: ________ Mart', accept: ['family', 'familymart', 'family mart'] },
-      { q: 'Cafe name: ________ Nine Cafe', accept: ['cloud'] },
-      { q: 'There are two of these at Jonathan\'s. What?', accept: [] },
+      { q: 'Read out a shop or cafe sign you can see from here.', accept: [] },
+      { q: 'How many people can you count from where you are standing?', accept: [] },
       { q: 'Something white and floating.', accept: ['cloud', 'clouds', 'seagull', 'seagulls'] },
+      { q: 'The furthest thing you can see. Name it.', accept: [] },
+    ],
+  },
+
+  /* CP5 — ask a stranger. Three tasks, team picks how brave it feels. */
+  ask: {
+    tasks: [
+      { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
+      { key: 'rec', pts: 3, label: 'Something they recommended', hint: 'Food, a spot, anything at all.' },
+      { key: 'photo', pts: 5, label: 'A photo with them and the whole team', hint: 'Ask first. If they say no, that is a no.' },
+    ],
+  },
+
+  /* CP6 — photo bingo. Open from the first stamp, locked in at CP6. */
+  bingo: {
+    linePts: 3,
+    fullPts: 5,
+    tiles: [
+      'Something older than everyone here',
+      'A vending machine nobody has seen the like of',
+      'An animal',
+      'A sign you cannot read',
+      'Someone in uniform',
+      'Something perfectly round',
+      'A door you want to open',
+      'The colour orange',
+      'A view worth stopping for',
+    ],
+  },
+
+  /* CP7 — closest guess. True answers are entered by the committee
+     in the organiser view; until then nothing is marked. */
+  guess: {
+    exactPts: 5,
+    nearPts: 3,
+    closePts: 1,
+    questions: [
+      'How many steps are in the staircase at this checkpoint?',
+      'The committee is holding one item. What does it cost, in yen?',
+      'How many vending machines did you pass since the last stamp?',
     ],
   },
 
   video: { seconds: 15, maxSeconds: 30 },
-  finishPoint: 'Sun Beach — the wide steps down to the sand. Walk north along the promenade, 3 minutes.',
+  finishPoint: 'The committee will point you to the finish at the briefing.',
 };
 
 /* ── Helper functions ──────────────────────────────── */
@@ -60,6 +92,26 @@ const CONFIG = {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf]/g, '');
+
+/* Downscale to a JPEG data URL. Bingo tiles pass a smaller max/quality —
+   nine of them per team has to fit in localStorage alongside everything else. */
+function compressImage(file, max = 760, quality = 0.72) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale);
+      c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
+    img.src = url;
+  });
+}
 
 const mmss = (s) => {
   const m = Math.floor(s / 60);
@@ -178,10 +230,34 @@ function loadState(teamId) {
 }
 
 function saveState(teamId, state) {
-  try { localStorage.setItem('treasure:' + teamId, JSON.stringify(state)); } catch { /* ignore */ }
+  try {
+    localStorage.setItem('treasure:' + teamId, JSON.stringify(state));
+    return true;
+  } catch {
+    return false; // quota — the caller decides whether to say so
+  }
 }
 
-const CP_INDEX = { cp1: 0, cp2a: 1, cp2b: 1, cp3: 2, cp4: 3, cp5: 4 };
+/* Stamp slot each submission fills. The cheer keeps its own key rather
+   than a number so the display order stays readable when it moved last. */
+let ANSWERS = null;
+
+function loadAnswers() {
+  if (!ANSWERS) {
+    try { ANSWERS = JSON.parse(localStorage.getItem('treasure:answers')) || {}; }
+    catch { ANSWERS = {}; }
+  }
+  return ANSWERS;
+}
+
+function saveAnswers(next) {
+  ANSWERS = next;
+  try { localStorage.setItem('treasure:answers', JSON.stringify(next)); } catch { /* ignore */ }
+}
+
+const SLOTS = Array.from({ length: 8 }, (_, i) => i);
+
+const CP_INDEX = { cp1: 0, cp2a: 1, cp2b: 1, cp3: 2, cp4: 3, ask: 4, bingo: 5, guess: 6, cheer: 7 };
 
 const FLOW = [
   { type: 'cp', key: 'cp1' },
@@ -192,8 +268,14 @@ const FLOW = [
   { type: 'cp', key: 'cp3' },
   { type: 'unlock', to: 'cp4' },
   { type: 'cp', key: 'cp4' },
-  { type: 'unlock', to: 'cp5' },
-  { type: 'cp', key: 'cp5' },
+  { type: 'unlock', to: 'ask' },
+  { type: 'cp', key: 'ask' },
+  { type: 'unlock', to: 'bingo' },
+  { type: 'cp', key: 'bingo' },
+  { type: 'unlock', to: 'guess' },
+  { type: 'cp', key: 'guess' },
+  { type: 'unlock', to: 'cheer' },
+  { type: 'cp', key: 'cheer' },
   { type: 'finish' },
 ];
 
@@ -206,18 +288,54 @@ function blankState(team) {
     finishedAt: null,
     stage: 0,
     subs: {},
+    bingo: {},
     bonus: {},
   };
+}
+
+function askPoints(sub) {
+  if (!sub) return 0;
+  return CONFIG.ask.tasks.reduce((n, t) => n + (String(sub[t.key] || '').trim() ? t.pts : 0), 0);
+}
+
+function bingoPoints(tiles) {
+  const filled = (i) => !!(tiles || {})[i];
+  const n = CONFIG.bingo.tiles.reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
+  let p = n;
+  p += BINGO_LINES.filter((line) => line.every(filled)).length * CONFIG.bingo.linePts;
+  if (n === CONFIG.bingo.tiles.length) p += CONFIG.bingo.fullPts;
+  return p;
+}
+
+/* Closeness scoring — a wrong answer still pays if it is in the region.
+   Unanswered by the committee means unmarked, not zero. */
+function guessScore(guess, truth) {
+  const g = Number(guess);
+  const t = Number(truth);
+  if (guess === '' || guess == null || truth === '' || truth == null) return 0;
+  if (!isFinite(g) || !isFinite(t) || t <= 0) return 0;
+  if (g === t) return CONFIG.guess.exactPts;
+  const off = Math.abs(g - t) / t;
+  if (off <= 0.10) return CONFIG.guess.nearPts;
+  if (off <= 0.25) return CONFIG.guess.closePts;
+  return 0;
+}
+
+function guessPoints(sub) {
+  if (!sub) return 0;
+  const truths = loadAnswers();
+  return CONFIG.guess.questions.reduce((n, _, i) => n + guessScore((sub.answers || [])[i], truths[i]), 0);
 }
 
 function scoreOf(run) {
   let p = 0;
   Object.keys(run.subs).forEach((k) => {
-    if (k === 'cp4') {
-      p += (run.subs.cp4.correct || 0) * CONFIG.points.quizPerAnswer + CONFIG.points.checkpoint;
-    } else {
-      p += CONFIG.points.checkpoint;
-    }
+    const sub = run.subs[k];
+    p += CONFIG.points.checkpoint;
+    if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
+    else if (k === 'ask') p += askPoints(sub);
+    else if (k === 'bingo') p += sub.points || 0;
+    else if (k === 'guess') p += guessPoints(sub);
   });
   Object.values(run.bonus || {}).forEach((v) => (p += v));
   return p;
@@ -234,6 +352,7 @@ export default function TreasureHunt({ onClose }) {
   const [tick, setTick] = useState(null);
   const [toast, setToast] = useState(null);
   const [, setOrgS] = useState(null); // for organizer bonus toggle
+  const [bingoOpen, setBingoOpen] = useState(false);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -258,24 +377,8 @@ export default function TreasureHunt({ onClose }) {
         v.src = url;
       });
     } else {
-      // compress image
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      await new Promise((res, rej) => {
-        img.onload = () => {
-          const max = 760;
-          const scale = Math.min(1, max / Math.max(img.width, img.height));
-          const c = document.createElement('canvas');
-          c.width = Math.round(img.width * scale);
-          c.height = Math.round(img.height * scale);
-          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-          URL.revokeObjectURL(url);
-          setDraft((d) => ({ ...d, photo: c.toDataURL('image/jpeg', 0.72) }));
-          res();
-        };
-        img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
-        img.src = url;
-      });
+      const dataUrl = await compressImage(file);
+      setDraft((d) => ({ ...d, photo: dataUrl }));
     }
   }, []);
 
@@ -326,8 +429,8 @@ export default function TreasureHunt({ onClose }) {
           <b style={{ fontFamily: 'var(--display)', fontSize: 15, letterSpacing: '.06em' }}>Stamp rally</b>
           <span style={{ fontSize: 11, letterSpacing: '.34em', color: 'var(--ink-soft)', fontWeight: 700 }}>スタンプラリー</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-          {[0, 1, 2, 3, 4].map((i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+          {SLOTS.map((i) => (
             <StampSlot key={i} idx={i} done={doneStamps.has(i)} now={!doneStamps.has(i) && i === nowIdx} />
           ))}
         </div>
@@ -337,33 +440,6 @@ export default function TreasureHunt({ onClose }) {
 
   const renderStartScreen = () => (
     <div>
-      <div className="hero" style={{ padding: '16px 0 6px' }}>
-        <div className="kana">熱海 · 社員旅行</div>
-        <div className="big" style={{ marginTop: 8 }}>Atami<em>Treasure Hunt</em></div>
-        <div className="rule" />
-        <p className="note">
-          Five checkpoints. {CONFIG.raceMinutes} minutes. One stamp each.<br />
-          All downhill, station to sea. About 30 minutes of walking.
-        </p>
-      </div>
-
-      <div className="card">
-        <div className="eyebrow" style={{ color: 'var(--red)' }}>The walk</div>
-        <ol className="route" style={{ marginTop: 10 }}>
-          {CONFIG.route.map((r, i) => (
-            <li key={i}>
-              <span className={`rt${r.tag === 'START' || r.tag === 'END' ? ' st' : ''}`}>{r.tag}</span>
-              <span className="rn">
-                <b>{esc(r.name)}</b>
-                <small>{esc(r.job)}</small>
-              </span>
-              {r.walk && <span className="rw">{esc(r.walk)}</span>}
-            </li>
-          ))}
-        </ol>
-        <p className="note" style={{ margin: '12px 0 0' }}>Each stop unlocks the next. Nobody gets the whole list up front.</p>
-      </div>
-
       <div className="card">
         <div className="eyebrow" style={{ color: 'var(--red)' }}>Step 1</div>
         <h2 className="display" style={{ fontSize: 24, margin: '4px 0 12px' }}>Pick your team</h2>
@@ -392,19 +468,6 @@ export default function TreasureHunt({ onClose }) {
             </button>
           ))}
         </div>
-        <label className="f" style={{ marginTop: 14, display: 'block' }}>
-          <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>Who's in the team?</span>
-          <input
-            type="text"
-            placeholder="Aisyah, Kenji, Farah, Wei Ling"
-            value={draft.members || ''}
-            onChange={(e) => setDraft((d) => ({ ...d, members: e.target.value }))}
-            style={{
-              width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-              border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-            }}
-          />
-        </label>
         <button
           className="btn block"
           style={{ marginTop: 14 }}
@@ -453,20 +516,8 @@ export default function TreasureHunt({ onClose }) {
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{S.teamName}</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--th-label)', letterSpacing: '.1em' }}>
-              {doneCount}/5 STAMPS
+              {doneCount}/{CONFIG.stamps} STAMPS
             </div>
-          </div>
-          <div style={{
-            fontFamily: '"DM Mono", monospace', fontSize: 20, fontWeight: 500,
-            padding: '2px 8px', border: '2px solid var(--gold)', color: 'var(--gold)',
-            borderRadius: 4,
-            ...(clockLeft() <= 300 ? { borderColor: 'var(--red)', color: '#fff', background: 'var(--red)', animation: 'pulse 1s infinite' } : {}),
-          }}>
-            {mmss(clockLeft())}
-          </div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 22, color: 'var(--gold)', lineHeight: 1 }}>
-            {scoreOf(S)}
-            <span style={{ fontFamily: '"DM Mono", monospace', fontSize: 9, display: 'block', color: 'var(--th-label)', letterSpacing: '.1em' }}>PTS</span>
           </div>
         </div>
       </div>
@@ -482,7 +533,7 @@ export default function TreasureHunt({ onClose }) {
         fontWeight: 900, fontSize: 19,
       }}>{KANJI[n - 1]}</div>
       <div>
-        <div className="eyebrow" style={{ color: 'var(--red)' }}>Checkpoint {n} of 5</div>
+        <div className="eyebrow" style={{ color: 'var(--red)' }}>Checkpoint {n} of {CONFIG.stamps}</div>
         <h2 className="display" style={{ fontSize: 25, margin: '2px 0 1px' }}>{title}</h2>
         <div className="kana">{kana}</div>
       </div>
@@ -747,7 +798,7 @@ export default function TreasureHunt({ onClose }) {
       <div className="card flag">
         {renderCpHead(4, 'Look around you', '周りを見ろ')}
         <div className="task">
-          <p style={{ margin: 0 }}>Go to <b>{esc(CONFIG.quiz.location)}</b>. Every answer is somewhere in sight. Phones down — this one isn't on the internet.</p>
+          <p style={{ margin: 0 }}>Stop where the committee sent you. Every answer is somewhere in sight. Phones down — this one isn't on the internet.</p>
         </div>
         {CONFIG.quiz.questions.map((q, i) => (
           <label key={i} className="f" style={{ display: 'block', marginBottom: 12 }}>
@@ -796,11 +847,267 @@ export default function TreasureHunt({ onClose }) {
     );
   };
 
-  const renderCp5 = () => {
+  /* ── CP5 — ask a stranger ─────────────────────────── */
+
+  const renderAsk = () => {
+    const done = CONFIG.ask.tasks.filter((t) => String(draft[t.key] || '').trim()).length;
+    const earned = askPoints(draft);
+    return (
+      <div className="card flag">
+        {renderCpHead(5, 'Ask a stranger', '声かけ')}
+        <div className="task">
+          <p>Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.</p>
+          <p style={{ margin: 0 }}>Ask before you photograph anyone. If they say no, thank them and find someone else.</p>
+        </div>
+        {CONFIG.ask.tasks.filter((t) => t.key !== 'photo').map((t) => (
+          <label key={t.key} className="f" style={{ display: 'block', marginBottom: 12 }}>
+            <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
+              {t.label}
+              <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+{t.pts}</b>
+            </span>
+            <input
+              type="text"
+              placeholder={t.hint}
+              value={draft[t.key] || ''}
+              onChange={(e) => setDraft((d) => ({ ...d, [t.key]: e.target.value }))}
+              style={{
+                width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
+                border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
+              }}
+            />
+          </label>
+        ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
+          Photo with them
+          <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+5</b>
+        </div>
+        {renderShot(draft.photo, 'Add the photo', 'Them and your whole team · optional')}
+        <button
+          className="btn block"
+          style={{ marginTop: 14 }}
+          disabled={done === 0}
+          onClick={() => {
+            const newS = { ...S };
+            newS.subs = {
+              ...(newS.subs || {}),
+              ask: { word: draft.word || '', rec: draft.rec || '', photo: draft.photo || null, at: Date.now() },
+            };
+            newS.stage = S.stage + 1;
+            saveState(newS.teamId, newS);
+            setS(newS);
+            setDraft({});
+            showToast('Stamp collected.');
+          }}
+          type="button"
+        >
+          Send it
+        </button>
+        <p className="note" style={{ margin: '12px 0 0' }}>
+          {done === 0
+            ? 'One of the three is enough to move on.'
+            : `${done} of 3 done · ${earned} bonus points so far.`}
+        </p>
+      </div>
+    );
+  };
+
+  /* ── CP6 — photo bingo ────────────────────────────────
+     Open as a panel from the first stamp, locked in here. */
+
+  const addBingoTile = async (i, file) => {
+    try {
+      const dataUrl = await compressImage(file, 420, 0.6);
+      const newS = { ...S, bingo: { ...(S.bingo || {}), [i]: dataUrl } };
+      if (!saveState(newS.teamId, newS)) {
+        showToast('Phone storage is full — clear a tile and retry.');
+        return;
+      }
+      setS(newS);
+    } catch {
+      showToast("That file didn't load. Try another.");
+    }
+  };
+
+  const clearBingoTile = (i) => {
+    const tiles = { ...(S.bingo || {}) };
+    delete tiles[i];
+    const newS = { ...S, bingo: tiles };
+    saveState(newS.teamId, newS);
+    setS(newS);
+  };
+
+  const renderBingoGrid = (locked) => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+      {CONFIG.bingo.tiles.map((label, i) => {
+        const shot = (S.bingo || {})[i];
+        const inner = (
+          <>
+            {shot && <img src={shot} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+            <span style={{
+              position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
+              fontSize: 9.5, lineHeight: 1.3, padding: 5,
+              color: shot ? '#fff' : 'var(--ink-soft)',
+              textShadow: shot ? '0 1px 4px rgba(0,0,0,.95)' : 'none',
+            }}>{label}</span>
+            {shot && !locked && (
+              <span
+                onClick={(e) => { e.preventDefault(); clearBingoTile(i); }}
+                style={{
+                  position: 'absolute', top: 3, right: 3, zIndex: 2, background: 'var(--card)',
+                  border: '2px solid var(--ink)', borderRadius: 5, width: 19, height: 19,
+                  display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900, lineHeight: 1,
+                }}
+              >×</span>
+            )}
+          </>
+        );
+        const box = {
+          position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
+          textAlign: 'center', overflow: 'hidden', borderRadius: 8,
+          border: shot ? 'var(--line)' : '3px dashed var(--th-dash)',
+          background: shot ? 'var(--ink)' : 'var(--th-parchment)',
+        };
+        if (locked) return <div key={i} style={box}>{inner}</div>;
+        return (
+          <label key={i} style={{ ...box, cursor: 'pointer' }}>
+            {inner}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files[0]; if (f) addBingoTile(i, f); e.target.value = ''; }}
+            />
+          </label>
+        );
+      })}
+    </div>
+  );
+
+  const renderBingo = (compact) => {
+    const tiles = S.bingo || {};
+    const filled = CONFIG.bingo.tiles.reduce((n, _, i) => n + (tiles[i] ? 1 : 0), 0);
+    const locked = !!S.subs?.bingo;
+    const lines = BINGO_LINES.filter((line) => line.every((i) => tiles[i])).length;
+
+    if (compact) {
+      if (locked) return null;
+      return (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <button
+            onClick={() => setBingoOpen((o) => !o)}
+            type="button"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              color: 'var(--ink)', textAlign: 'left',
+            }}
+          >
+            <b className="display" style={{ fontSize: 17 }}>Photo bingo</b>
+            <span className="note">{filled}/9 · {bingoPoints(tiles)} pts</span>
+            <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11 }}>{bingoOpen ? '▲' : '▼'}</span>
+          </button>
+          {bingoOpen && (
+            <div style={{ marginTop: 12 }}>
+              {renderBingoGrid(false)}
+              <p className="note" style={{ margin: '10px 0 0' }}>Fill these in whenever — walking, queueing, waiting. Locked in at checkpoint 6.</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="card flag">
+        {renderCpHead(6, 'Photo bingo', 'ビンゴ')}
+        <div className="task">
+          <p>Nine prompts, one photo each. {lines > 0
+            ? <b>{lines} line{lines > 1 ? 's' : ''} complete.</b>
+            : 'A full line — across, down or corner to corner — is worth an extra 3.'}</p>
+          <p style={{ margin: 0 }}>1 point a tile, +{CONFIG.bingo.linePts} a line, +{CONFIG.bingo.fullPts} for all nine.</p>
+        </div>
+        {renderBingoGrid(locked)}
+        <button
+          className="btn block"
+          style={{ marginTop: 14 }}
+          onClick={() => {
+            const newS = { ...S };
+            newS.subs = { ...(newS.subs || {}), bingo: { tiles: filled, points: bingoPoints(tiles), at: Date.now() } };
+            newS.stage = S.stage + 1;
+            saveState(newS.teamId, newS);
+            setS(newS);
+            showToast(`Card locked — ${bingoPoints(tiles)} points.`);
+          }}
+          type="button"
+        >
+          Lock the card in · {filled}/9
+        </button>
+        <p className="note" style={{ margin: '12px 0 0' }}>Blank tiles score nothing, but they do not cost you the stamp.</p>
+      </div>
+    );
+  };
+
+  /* ── CP7 — closest guess ──────────────────────────── */
+
+  const renderGuess = () => {
+    const answers = draft.answers || [];
+    const filledAll = CONFIG.guess.questions.every((_, i) => String(answers[i] ?? '').trim() !== '');
+    return (
+      <div className="card flag">
+        {renderCpHead(7, 'Closest guess', '目分量')}
+        <div className="task">
+          <p style={{ margin: 0 }}>
+            Nothing to look up — just call it. Spot on is {CONFIG.guess.exactPts} points,
+            within 10% is {CONFIG.guess.nearPts}, within 25% is {CONFIG.guess.closePts}.
+            A wrong answer still pays if you are in the region.
+          </p>
+        </div>
+        {CONFIG.guess.questions.map((q, i) => (
+          <label key={i} className="f" style={{ display: 'block', marginBottom: 12 }}>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {esc(q)}</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder="Your number"
+              value={answers[i] ?? ''}
+              onChange={(e) => {
+                const next = [...answers];
+                next[i] = e.target.value;
+                setDraft((d) => ({ ...d, answers: next }));
+              }}
+              style={{
+                width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
+                border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
+              }}
+            />
+          </label>
+        ))}
+        <button
+          className="btn block"
+          disabled={!filledAll}
+          onClick={() => {
+            const newS = { ...S };
+            newS.subs = { ...(newS.subs || {}), guess: { answers, at: Date.now() } };
+            newS.stage = S.stage + 1;
+            saveState(newS.teamId, newS);
+            setS(newS);
+            setDraft({});
+            showToast('Numbers in. Stamp collected.');
+          }}
+          type="button"
+        >
+          Send the numbers
+        </button>
+        <p className="note" style={{ margin: '12px 0 0' }}>The committee marks these at the finish, so the board can still move.</p>
+      </div>
+    );
+  };
+
+  const renderCheer = () => {
     const v = draft.video;
     return (
       <div className="card flag">
-        {renderCpHead(5, 'The team cheer', 'チームコール')}
+        {renderCpHead(8, 'The team cheer', 'チームコール')}
         <div className="task">
           <p><b>{CONFIG.video.seconds} seconds. One take.</b> Your team cheer — chant, dance, war cry, whatever you invented on the way here.</p>
           <p style={{ margin: 0 }}>Everyone on camera. Say "Atami" once. Loud enough to embarrass yourselves.</p>
@@ -851,7 +1158,7 @@ export default function TreasureHunt({ onClose }) {
           disabled={!v || v.seconds > CONFIG.video.maxSeconds}
           onClick={() => {
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cp5: { name: v.name, seconds: v.seconds, at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), cheer: { name: v.name, seconds: v.seconds, at: Date.now() } };
             newS.finishedAt = Date.now();
             newS.stage = S.stage + 1;
             saveState(newS.teamId, newS);
@@ -870,20 +1177,32 @@ export default function TreasureHunt({ onClose }) {
   const renderUnlock = (to) => {
     const copy = {
       cp2: {
-        h: 'Head down to Sakimicho',
-        p: `Keep walking downhill from the hotel. Somewhere on that slope is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team's, so following them won't help.`,
+        h: 'Find the spot',
+        p: `Somewhere along the way is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team's, so following another team won't help.`,
       },
       cp3: {
-        h: 'Down to Jacaranda Promenade',
-        p: `Carry on to the promenade and the Ginza shops behind it. ¥${CONFIG.buy.budgetYen} for the team, one thing none of you have tried, everyone tastes it.`,
+        h: 'Buy it, try it',
+        p: `Find the shops. ¥${CONFIG.buy.budgetYen} for the team, one thing none of you have tried, everyone tastes it.`,
       },
       cp4: {
-        h: 'Cut inland to Itokawa',
-        p: `Head to ${CONFIG.quiz.location}. Five questions, every answer within sight. Nothing to google.`,
+        h: 'Look around you',
+        p: `Five questions, every answer within sight of where you're standing. Nothing to google.`,
       },
-      cp5: {
-        h: 'Last one — back to the sea',
-        p: `Walk down to the Water Park seafront and film your cheer with the water behind you. That's the finish: ${CONFIG.finishPoint}`,
+      ask: {
+        h: 'Talk to a stranger',
+        p: `Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo. Start counting vending machines from here; you will be asked.`,
+      },
+      bingo: {
+        h: 'Bingo card — lock it in',
+        p: `Last call on the nine photo prompts. Anything still blank when you lock the card stays blank, so fill what you can on the way.`,
+      },
+      guess: {
+        h: 'Three numbers',
+        p: `No looking anything up, no counting twice. Closest guess takes the points — and being roughly right still pays.`,
+      },
+      cheer: {
+        h: 'Last one',
+        p: `Film your team cheer, then walk it in. ${CONFIG.finishPoint}`,
       },
     }[to];
     return (
@@ -933,7 +1252,10 @@ export default function TreasureHunt({ onClose }) {
       }, 100);
       return <p className="note" style={{ textAlign: 'center', padding: 20 }}>Finishing...</p>;
     }
-    const renderers = { cp1: renderCp1, cp2a: renderCp2a, cp2b: renderCp2b, cp3: renderCp3, cp4: renderCp4, cp5: renderCp5 };
+    const renderers = {
+      cp1: renderCp1, cp2a: renderCp2a, cp2b: renderCp2b, cp3: renderCp3, cp4: renderCp4,
+      ask: renderAsk, bingo: () => renderBingo(false), guess: renderGuess, cheer: renderCheer,
+    };
     const fn = renderers[st.key];
     return fn ? fn() : null;
   };
@@ -944,7 +1266,10 @@ export default function TreasureHunt({ onClose }) {
       ['2', 'Selfie + riddle', CONFIG.points.checkpoint],
       ['3', 'Buy &amp; try', CONFIG.points.checkpoint],
       ['4', `Observation quiz (${S.subs?.cp4?.correct ?? 0} auto-marked)`, CONFIG.points.checkpoint + (S.subs?.cp4?.correct || 0) * CONFIG.points.quizPerAnswer],
-      ['5', 'Team cheer', CONFIG.points.checkpoint],
+      ['5', 'Ask a stranger', CONFIG.points.checkpoint + askPoints(S.subs?.ask)],
+      ['6', `Photo bingo (${S.subs?.bingo?.tiles ?? 0}/9)`, CONFIG.points.checkpoint + (S.subs?.bingo?.points || 0)],
+      ['7', 'Closest guess (committee marks it)', CONFIG.points.checkpoint + guessPoints(S.subs?.guess)],
+      ['8', 'Team cheer', CONFIG.points.checkpoint],
     ];
     const used = CONFIG.raceMinutes * 60 - clockLeft();
     const doneStamps = new Set(
@@ -954,7 +1279,7 @@ export default function TreasureHunt({ onClose }) {
       <div>
         {renderStampRally()}
         <div className="hero" style={{ padding: '10px 0' }}>
-          <div className="big" style={{ fontSize: 'clamp(40px, 13vw, 62px)' }}>All five<em>stamped</em></div>
+          <div className="big" style={{ fontSize: 'clamp(40px, 13vw, 62px)' }}>All eight<em>stamped</em></div>
           <div className="rule" />
         </div>
         <div className="card">
@@ -1077,7 +1402,7 @@ export default function TreasureHunt({ onClose }) {
                 <tbody>
                   {allRuns.map((run, i) => {
                     const done = new Set(
-                      Object.keys(run.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter(Boolean)
+                      Object.keys(run.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter((v) => v != null)
                     );
                     const left = run.startedAt
                       ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
@@ -1089,9 +1414,9 @@ export default function TreasureHunt({ onClose }) {
                           <br /><span className="note">{run.members || '—'}</span>
                         </td>
                         <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
-                          {[0, 1, 2, 3, 4].map((si) => (
+                          {SLOTS.map((si) => (
                             <span key={si} style={{
-                              display: 'inline-block', width: 13, height: 13, borderRadius: '50%',
+                              display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
                               border: '2px solid var(--ink)', marginRight: 3,
                               background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
                             }} />
@@ -1110,15 +1435,41 @@ export default function TreasureHunt({ onClose }) {
               </table>
             </div>
 
+            {/* Closest-guess answer key */}
+            <div className="card">
+              <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Closest guess — true answers</div>
+              {CONFIG.guess.questions.map((q, i) => (
+                <label key={i} className="f" style={{ display: 'block', marginBottom: 10 }}>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 5 }}>{i + 1}. {esc(q)}</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="Leave blank to leave unmarked"
+                    value={loadAnswers()[i] ?? ''}
+                    onChange={(e) => {
+                      saveAnswers({ ...loadAnswers(), [i]: e.target.value });
+                      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
+                    }}
+                    style={{
+                      width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '9px 12px',
+                      border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
+                    }}
+                  />
+                </label>
+              ))}
+              <p className="note" style={{ margin: 0 }}>Every team's score updates the moment you type. Blank means nobody scores that one.</p>
+            </div>
+
             {/* Team panels */}
             {allRuns.map((run, i) => {
               const s = run.subs || {};
-              const imgs = [s.cp1?.photo, s.cp2a?.photo, s.cp3?.photo, s.cp4?.photo].filter(Boolean);
+              const imgs = [s.cp1?.photo, s.cp2a?.photo, s.cp3?.photo, s.cp4?.photo, s.ask?.photo].filter(Boolean);
+              const bingoShots = Object.keys(run.bingo || {}).map((k) => run.bingo[k]);
               return (
                 <div key={i} className="card">
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                     <b className="display" style={{ fontSize: 20 }}>{esc(run.teamName)}</b>
-                    <span className="note" style={{ marginLeft: 'auto' }}>{Object.keys(s).filter((k) => k !== 'cp2a').length}/5</span>
+                    <span className="note" style={{ marginLeft: 'auto' }}>{Object.keys(s).filter((k) => k !== 'cp2a').length}/{CONFIG.stamps}</span>
                   </div>
                   {imgs.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 10 }}>
@@ -1131,7 +1482,31 @@ export default function TreasureHunt({ onClose }) {
                     background: s.cp4.correct ? 'rgba(143,190,126,.3)' : 'var(--th-slot)',
                     color: s.cp4.correct ? '#2f6b1f' : 'var(--ink-soft)',
                   }}>{s.cp4.correct} auto-marked</span></p>}
-                  {s.cp5 && <p className="note">VIDEO — {esc(s.cp5.name)} · {s.cp5.seconds}s (held on the team's phone)</p>}
+                  {s.ask && (
+                    <p className="note">
+                      STRANGER — word: {esc(s.ask.word || '—')} · rec: {esc(s.ask.rec || '—')} · photo: {s.ask.photo ? 'yes' : 'no'}
+                      <span className="tag">+{askPoints(s.ask)}</span>
+                    </p>
+                  )}
+                  {s.bingo && (
+                    <div>
+                      <p className="note">BINGO — {s.bingo.tiles}/9 <span className="tag">+{s.bingo.points}</span></p>
+                      {bingoShots.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 5 }}>
+                          {bingoShots.map((img, bi) => (
+                            <img key={bi} src={img} alt="" style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {s.guess && (
+                    <p className="note">
+                      GUESSES — {(s.guess.answers || []).map((a, gi) => `${gi + 1}. ${esc(a)}`).join(' · ')}
+                      <span className="tag">+{guessPoints(s.guess)}</span>
+                    </p>
+                  )}
+                  {s.cheer && <p className="note">VIDEO — {esc(s.cheer.name)} · {s.cheer.seconds}s (held on the team's phone)</p>}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
                     {bonuses.map((b) => (
                       <button
@@ -1187,6 +1562,7 @@ export default function TreasureHunt({ onClose }) {
       {view === 'race' && (
         <div>
           {renderStampRally()}
+          {FLOW[S.stage]?.key !== 'bingo' && renderBingo(true)}
           {renderStage()}
         </div>
       )}
