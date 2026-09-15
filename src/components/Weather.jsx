@@ -256,18 +256,14 @@ export default function WeatherWidget() {
       )}
 
       {/* What am I looking at? */}
-      {data && (
-        <div className={`rounded-lg p-3.5 mt-2.5 border ${
-          data.mode === 'live' ? 'border-gray-200 bg-white' : 'border-gold'
-        }`}>
+      {data && data.mode === 'live' && (
+        <div className="rounded-lg p-3.5 mt-2.5 border border-gray-200 bg-white">
           <p className="text-sm font-medium mb-0.5">
-            {data.mode === 'live' ? '📡 Live forecast' : '📊 Typical late October'}
+            📡 Live forecast
             <span className="note font-normal"> · Open-Meteo</span>
           </p>
           <p className="text-xs text-gray-500 leading-relaxed">
-            {data.mode === 'live'
-              ? 'Actual forecast for the trip dates, refreshed from Open-Meteo.'
-              : ''}
+            Actual forecast for the trip dates, refreshed from Open-Meteo.
             {data.cached && ' Showing the last saved copy — you appear to be offline.'}
           </p>
         </div>

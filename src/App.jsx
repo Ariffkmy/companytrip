@@ -1,9 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import schedule from './data/schedule';
-import groupRoster from './data/groupRoster';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
-import Album from './components/Album';
 import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
@@ -49,8 +47,6 @@ function ThemeToggle({ dark, onToggle }) {
 const TABS = [
   { id: 'home', label: 'Home' },
   { id: 'itinerary', label: 'Itinerary' },
-  { id: 'group', label: 'Group' },
-  { id: 'album', label: 'Album' },
 ];
 
 /* 24px outline glyphs for the mobile tab bar, drawn to one stroke
@@ -63,24 +59,10 @@ const TAB_ICONS = {
       <path d="M4 9.5h16M8.5 3v4M15.5 3v4M8 13.5h3M8 16.5h6" />
     </>
   ),
-  group: (
-    <>
-      <circle cx="9" cy="8.5" r="3" />
-      <path d="M3.5 19.5c.6-3 2.8-4.7 5.5-4.7s4.9 1.7 5.5 4.7" />
-      <path d="M15.5 5.8a3 3 0 0 1 0 5.4M17.5 14.9c1.6.6 2.7 2 3 4.6" />
-    </>
-  ),
   admin: (
     <>
       <path d="M12 3.5 5 6.2v5.3c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6.2z" />
       <path d="m9 12 2 2 4-4" />
-    </>
-  ),
-  album: (
-    <>
-      <rect x="3.5" y="5.5" width="17" height="14" rx="2" />
-      <circle cx="9" cy="10.5" r="1.75" />
-      <path d="m4 17.5 5-4.5 3.5 3 3-2.5 4.5 4" />
     </>
   ),
 };
@@ -97,25 +79,6 @@ function PageHead({ kicker, title, accent, lede }) {
       {lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{lede}</p>}
     </div>
   );
-}
-
-function copyText(t) {
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(t).catch(() => fallbackCopy(t));
-  } else {
-    fallbackCopy(t);
-  }
-}
-
-function fallbackCopy(t) {
-  const ta = document.createElement('textarea');
-  ta.value = t;
-  ta.style.position = 'fixed';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  try { document.execCommand('copy'); } catch (e) { /* silent */ }
-  ta.remove();
 }
 
 /* ── ActivityCard ──────────────────────────────────── */
@@ -256,78 +219,6 @@ function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay }) {
       {schedule.map((day, i) => (
         <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} />
       ))}
-    </section>
-  );
-}
-
-/* ── Group ──────────────────────────────────────────── */
-/* Lead and JP Speaker are the two you need to find fast, so they are
-   the only rows that carry a badge. */
-const ROLE_STYLE = {
-  'Team Lead': 'text-sea',
-  'JP Speaker': 'text-gold',
-};
-
-function Group() {
-  const [openGroups, setOpenGroups] = useState([0]);
-
-  const toggleGroup = (idx) => {
-    setOpenGroups((prev) => prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]);
-  };
-
-  return (
-    <section>
-      <PageHead
-        kicker="Roster"
-        title="The"
-        accent="Teams"
-        lede="Five teams, each with a Team Lead and a Japanese speaker. Know both before you need them."
-      />
-
-      <div className="space-y-2.5">
-        {groupRoster.map((g, gi) => (
-          <div key={g.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden transition-shadow hover:shadow-sm">
-            <button
-              onClick={() => toggleGroup(gi)}
-              type="button"
-              className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 cursor-pointer"
-            >
-              <span className="font-display text-base tracking-wide">{g.name}</span>
-              <span className="text-xs text-gray-400 font-mono">{g.members.length} pax</span>
-              <span className={`ml-auto text-gray-400 text-xs transition-transform ${openGroups.includes(gi) ? 'rotate-90' : ''}`}>▶</span>
-            </button>
-            {openGroups.includes(gi) && (
-              <div className="px-4 pb-3 border-t border-gray-100">
-                {g.members.map((m) => (
-                  <div key={m.name} className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-100 last:border-b-0">
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium leading-snug">
-                        {m.name}
-                        {ROLE_STYLE[m.role] && (
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider ml-2 ${ROLE_STYLE[m.role]}`}>
-                            {m.role}
-                          </span>
-                        )}
-                      </span>
-                      {m.full && (
-                        <span className="block text-[11px] text-gray-400 leading-snug mt-0.5 truncate">{m.full}</span>
-                      )}
-                    </span>
-                    {m.phone ? (
-                      <span className="text-xs font-mono text-gray-400 shrink-0 whitespace-nowrap">
-                        {m.phone}
-                        <button onClick={() => copyText(m.phone)} type="button" className="ml-2 text-xs text-gray-400 hover:text-sea underline underline-offset-2">Copy</button>
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-mono text-gray-300 shrink-0">no number</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
@@ -503,11 +394,9 @@ export default function App() {
             setActiveDay={setItinDay}
           />
         )}
-        {tab === 'group' && <Group />}
         {tab === 'admin' && auth.isAdmin && (
           <Admin currentEmail={auth.user?.email} onSelfChanged={auth.refreshMember} />
         )}
-        {tab === 'album' && <Album userId={auth.user?.id} isAdmin={auth.isAdmin} />}
         {tab === 'safety' && <Safety />}
       </div>
     </>
