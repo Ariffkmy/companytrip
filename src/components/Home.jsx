@@ -46,9 +46,9 @@ function Jump({ onGo, onOpenTreasureHunt }) {
 export default function Home({ onGo, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
+      <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       <ForexWidget />
-      <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <Jump onGo={onGo} onOpenTreasureHunt={onOpenTreasureHunt} />
 
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">

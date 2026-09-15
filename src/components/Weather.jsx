@@ -267,7 +267,7 @@ export default function WeatherWidget() {
           <p className="text-xs text-gray-500 leading-relaxed">
             {data.mode === 'live'
               ? 'Actual forecast for the trip dates, refreshed from Open-Meteo.'
-              : `The trip is still beyond any real forecast — no service predicts this far out. These are the same five calendar days averaged over the last ${days.find((d) => d)?.years ?? 5} years, which is what to pack by. Precipitation % is how often those years were actually wet. The live forecast replaces this automatically about two weeks before departure.`}
+              : ''}
             {data.cached && ' Showing the last saved copy — you appear to be offline.'}
           </p>
         </div>
