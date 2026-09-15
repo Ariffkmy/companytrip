@@ -17,11 +17,15 @@ npm run dev
 The app requires sign-in (email + password). Accounts are invite-only: the committee invites each participant, and only allowlisted emails can be invited.
 
 1. Create a Supabase project, then copy `.env.example` to `.env.local` and fill in the project URL and publishable key (Project Settings → API).
-2. Run `supabase/migrations/20260914000000_auth_allowlist.sql` in the SQL editor (or `supabase db push`).
+2. Run both files in `supabase/migrations/`, in filename order, in the SQL editor (or `supabase db push`).
 3. Add each participant to the allowlist (emails lowercase):
    ```sql
    insert into public.allowed_emails (email, full_name, team, role)
    values ('someone@company.com', 'Someone', 'Team 1', 'Member');
+   ```
+   To make someone an admin (can manage the allowlist), set `is_admin`:
+   ```sql
+   update public.allowed_emails set is_admin = true where email = 'someone@company.com';
    ```
 4. Invite them: Authentication → Users → **Invite user**. The email link opens the app on a "Welcome aboard" screen where they set their password. Invites for emails not on the allowlist are refused.
 5. Authentication → Sign In / Providers: turn **off** "Allow new users to sign up". There is no sign-up form in the app; this closes the API route too (invites still work).

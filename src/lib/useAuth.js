@@ -40,11 +40,27 @@ export function useAuth() {
     return () => data.subscription.unsubscribe();
   }, []);
 
+  /* Admin is decided server-side (public.is_admin). Asked in its own
+     effect: calling Supabase inside onAuthStateChange can deadlock the
+     auth lock. The flag only shows or hides UI — every admin write is
+     still checked by RLS. */
+  const userId = session?.user?.id;
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!supabase || !userId) { setIsAdmin(false); return undefined; }
+    let live = true;
+    supabase.rpc('is_admin').then(({ data, error }) => {
+      if (live && !error) setIsAdmin(data === true);
+    });
+    return () => { live = false; };
+  }, [userId]);
+
   return {
     configured: supabaseConfigured,
     loading,
     session,
     user: session?.user ?? null,
+    isAdmin,
     setup,
     endSetup: () => setSetup(null),
     signOut: () => supabase?.auth.signOut(),

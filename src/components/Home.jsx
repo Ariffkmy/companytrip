@@ -133,7 +133,7 @@ function Jump({ onGo, onOpenTreasureHunt }) {
   );
 }
 
-export default function Home({ onGo, onGoToDay, onOpenTreasureHunt, userEmail, onSignOut }) {
+export default function Home({ onGo, onGoToDay, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
   /* One read at mount is enough — nobody leaves this screen open
      across a date boundary, and a ticking clock here would be motion
      for its own sake. */
@@ -150,6 +150,9 @@ export default function Home({ onGo, onGoToDay, onOpenTreasureHunt, userEmail, o
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">
         <p className="note flex items-baseline gap-2 min-w-0">
           <span className="truncate">Signed in as {userEmail}</span>
+          {isAdmin && (
+            <span className="shrink-0 font-semibold uppercase tracking-wider text-red">Admin</span>
+          )}
           <button
             type="button"
             onClick={onSignOut}

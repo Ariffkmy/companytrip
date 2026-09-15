@@ -151,11 +151,19 @@
 
   /* Background illustration. A fixed pseudo-element rather than
      `background-attachment: fixed`, which iOS Safari ignores (it
-     scrolls the image and rescales it on every repaint). */
+     scrolls the image and rescales it on every repaint).
+     The art is portrait (941×1672), so it stays a centred phone-shaped
+     column at full viewport height: on desktop the sides are plain
+     paper; on a phone the column is the full width and crops a sliver
+     off the sides rather than letterboxing top and bottom. */
   body::before {
     content: "";
     position: fixed;
-    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: min(100vw, calc(100dvh * 941 / 1672));
+    transform: translateX(-50%);
     z-index: -1;
     pointer-events: none;
     background:

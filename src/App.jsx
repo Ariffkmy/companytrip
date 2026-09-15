@@ -51,6 +51,31 @@ const TABS = [
   { id: 'weather', label: 'Weather' },
 ];
 
+/* 24px outline glyphs for the mobile tab bar, drawn to one stroke
+   weight so the four read as a set. */
+const TAB_ICONS = {
+  home: <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />,
+  itinerary: (
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 9.5h16M8.5 3v4M15.5 3v4M8 13.5h3M8 16.5h6" />
+    </>
+  ),
+  group: (
+    <>
+      <circle cx="9" cy="8.5" r="3" />
+      <path d="M3.5 19.5c.6-3 2.8-4.7 5.5-4.7s4.9 1.7 5.5 4.7" />
+      <path d="M15.5 5.8a3 3 0 0 1 0 5.4M17.5 14.9c1.6.6 2.7 2 3 4.6" />
+    </>
+  ),
+  weather: (
+    <>
+      <path d="M7.5 18.5h9a3.5 3.5 0 0 0 .4-7A5 5 0 0 0 7.2 12a3.25 3.25 0 0 0 .3 6.5z" />
+      <path d="M17 4.5v1.2M20.9 7.1l-.9.9M13.1 7.1l.9.9" />
+    </>
+  ),
+};
+
 /* One header treatment, parameterised — rather than seven hand-rolled
    centred blocks that made every tab look like the same page. */
 function PageHead({ kicker, title, accent, lede }) {
@@ -384,8 +409,9 @@ export default function App() {
     <>
       <Header />
 
-      {/* Tab navigation — edge-faded so it is obvious the strip scrolls */}
-      <nav className="sticky top-13 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200">
+      {/* Tab navigation — desktop/tablet: strip under the header, edge-faded
+          so it is obvious it scrolls. Phones get the bottom bar instead. */}
+      <nav aria-label="Sections" className="hidden md:block sticky top-13 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-[640px] mx-auto nav-fade">
           <div className="flex gap-1 overflow-x-auto px-4 scrollbar-none">
             {TABS.map((t) => (
@@ -407,14 +433,57 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Content */}
-      <div className="max-w-[640px] mx-auto px-4 pb-14">
+      {/* Mobile tab bar — within thumb reach, the way native apps do it.
+          Pads for the iPhone home indicator (viewport-fit=cover is set). */}
+      <nav
+        aria-label="Sections"
+        className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="max-w-[640px] mx-auto grid grid-cols-4">
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => go(t.id)}
+                type="button"
+                aria-current={active ? 'page' : undefined}
+                className={`relative h-16 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors active:bg-gray-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red ${
+                  active ? 'text-red' : 'text-gray-400'
+                }`}
+              >
+                {active && <span aria-hidden="true" className="absolute top-0 inset-x-5 h-0.5 rounded-full bg-red" />}
+                <svg
+                  viewBox="0 0 24 24"
+                  width="24"
+                  height="24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={active ? 2 : 1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  {TAB_ICONS[t.id]}
+                </svg>
+                <span className={`text-[11px] leading-none ${active ? 'font-semibold text-ink' : 'font-medium'}`}>
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Content — extra bottom room on phones so the last card clears the tab bar */}
+      <div className="max-w-[640px] mx-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-14">
         {tab === 'home' && (
           <Home
             onGo={go}
             onGoToDay={goToDay}
             onOpenTreasureHunt={openTreasureHunt}
             userEmail={auth.user?.email}
+            isAdmin={auth.isAdmin}
             onSignOut={auth.signOut}
           />
         )}
