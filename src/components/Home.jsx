@@ -102,7 +102,7 @@ function Jump({ onGo, onOpenTreasureHunt }) {
 export default function Home({ onGo, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
-      <PhotoCarousel />
+      <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <Groups />
       <WeatherWidget />
       <ForexWidget />
