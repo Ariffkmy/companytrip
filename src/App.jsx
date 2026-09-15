@@ -367,9 +367,6 @@ export default function App() {
           className="flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer"
         >
           <span className="block font-display text-sm tracking-wide text-ink">Orangeleaf · Japan 2026</span>
-          <span className="block text-[10px] text-gray-400 font-mono tracking-wider truncate">
-            YOKOHAMA · KAMAKURA · ATAMI · 26+1 PAX
-          </span>
         </button>
 
         {/* Pinned, not a tab: the one screen you must never have to hunt for. */}
