@@ -12,6 +12,21 @@ npm install
 npm run dev
 ```
 
+## 🔐 Supabase auth (invite-only)
+
+The app requires sign-in (email + password). Accounts are invite-only: the committee invites each participant, and only allowlisted emails can be invited.
+
+1. Create a Supabase project, then copy `.env.example` to `.env.local` and fill in the project URL and publishable key (Project Settings → API).
+2. Run `supabase/migrations/20260914000000_auth_allowlist.sql` in the SQL editor (or `supabase db push`).
+3. Add each participant to the allowlist (emails lowercase):
+   ```sql
+   insert into public.allowed_emails (email, full_name, team, role)
+   values ('someone@company.com', 'Someone', 'Team 1', 'Member');
+   ```
+4. Invite them: Authentication → Users → **Invite user**. The email link opens the app on a "Welcome aboard" screen where they set their password. Invites for emails not on the allowlist are refused.
+5. Authentication → Sign In / Providers: turn **off** "Allow new users to sign up". There is no sign-up form in the app; this closes the API route too (invites still work).
+6. Authentication → URL Configuration: set **Site URL** to the deployed app URL and add `http://localhost:5173` to **Redirect URLs**, so invite and password-reset links land back in the app.
+
 ## 🔧 Build
 
 ```bash
@@ -24,7 +39,6 @@ npm run preview
 | Section | Description |
 |---------|-------------|
 | **🗓️ Itinerary** | 5-day tabbed timeline with collapsible activity cards, participant/committee prep lists |
-| **🍽️ Restaurants** | 18 venues across Atami/Yokohama/Kamakura with halal/pork-free/30pax filters + search |
 | **🚆 Logistics** | Transport table, weather, budget estimates, booking tips, flights |
 | **👥 Group** | 5 group rosters with leader/member phone copy |
 | **📞 Contact** | Key venue phone numbers |
@@ -39,10 +53,9 @@ Atami Stamp Rally aesthetic: Anton display font, Zen Kaku Gothic New body, DM Mo
 - **Flight**: AirAsia X KUL↔HND (D7522/D7523)
 - **Route**: Yokohama (2 nights) → Kamakura (day trip) → Atami (2 nights)
 - **Highlight**: Atami Seaside Fireworks — Sun 25 Oct, 8:20 PM
-- **Dietary**: Halal-first planning with certified options at ATAMI Sekaie, Khazana, Cinta Jawa
 
 ---
 
 ### Original Planning Docs
 
-The full restaurant survey, halal plan, email templates, and logistical research from the original README are preserved in the React app's data files (`src/data/schedule.js`, `src/data/restaurants.js`, `src/data/groupRoster.js`).
+The email templates, and logistical research from the original README are preserved in the React app's data files (`src/data/schedule.js`, `src/data/groupRoster.js`).

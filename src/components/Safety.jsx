@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ALERT_SETUP, EMERGENCY_NUMBERS, HAZARDS, REGROUP, PHRASES,
+  MEDICAL, MEDICAL_HOTLINES, MEDICAL_NOTES,
 } from '../data/safety';
 
 function Card({ eyebrow, title, children }) {
@@ -67,8 +68,63 @@ function Hazard({ hazard, open, onToggle }) {
   );
 }
 
+/* One area of the route, collapsed by default. Same pattern as Hazard:
+   on a phone the whole list open at once is unreadable. */
+function MedicalArea({ area, open, onToggle }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full flex items-center gap-3 px-4 py-3.5 text-left bg-transparent border-0 cursor-pointer"
+      >
+        <span className="text-2xl shrink-0">🏥</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-base tracking-wide">{area.area}</span>
+          <span className="block text-xs text-gray-500 leading-snug mt-0.5">{area.days}</span>
+        </span>
+        <span className={`text-gray-400 text-xs shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 pt-3 border-t border-gray-100">
+          <p className="text-xs text-gray-400 font-mono mb-3">{area.where}</p>
+
+          <div className="space-y-3">
+            {area.facilities.map((f) => (
+              <div key={f.name + f.phone} className="border border-gray-200 rounded-lg p-3.5">
+                <p className="text-sm font-medium leading-snug">{f.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{f.jp}</p>
+                <p className="inline-block mt-1.5 text-[10px] font-mono tracking-wide uppercase text-red border border-red rounded px-1.5 py-0.5">
+                  {f.tag}
+                </p>
+                <p className="text-xs text-gray-500 leading-relaxed mt-2">{f.address}</p>
+                <a
+                  href={`tel:${f.dial}`}
+                  className="inline-block mt-2 font-display text-lg tracking-wide text-red no-underline"
+                >
+                  {f.phone}
+                </a>
+                <p className="text-sm text-gray-600 leading-relaxed mt-1.5">{f.note}</p>
+              </div>
+            ))}
+          </div>
+
+          {area.warning && (
+            <p className="text-sm text-gray-600 leading-relaxed mt-3 border-l-2 border-red pl-3">
+              {area.warning}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Safety() {
   const [open, setOpen] = useState(null);
+  const [openArea, setOpenArea] = useState(null);
 
   return (
     <section>
@@ -135,6 +191,51 @@ export default function Safety() {
           </div>
         </div>
 
+        {/* Medical: nearest care at every stop on the itinerary. */}
+        <Card eyebrow="🩺 Not sure how bad it is?" title="Ask before you decide">
+          <div className="space-y-2">
+            {MEDICAL_HOTLINES.map((n) => (
+              <a
+                key={n.label + n.number}
+                href={`tel:${n.dial}`}
+                className={`flex items-center gap-3 p-3 rounded-lg no-underline border transition-colors active:bg-card-hover ${
+                  n.highlight ? 'border-red' : 'border-gray-200'
+                }`}
+              >
+                <span className="font-display text-lg tracking-wide text-red shrink-0 min-w-[92px]">
+                  {n.number}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{n.label}</span>
+                  <span className="block text-xs text-gray-500 leading-snug">{n.note}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+          <p className="note mt-3">
+            For a real emergency skip all of this and dial 119. The ambulance crew picks the
+            hospital — you do not.
+          </p>
+        </Card>
+
+        <div>
+          <h3 className="eyebrow mb-2 px-1">🏥 Hospitals along the route — tap a stop</h3>
+          <div className="space-y-2">
+            {MEDICAL.map((a) => (
+              <MedicalArea
+                key={a.id}
+                area={a}
+                open={openArea === a.id}
+                onToggle={() => setOpenArea(openArea === a.id ? null : a.id)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <Card eyebrow="💴 Before you walk in" title="How Japanese hospitals work">
+          <Bullets items={MEDICAL_NOTES} dot="bg-sea" />
+        </Card>
+
         <Card eyebrow="🔔 Before you fly" title="Turn on real alerts">
           <div className="space-y-3.5">
             {ALERT_SETUP.map((s) => (
@@ -174,7 +275,7 @@ export default function Safety() {
       </div>
 
       <p className="note text-center mt-5 pb-6">
-        Numbers verified Aug 2026 · confirm the embassy line before you travel
+        Numbers and hospitals verified Sept 2026 · confirm the embassy line and clinic hours before you travel
       </p>
     </section>
   );

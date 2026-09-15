@@ -40,7 +40,7 @@ export default defineConfig({
       },
 
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webp,woff2}'],
         // Any unknown route falls back to the shell — this is a SPA.
         navigateFallback: '/index.html',
         runtimeCaching: [

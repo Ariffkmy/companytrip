@@ -1,56 +1,71 @@
+/* ═══════════════════════════════════════════════════
+   Team arrangement, from the proposal deck (slide 10).
+
+   Five teams, each with a Team Lead and a JP Speaker. The short
+   names are the deck's own; `full` is the passport-style name
+   already held in this app, matched where the pairing is
+   unambiguous. Two members have no full name on file yet.
+
+   Phone numbers are deliberately null — the previous values in
+   this file were sequential dummies (012-555-01xx). A fake number
+   beside a real name is worse than no number in an app people
+   may open in an emergency. Fill these in before departure.
+   ═══════════════════════════════════════════════════ */
+
 const groupRoster = [
   {
-    id: 'group-a',
-    name: 'Group A',
-    leader: { name: 'RUBY BALASINGAM', phone: '012-555-0101' },
+    id: 'team-ruby',
+    name: 'Team Ruby',
     members: [
-      { name: 'ASHLEY ANG', phone: '012-555-0102' },
-      { name: 'KEVIN LEE', phone: '012-555-0103' },
-      { name: 'AMIR ARSHAD ABD AZIZ', phone: '012-555-0104' },
-      { name: 'KHAW HUAI YU', phone: '012-555-0105' },
+      { name: 'Nicholas', full: 'NICHOLAS (YAP WEI CHOONG)', role: 'Team Lead', phone: null },
+      { name: 'Chiew', full: 'CHIEW SOW DING', role: 'JP Speaker', phone: null },
+      { name: 'Amir', full: 'AMIR ARSHAD ABD AZIZ', role: 'Member', phone: null },
+      { name: 'Rabiatul', full: null, role: 'Member', phone: null },
+      { name: 'Ruby', full: 'RUBY BALASINGAM', role: 'Member', phone: null },
     ],
   },
   {
-    id: 'group-b',
-    name: 'Group B',
-    leader: { name: 'JAY ANIL SINGH SHEMAR', phone: '012-555-0106' },
+    id: 'team-sapphire',
+    name: 'Team Sapphire',
     members: [
-      { name: 'ONG YU HAN', phone: '012-555-0107' },
-      { name: 'ARIFF HAKIMI BIN CHIK', phone: '012-555-0108' },
-      { name: 'HELMI PUTERA BIN NURNASHRIQ AZIZ', phone: '012-555-0109' },
-      { name: 'MUHAMMAD HAIRULWAFIQ BIN HAIRUNIZAM', phone: '012-555-0110' },
+      { name: 'Helmi', full: 'HELMI PUTERA BIN NURNASHRIQ AZIZ', role: 'Team Lead', phone: null },
+      { name: 'Shahrul', full: 'SHAHRULNIZAM BIN AHMAD SHAMSUDDIN', role: 'JP Speaker', phone: null },
+      { name: 'Carmen', full: 'CARMEN SEE THOO', role: 'Member', phone: null },
+      { name: 'Jord', full: 'JORD TEN BULTE', role: 'Member', phone: null },
+      { name: 'Liyana', full: 'NUR LIYANA BINTI YAACOB', role: 'Member', phone: null },
     ],
   },
   {
-    id: 'group-c',
-    name: 'Group C',
-    leader: { name: 'LEE HOE JIN', phone: '012-555-0111' },
+    id: 'team-emerald',
+    name: 'Team Emerald',
     members: [
-      { name: 'REGINA MOEY', phone: '012-555-0112' },
-      { name: 'NUR AINA NAJWA BINTI NOR DAUMI', phone: '012-555-0113' },
-      { name: 'SHAHRULNIZAM BIN AHMAD SHAMSUDDIN', phone: '012-555-0114' },
-      { name: 'CHIEW SOW DING', phone: '012-555-0115' },
+      { name: 'Eleora', full: 'ELEORA LINA SCHWARTZ', role: 'Team Lead', phone: null },
+      { name: 'Aidan', full: null, role: 'JP Speaker', phone: null },
+      { name: 'Ariff', full: 'ARIFF HAKIMI BIN CHIK', role: 'Member', phone: null },
+      { name: 'Raf', full: 'RAF SWIGGERS', role: 'Member', phone: null },
+      { name: 'Ashley', full: 'ASHLEY ANG', role: 'Member', phone: null },
     ],
   },
   {
-    id: 'group-d',
-    name: 'Group D',
-    leader: { name: "ASMA' BINTI ZUBIR", phone: '012-555-0116' },
+    id: 'team-diamond',
+    name: 'Team Diamond',
     members: [
-      { name: 'JORD TEN BULTE', phone: '012-555-0117' },
-      { name: 'CARMEN SEE THOO', phone: '012-555-0118' },
-      { name: 'MOHD AIMAN HAKIM BIN SHAMSUL KAHAR', phone: '012-555-0119' },
-      { name: 'RAF SWIGGERS', phone: '012-555-0120' },
+      { name: 'Hairul', full: 'MUHAMMAD HAIRULWAFIQ BIN HAIRUNIZAM', role: 'Team Lead', phone: null },
+      { name: "Asma'", full: "ASMA' BINTI ZUBIR", role: 'JP Speaker', phone: null },
+      { name: 'Aina', full: 'NUR AINA NAJWA BINTI NOR DAUMI', role: 'Member', phone: null },
+      { name: 'Zaire', full: 'MOHD ZAIRE BIN RAMLI', role: 'Member', phone: null },
+      { name: 'Kevin', full: 'KEVIN LEE', role: 'Member', phone: null },
     ],
   },
   {
-    id: 'group-e',
-    name: 'Group E',
-    leader: { name: 'ELEORA LINA SCHWARTZ', phone: '012-555-0121' },
+    id: 'team-pearl',
+    name: 'Team Pearl',
     members: [
-      { name: 'MOHD ZAIRE BIN RAMLI', phone: '012-555-0122' },
-      { name: 'NICHOLAS (YAP WEI CHOONG)', phone: '012-555-0123' },
-      { name: 'NUR LIYANA BINTI YAACOB', phone: '012-555-0124' },
+      { name: 'Aiman', full: 'MOHD AIMAN HAKIM BIN SHAMSUL KAHAR', role: 'Team Lead', phone: null },
+      { name: 'Yu Han', full: 'ONG YU HAN', role: 'JP Speaker', phone: null },
+      { name: 'Ragina', full: 'REGINA MOEY', role: 'Member', phone: null },
+      { name: 'Jay', full: 'JAY ANIL SINGH SHEMAR', role: 'Member', phone: null },
+      { name: 'Huai Yu', full: 'KHAW HUAI YU', role: 'Member', phone: null },
     ],
   },
 ];

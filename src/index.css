@@ -1,3 +1,10 @@
+/* Hallmark · macrostructure: Workbench · tone: utilitarian travel-zine · anchor hue: red/flame
+ * fingerprint: bottom-aligned heading · asymmetric spans · negative-space dividers
+ *              · oversized solid CTA · no imagery · number-tick reveal
+ * theme: project-owned (Anton + Inter + JetBrains Mono · red/gold/sea · flame on black)
+ * pre-emit critique: P5 H5 E4 S5 R4 V4
+ */
+
 @import "tailwindcss";
 
 /* Class-based dark mode: <html class="dark"> */
@@ -44,6 +51,11 @@
 
   --scrollbar-thumb: #D1D5DB;
 
+  /* Wash laid over the background illustration. The art is busy and
+     saturated; without this, grey body text on the page heads drops
+     well under 4.5:1 wherever it crosses a lantern or a blossom. */
+  --bg-scrim: rgba(245, 243, 240, .84);
+
   /* Shared border + hard-shadow tokens (TreasureHunt inline styles) */
   --line: 2px solid var(--ink);
   --hard: 3px 3px 0 var(--ink);
@@ -58,15 +70,6 @@
   --th-body-alt: #D6DDE3;
   --th-stamp-glow: rgba(222, 59, 43, .15);
 
-  --tag-halal-bg: rgba(17, 104, 58, .09);
-  --tag-halal-fg: #11683a;
-  --tag-halal-bd: rgba(17, 104, 58, .22);
-  --tag-pork-bg: rgba(123, 92, 0, .09);
-  --tag-pork-fg: #7b5c00;
-  --tag-pork-bd: rgba(123, 92, 0, .22);
-  --tag-muslim-bg: rgba(37, 92, 143, .09);
-  --tag-muslim-fg: #255c8f;
-  --tag-muslim-bd: rgba(37, 92, 143, .22);
   --tag-group-bg: rgba(99, 82, 143, .09);
   --tag-group-fg: #63528f;
   --tag-group-bd: rgba(99, 82, 143, .22);
@@ -111,6 +114,8 @@
 
   --scrollbar-thumb: #3A3A44;
 
+  --bg-scrim: rgba(10, 10, 12, .8);
+
   --th-dash: #4A4A55;
   --th-rule: #3A3A44;
   --th-parchment: #1C1C21;
@@ -119,15 +124,6 @@
   --th-body-alt: #C4C4CE;
   --th-stamp-glow: rgba(255, 122, 26, .22);
 
-  --tag-halal-bg: rgba(123, 211, 90, .12);
-  --tag-halal-fg: #8FE06E;
-  --tag-halal-bd: rgba(123, 211, 90, .28);
-  --tag-pork-bg: rgba(255, 194, 77, .12);
-  --tag-pork-fg: #FFC24D;
-  --tag-pork-bd: rgba(255, 194, 77, .28);
-  --tag-muslim-bg: rgba(79, 195, 220, .12);
-  --tag-muslim-fg: #6FD4E9;
-  --tag-muslim-bd: rgba(79, 195, 220, .28);
   --tag-group-bg: rgba(178, 152, 255, .12);
   --tag-group-fg: #B298FF;
   --tag-group-bd: rgba(178, 152, 255, .28);
@@ -142,6 +138,8 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
+  /* clip, never hidden — `hidden` on the root kills position:sticky */
+  html, body { overflow-x: clip; }
   body {
     font-family: var(--font-body);
     background: var(--color-paper);
@@ -150,10 +148,39 @@
     -webkit-font-smoothing: antialiased;
   }
   .dark body { color-scheme: dark; }
+
+  /* Background illustration. A fixed pseudo-element rather than
+     `background-attachment: fixed`, which iOS Safari ignores (it
+     scrolls the image and rescales it on every repaint). */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--bg-scrim), var(--bg-scrim)),
+      url("/bg-japan.webp") center / cover no-repeat;
+  }
 }
 
 @layer utilities {
   .display { font-family: var(--font-display); letter-spacing: .02em; line-height: 1; text-transform: uppercase; }
+
+  /* Any run of figures that should align in a column, or count up
+     without the layout juddering as digit widths change. */
+  .tick { font-variant-numeric: tabular-nums; }
+
+  /* Tells the eye the tab strip continues past the right edge —
+     without a scrollbar, which mobile does not render. */
+  .nav-fade {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%);
+  }
+
+  /* Header is 52px; the nav sticks directly beneath it. */
+  .h-13 { height: 52px; }
+  .top-13 { top: 52px; }
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-ink-soft); }
   .note { font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-soft); }
 
@@ -163,7 +190,8 @@
     font-family: var(--font-display); font-size: 18px; letter-spacing: .04em;
     text-transform: uppercase; line-height: 1;
     padding: 14px 20px;
-    color: #fff; background: var(--color-red);
+    /* paper, not #fff — see Home.jsx: white on dark-mode flame is ~2.7:1 */
+    color: var(--color-paper); background: var(--color-red);
     border: var(--line); border-radius: 8px; box-shadow: var(--hard);
     cursor: pointer; transition: transform .08s ease, box-shadow .08s ease;
   }
