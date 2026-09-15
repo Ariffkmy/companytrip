@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import schedule from './data/schedule';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
+import Album from './components/Album';
 import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
@@ -47,6 +48,7 @@ function ThemeToggle({ dark, onToggle }) {
 const TABS = [
   { id: 'home', label: 'Home' },
   { id: 'itinerary', label: 'Itinerary' },
+  { id: 'album', label: 'Album' },
 ];
 
 /* 24px outline glyphs for the mobile tab bar, drawn to one stroke
@@ -57,6 +59,13 @@ const TAB_ICONS = {
     <>
       <rect x="4" y="5" width="16" height="15" rx="2" />
       <path d="M4 9.5h16M8.5 3v4M15.5 3v4M8 13.5h3M8 16.5h6" />
+    </>
+  ),
+  album: (
+    <>
+      <rect x="3.5" y="5.5" width="17" height="14" rx="2" />
+      <circle cx="9" cy="10.5" r="1.75" />
+      <path d="m4 17.5 5-4.5 3.5 3 3-2.5 4.5 4" />
     </>
   ),
   admin: (
@@ -394,6 +403,7 @@ export default function App() {
             setActiveDay={setItinDay}
           />
         )}
+        {tab === 'album' && <Album userId={auth.user?.id} isAdmin={auth.isAdmin} />}
         {tab === 'admin' && auth.isAdmin && (
           <Admin currentEmail={auth.user?.email} onSelfChanged={auth.refreshMember} />
         )}
