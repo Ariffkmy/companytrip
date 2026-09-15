@@ -89,7 +89,8 @@ function Chart({ hours, metric, unitF }) {
   );
 }
 
-export default function Weather() {
+/* Home-screen weather widget (formerly the Weather tab). */
+export default function WeatherWidget() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [city, setCity] = useState(CITIES[0].id);
@@ -117,14 +118,10 @@ export default function Weather() {
   const t = (c) => Math.round(unitF ? toF(c) : c);
 
   return (
-    <section>
-      <div className="py-8 text-center">
-        <p className="text-xs text-gray-400 font-mono tracking-widest uppercase">22–26 Oct 2026</p>
-        <h1 className="display text-3xl sm:text-4xl mt-2">
-          Weather <span className="text-red">Forecast</span>
-        </h1>
-        <p className="text-sm text-gray-500 mt-2">Yokohama · Kamakura · Atami</p>
-      </div>
+    <section className="pt-9" aria-labelledby="wx-h">
+      <h2 id="wx-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+        Weather · 22–26 Oct
+      </h2>
 
       {/* City */}
       <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 mb-3">
@@ -260,11 +257,12 @@ export default function Weather() {
 
       {/* What am I looking at? */}
       {data && (
-        <div className={`rounded-lg p-3.5 mt-4 border ${
+        <div className={`rounded-lg p-3.5 mt-2.5 border ${
           data.mode === 'live' ? 'border-gray-200 bg-white' : 'border-gold'
         }`}>
           <p className="text-sm font-medium mb-0.5">
             {data.mode === 'live' ? '📡 Live forecast' : '📊 Typical late October'}
+            <span className="note font-normal"> · Open-Meteo</span>
           </p>
           <p className="text-xs text-gray-500 leading-relaxed">
             {data.mode === 'live'
@@ -275,7 +273,6 @@ export default function Weather() {
         </div>
       )}
 
-      <p className="note text-center mt-5 pb-6">Open-Meteo</p>
     </section>
   );
 }

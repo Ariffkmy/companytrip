@@ -3,7 +3,7 @@ import schedule from './data/schedule';
 import groupRoster from './data/groupRoster';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
-import Weather from './components/Weather';
+import Album from './components/Album';
 import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
@@ -50,7 +50,7 @@ const TABS = [
   { id: 'home', label: 'Home' },
   { id: 'itinerary', label: 'Itinerary' },
   { id: 'group', label: 'Group' },
-  { id: 'weather', label: 'Weather' },
+  { id: 'album', label: 'Album' },
 ];
 
 /* 24px outline glyphs for the mobile tab bar, drawn to one stroke
@@ -76,10 +76,11 @@ const TAB_ICONS = {
       <path d="m9 12 2 2 4-4" />
     </>
   ),
-  weather: (
+  album: (
     <>
-      <path d="M7.5 18.5h9a3.5 3.5 0 0 0 .4-7A5 5 0 0 0 7.2 12a3.25 3.25 0 0 0 .3 6.5z" />
-      <path d="M17 4.5v1.2M20.9 7.1l-.9.9M13.1 7.1l.9.9" />
+      <rect x="3.5" y="5.5" width="17" height="14" rx="2" />
+      <circle cx="9" cy="10.5" r="1.75" />
+      <path d="m4 17.5 5-4.5 3.5 3 3-2.5 4.5 4" />
     </>
   ),
 };
@@ -351,13 +352,6 @@ export default function App() {
   }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
 
-  /* Home deep-links into a specific day of the itinerary. */
-  const goToDay = useCallback((i) => {
-    setItinDay(i);
-    setTab('itinerary');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
   const go = useCallback((id) => {
     setTab(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -499,7 +493,6 @@ export default function App() {
         {tab === 'home' && (
           <Home
             onGo={go}
-            onGoToDay={goToDay}
             onOpenTreasureHunt={openTreasureHunt}
             userEmail={auth.user?.email}
             isAdmin={auth.isAdmin}
@@ -517,7 +510,7 @@ export default function App() {
         {tab === 'admin' && auth.isAdmin && (
           <Admin currentEmail={auth.user?.email} onSelfChanged={auth.refreshMember} />
         )}
-        {tab === 'weather' && <Weather />}
+        {tab === 'album' && <Album userId={auth.user?.id} isAdmin={auth.isAdmin} />}
         {tab === 'safety' && <Safety />}
       </div>
     </>
