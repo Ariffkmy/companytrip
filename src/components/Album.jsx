@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PAGE_SIZE, deletePhoto, formatUploaded, listPhotos, uploadPhoto } from '../lib/album';
+import schedule from '../data/schedule';
+
+/* D0–D5 only: the days people are actually out taking photos. */
+const DAY_TABS = [
+  { id: 'all', label: 'All' },
+  ...schedule.slice(0, 6).map((d) => ({ id: d.day, label: d.day, date: d.date })),
+];
+
+function dateKey(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function friendly(err) {
   const msg = err?.message ?? '';
@@ -82,6 +94,7 @@ export default function Album({ userId, isAdmin }) {
   const [upload, setUpload] = useState(null); // { done, total, failed }
   const [open, setOpen] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [dayFilter, setDayFilter] = useState('all');
 
   const load = useCallback(async () => {
     try {
@@ -150,6 +163,10 @@ export default function Album({ userId, isAdmin }) {
   }
 
   const uploading = Boolean(upload);
+  const activeTab = DAY_TABS.find((t) => t.id === dayFilter);
+  const filteredPhotos = !photos ? photos
+    : dayFilter === 'all' ? photos
+    : photos.filter((p) => dateKey(p.created_at) === activeTab.date);
 
   return (
     <section>
@@ -195,22 +212,46 @@ export default function Album({ userId, isAdmin }) {
         </div>
       ) : (
         <>
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-7">
-            {photos.map((p, i) => (
-              <li key={p.id} className="min-w-0">
-                <button type="button" onClick={() => setOpen(i)}
-                  className="block w-full text-left cursor-pointer rounded-lg overflow-hidden bg-white border border-gray-200 focus-visible:outline-2 focus-visible:outline-red">
-                  <span className="block aspect-square bg-gray-100">
-                    {p.thumb && <img src={p.thumb} alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
-                  </span>
-                  <span className="block px-2.5 py-2">
-                    <span className="block text-[13px] font-medium leading-snug truncate">{p.uploader_name}</span>
-                    <span className="block font-mono text-[10px] text-gray-400 truncate">{formatUploaded(p.created_at)}</span>
-                  </span>
-                </button>
-              </li>
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 mt-7">
+            {DAY_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setDayFilter(t.id)}
+                className={`flex-none px-3.5 py-2 rounded-lg font-display text-sm tracking-wide transition-colors ${
+                  t.id === dayFilter
+                    ? 'bg-ink dark:bg-flame text-white'
+                    : 'bg-white text-gray-500 border border-gray-200 active:border-gray-300'
+                }`}
+              >
+                {t.label}
+              </button>
             ))}
-          </ul>
+          </div>
+
+          {filteredPhotos.length === 0 ? (
+            <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-10 text-center">
+              <p className="font-display text-lg tracking-wide">No photos for {activeTab.label} yet</p>
+              <p className="text-sm text-gray-500 mt-1">They’ll show up here once someone adds one.</p>
+            </div>
+          ) : (
+            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-4">
+              {filteredPhotos.map((p) => (
+                <li key={p.id} className="min-w-0">
+                  <button type="button" onClick={() => setOpen(photos.indexOf(p))}
+                    className="block w-full text-left cursor-pointer rounded-lg overflow-hidden bg-white border border-gray-200 focus-visible:outline-2 focus-visible:outline-red">
+                    <span className="block aspect-square bg-gray-100">
+                      {p.thumb && <img src={p.thumb} alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                    </span>
+                    <span className="block px-2.5 py-2">
+                      <span className="block text-[13px] font-medium leading-snug truncate">{p.uploader_name}</span>
+                      <span className="block font-mono text-[10px] text-gray-400 truncate">{formatUploaded(p.created_at)}</span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {hasMore && (
             <button type="button" onClick={loadMore} disabled={loadingMore}
               className="mt-5 w-full h-11 rounded-lg border border-gray-200 bg-white text-sm font-medium cursor-pointer disabled:cursor-wait">
