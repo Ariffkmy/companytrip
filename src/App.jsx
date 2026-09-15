@@ -6,7 +6,9 @@ import Safety from './components/Safety';
 import Weather from './components/Weather';
 import Home from './components/Home';
 import Login from './components/Login';
+import Admin from './components/Admin';
 import { useAuth } from './lib/useAuth';
+import { cachedHuntConfig, fetchHuntConfig } from './lib/huntConfig';
 
 const THEME_KEY = 'olc-theme';
 
@@ -66,6 +68,12 @@ const TAB_ICONS = {
       <circle cx="9" cy="8.5" r="3" />
       <path d="M3.5 19.5c.6-3 2.8-4.7 5.5-4.7s4.9 1.7 5.5 4.7" />
       <path d="M15.5 5.8a3 3 0 0 1 0 5.4M17.5 14.9c1.6.6 2.7 2 3 4.6" />
+    </>
+  ),
+  admin: (
+    <>
+      <path d="M12 3.5 5 6.2v5.3c0 4.2 3 7.6 7 9 4-1.4 7-4.8 7-9V6.2z" />
+      <path d="m9 12 2 2 4-4" />
     </>
   ),
   weather: (
@@ -331,7 +339,16 @@ export default function App() {
   const [dark, toggleTheme] = useTheme();
   const auth = useAuth();
 
-  const openTreasureHunt = useCallback(() => setTreasureOpen(true), []);
+  /* Re-read the team on the way in: an admin may have just assigned it. */
+  const { refreshMember } = auth;
+  /* Hunt content is edited by admins. Open with the phone's last copy
+     straight away, then swap in the latest if there is signal. */
+  const [huntConfig, setHuntConfig] = useState(() => cachedHuntConfig());
+  const openTreasureHunt = useCallback(() => {
+    refreshMember();
+    fetchHuntConfig().then(({ config }) => setHuntConfig(config));
+    setTreasureOpen(true);
+  }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
 
   /* Home deep-links into a specific day of the itinerary. */
@@ -383,6 +400,8 @@ export default function App() {
      login form at someone already signed in reads as being logged out. */
   if (auth.loading) return null;
 
+  const tabs = auth.isAdmin ? [...TABS, { id: 'admin', label: 'Admin' }] : TABS;
+
   if (!auth.session || auth.setup) {
     return (
       <Login
@@ -399,7 +418,7 @@ export default function App() {
       <>
         <Header />
         <div className="max-w-[640px] mx-auto px-4 pb-8">
-          <TreasureHunt onClose={closeTreasureHunt} />
+          <TreasureHunt onClose={closeTreasureHunt} teamId={auth.member.team} config={huntConfig} />
         </div>
       </>
     );
@@ -414,7 +433,7 @@ export default function App() {
       <nav aria-label="Sections" className="hidden md:block sticky top-13 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200">
         <div className="max-w-[640px] mx-auto nav-fade">
           <div className="flex gap-1 overflow-x-auto px-4 scrollbar-none">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => go(t.id)}
@@ -439,8 +458,8 @@ export default function App() {
         aria-label="Sections"
         className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="max-w-[640px] mx-auto grid grid-cols-4">
-          {TABS.map((t) => {
+        <div className="max-w-[640px] mx-auto grid" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+          {tabs.map((t) => {
             const active = tab === t.id;
             return (
               <button
@@ -495,6 +514,9 @@ export default function App() {
           />
         )}
         {tab === 'group' && <Group />}
+        {tab === 'admin' && auth.isAdmin && (
+          <Admin currentEmail={auth.user?.email} onSelfChanged={auth.refreshMember} />
+        )}
         {tab === 'weather' && <Weather />}
         {tab === 'safety' && <Safety />}
       </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase, supabaseConfigured, AUTH_STORAGE_KEY, arrivedViaInvite } from './supabase';
 
 /* The app is read offline on train platforms. An access token lasts an
@@ -15,6 +15,8 @@ function storedSession() {
     return null;
   }
 }
+
+const EMPTY_MEMBER = { isAdmin: false, team: null, fullName: null, role: null };
 
 export function useAuth() {
   const [session, setSession] = useState(null);
@@ -40,27 +42,51 @@ export function useAuth() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  /* Admin is decided server-side (public.is_admin). Asked in its own
-     effect: calling Supabase inside onAuthStateChange can deadlock the
-     auth lock. The flag only shows or hides UI — every admin write is
-     still checked by RLS. */
+  /* Who this member is on the trip: admin flag (public.is_admin) and
+     their assigned team (profiles, kept in step with the allowlist).
+     Fetched in its own effect — calling Supabase inside
+     onAuthStateChange can deadlock the auth lock. Cached per user, since
+     the treasure hunt runs in Atami where signal is patchy. The admin
+     flag only shows or hides UI; every admin write is checked by RLS. */
   const userId = session?.user?.id;
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [member, setMember] = useState(EMPTY_MEMBER);
+  const [memberTick, setMemberTick] = useState(0);
   useEffect(() => {
-    if (!supabase || !userId) { setIsAdmin(false); return undefined; }
+    if (!supabase || !userId) { setMember(EMPTY_MEMBER); return undefined; }
+    const cacheKey = `olc-member:${userId}`;
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+      if (cached) setMember({ ...EMPTY_MEMBER, ...cached });
+    } catch (e) { /* ignore a corrupt cache */ }
+
     let live = true;
-    supabase.rpc('is_admin').then(({ data, error }) => {
-      if (live && !error) setIsAdmin(data === true);
+    Promise.all([
+      supabase.rpc('is_admin'),
+      supabase.from('profiles').select('full_name, team, role').eq('id', userId).maybeSingle(),
+    ]).then(([admin, profile]) => {
+      if (!live || admin.error || profile.error) return;
+      const next = {
+        isAdmin: admin.data === true,
+        team: profile.data?.team ?? null,
+        fullName: profile.data?.full_name ?? null,
+        role: profile.data?.role ?? null,
+      };
+      setMember(next);
+      try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch (e) { /* silent */ }
     });
     return () => { live = false; };
-  }, [userId]);
+  }, [userId, memberTick]);
+
+  const refreshMember = useCallback(() => setMemberTick((n) => n + 1), []);
 
   return {
     configured: supabaseConfigured,
     loading,
     session,
     user: session?.user ?? null,
-    isAdmin,
+    member,
+    isAdmin: member.isAdmin,
+    refreshMember,
     setup,
     endSetup: () => setSetup(null),
     signOut: () => supabase?.auth.signOut(),

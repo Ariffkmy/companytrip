@@ -17,12 +17,13 @@ npm run dev
 The app requires sign-in (email + password). Accounts are invite-only: the committee invites each participant, and only allowlisted emails can be invited.
 
 1. Create a Supabase project, then copy `.env.example` to `.env.local` and fill in the project URL and publishable key (Project Settings → API).
-2. Run both files in `supabase/migrations/`, in filename order, in the SQL editor (or `supabase db push`).
-3. Add each participant to the allowlist (emails lowercase):
+2. Run every file in `supabase/migrations/`, in filename order, in the SQL editor (or `supabase db push`).
+3. Make yourself the first admin (emails lowercase):
    ```sql
-   insert into public.allowed_emails (email, full_name, team, role)
-   values ('someone@company.com', 'Someone', 'Team 1', 'Member');
+   insert into public.allowed_emails (email, full_name, team, role, is_admin)
+   values ('you@company.com', 'Your Name', 'team-ruby', 'Member', true);
    ```
+   Teams are `team-ruby`, `team-sapphire`, `team-emerald`, `team-diamond`, `team-pearl`. After that, add everyone else and assign teams from the app's **Admin** tab — the treasure hunt uses the team set there.
    To make someone an admin (can manage the allowlist), set `is_admin`:
    ```sql
    update public.allowed_emails set is_admin = true where email = 'someone@company.com';
@@ -30,6 +31,12 @@ The app requires sign-in (email + password). Accounts are invite-only: the commi
 4. Invite them: Authentication → Users → **Invite user**. The email link opens the app on a "Welcome aboard" screen where they set their password. Invites for emails not on the allowlist are refused.
 5. Authentication → Sign In / Providers: turn **off** "Allow new users to sign up". There is no sign-up form in the app; this closes the API route too (invites still work).
 6. Authentication → URL Configuration: set **Site URL** to the deployed app URL and add `http://localhost:5173` to **Redirect URLs**, so invite and password-reset links land back in the app.
+
+## 🗺️ Editing the treasure hunt
+
+Admins edit the Atami hunt in **Admin → Treasure hunt**: every checkpoint's title, instructions, questions, bingo tiles, points, unlock screens, and reference photos (each team's pose and place-to-find). **Preview the game** plays the unsaved edits as any team and can jump to any step; nothing it does touches a real team's run. **Save** publishes to everyone.
+
+Content is one JSON document in `public.hunt_config`; photos go to the public `hunt-media` Storage bucket (random file names). The original content ships in `src/lib/huntConfig.js` as defaults, so the hunt still plays before anything is saved or with no signal.
 
 ## 🔧 Build
 

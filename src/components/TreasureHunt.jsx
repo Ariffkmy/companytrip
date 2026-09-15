@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { toRuntime, withDefaults } from '../lib/huntConfig';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
@@ -8,84 +9,6 @@ const KANJI = ['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
 
 /* 3x3 bingo card — rows, columns, diagonals */
 const BINGO_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-
-const CONFIG = {
-  raceMinutes: 90,
-  stamps: 8,
-  points: { checkpoint: 10, quizPerAnswer: 2 },
-
-  teams: [
-    { id: 't1', name: 'Team Ume', colour: 'var(--red)',
-      pose: { key: 'pyramid', title: 'The Human Pyramid', note: 'Three at the bottom on all fours, the rest climb on. Nobody falls.' },
-      spot: { name: 'Spot A', hint: 'Recce photo goes here.' } },
-    { id: 't2', name: 'Team Kinomiya', colour: 'var(--sea)',
-      pose: { key: 'ninja', title: 'Frozen Ninja', note: 'Everyone mid-air kick, faces deadly serious. Jump on three.' },
-      spot: { name: 'Spot B', hint: 'Recce photo goes here.' } },
-    { id: 't3', name: 'Team Sun Beach', colour: '#E9A82C',
-      pose: { key: 'nap', title: 'Synchronised Nap', note: 'All asleep standing up, heads on each other\'s shoulders.' },
-      spot: { name: 'Spot C', hint: 'Recce photo goes here.' } },
-    { id: 't4', name: 'Team Ropeway', colour: '#5B7F3E',
-      pose: { key: 'rocket', title: 'Rocket Launch', note: 'One person crouched as the rocket, everyone else pointing at the sky.' },
-      spot: { name: 'Spot D', hint: 'Recce photo goes here.' } },
-    { id: 't5', name: 'Team Hanabi', colour: '#8A4B9E',
-      pose: { key: 'wave', title: 'The Frozen Wave', note: 'A five-person wave caught halfway — each person at a different height.' },
-      spot: { name: 'Spot E', hint: 'Recce photo goes here.' } },
-  ],
-
-  buy: { budgetYen: 500, brief: 'Something Japanese that nobody on your team has tried before.' },
-
-  quiz: {
-    questions: [
-      { q: 'Something that is red. Name the object.', accept: [] },
-      { q: 'Read out a shop or cafe sign you can see from here.', accept: [] },
-      { q: 'How many people can you count from where you are standing?', accept: [] },
-      { q: 'Something white and floating.', accept: ['cloud', 'clouds', 'seagull', 'seagulls'] },
-      { q: 'The furthest thing you can see. Name it.', accept: [] },
-    ],
-  },
-
-  /* CP5 — ask a stranger. Three tasks, team picks how brave it feels. */
-  ask: {
-    tasks: [
-      { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
-      { key: 'rec', pts: 3, label: 'Something they recommended', hint: 'Food, a spot, anything at all.' },
-      { key: 'photo', pts: 5, label: 'A photo with them and the whole team', hint: 'Ask first. If they say no, that is a no.' },
-    ],
-  },
-
-  /* CP6 — photo bingo. Open from the first stamp, locked in at CP6. */
-  bingo: {
-    linePts: 3,
-    fullPts: 5,
-    tiles: [
-      'Something older than everyone here',
-      'A vending machine nobody has seen the like of',
-      'An animal',
-      'A sign you cannot read',
-      'Someone in uniform',
-      'Something perfectly round',
-      'A door you want to open',
-      'The colour orange',
-      'A view worth stopping for',
-    ],
-  },
-
-  /* CP7 — closest guess. True answers are entered by the committee
-     in the organiser view; until then nothing is marked. */
-  guess: {
-    exactPts: 5,
-    nearPts: 3,
-    closePts: 1,
-    questions: [
-      'How many steps are in the staircase at this checkpoint?',
-      'The committee is holding one item. What does it cost, in yen?',
-      'How many vending machines did you pass since the last stamp?',
-    ],
-  },
-
-  video: { seconds: 15, maxSeconds: 30 },
-  finishPoint: 'The committee will point you to the finish at the briefing.',
-};
 
 /* ── Helper functions ──────────────────────────────── */
 
@@ -118,37 +41,6 @@ const mmss = (s) => {
   const sec = s % 60;
   return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
 };
-
-/* ── Pose SVG illustrations ────────────────────────── */
-
-function poseArt(key) {
-  const g = 'stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"';
-  const head = (x, y, r = 9) => `<circle cx="${x}" cy="${y}" r="${r}" fill="currentColor"/>`;
-  const art = {
-    pyramid: `${head(60, 86)}<path d="M60 95v16M46 111h28M50 111l-8 14M70 111l8 14" ${g}/>
-      ${head(180, 86)}<path d="M180 95v16M166 111h28M170 111l-8 14M190 111l8 14" ${g}/>
-      ${head(120, 40)}<path d="M120 49v22M120 56l-24-14M120 56l24-14M120 71l-14 20M120 71l14 20" ${g}/>
-      <path d="M20 128h200" ${g}/>`,
-    ninja: `${head(58, 52)}<path d="M58 61v20M58 66l-22 8M58 66l20-10M58 81l-16 14M58 81l24 4" ${g}/>
-      ${head(122, 44)}<path d="M122 53v22M122 58l-24 4M122 58l22-12M122 75l-18 12M122 75l26 0" ${g}/>
-      ${head(188, 56)}<path d="M188 65v20M188 70l-22 6M188 70l18-12M188 85l-14 16M188 85l22 6" ${g}/>
-      <path d="M20 124h200" stroke-dasharray="10 9" ${g}/>`,
-    nap: `${head(70, 54)}<path d="M70 63v30M70 70l-16 12M70 70l18 8M70 93l-10 26M70 93l12 26" ${g}/>
-      ${head(120, 48)}<path d="M120 57v34M120 64l-16 10M120 64l16 10M120 91l-9 28M120 91l11 28" ${g}/>
-      ${head(170, 54)}<path d="M170 63v30M170 70l-18 8M170 70l16 12M170 93l-12 26M170 93l10 26" ${g}/>
-      <text x="196" y="34" font-size="26" fill="currentColor" font-family="serif">z</text>
-      <text x="176" y="20" font-size="18" fill="currentColor" font-family="serif">z</text>`,
-    rocket: `${head(120, 96, 11)}<path d="M120 107v14M104 118h32" ${g}/>
-      ${head(56, 50)}<path d="M56 59v26M56 64l24-22M56 64l-16 12M56 85l-10 26M56 85l12 26" ${g}/>
-      ${head(186, 50)}<path d="M186 59v26M186 64l-26-22M186 64l16 12M186 85l-12 26M186 85l10 26" ${g}/>
-      <path d="M120 30l-9 22h18z" ${g}/>`,
-    wave: `${head(38, 92)}<path d="M38 101v20M38 106l-14 10M38 106l16-14M38 121l-9 12M38 121l11 12" ${g}/>
-      ${head(92, 70)}<path d="M92 79v22M92 84l-14 10M92 84l18-16M92 101l-10 14M92 101l12 14" ${g}/>
-      ${head(146, 50)}<path d="M146 59v24M146 64l-16 10M146 64l18-18M146 83l-11 16M146 83l13 16" ${g}/>
-      ${head(200, 74)}<path d="M200 83v22M200 88l-16 10M200 88l14-16M200 105l-10 14M200 105l12 14" ${g}/>`,
-  };
-  return `<svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg">${art[key] || art.wave}</svg>`;
-}
 
 /* ── Stamp slot component ──────────────────────────── */
 
@@ -222,20 +114,61 @@ if (!document.getElementById(styleId)) {
    React state store (simple in-memory, persists in localStorage)
    ════════════════════════════════════════════════════════════ */
 
-function loadState(teamId) {
-  try {
-    const raw = localStorage.getItem('treasure:' + teamId);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+/* Where team runs are kept. The real hunt persists to localStorage on
+   the phone; an admin preview lives only in memory, so trying the game
+   never touches a real team's run. */
+function makeStore(preview) {
+  if (preview) {
+    const mem = new Map();
+    return {
+      load: (teamId) => (mem.has(teamId) ? structuredClone(mem.get(teamId)) : null),
+      save: (teamId, state) => { mem.set(teamId, structuredClone(state)); return true; },
+      remove: (teamId) => { mem.delete(teamId); },
+    };
+  }
+  return {
+    load(teamId) {
+      try {
+        const raw = localStorage.getItem('treasure:' + teamId);
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    },
+    save(teamId, state) {
+      try {
+        localStorage.setItem('treasure:' + teamId, JSON.stringify(state));
+        return true;
+      } catch {
+        return false; // quota — the caller decides whether to say so
+      }
+    },
+    remove(teamId) {
+      try { localStorage.removeItem('treasure:' + teamId); } catch { /* ignore */ }
+    },
+  };
 }
 
-function saveState(teamId, state) {
-  try {
-    localStorage.setItem('treasure:' + teamId, JSON.stringify(state));
-    return true;
-  } catch {
-    return false; // quota — the caller decides whether to say so
-  }
+/* Admin-written text: blank line = paragraph, **stars** = bold. */
+function Rich({ text, lead }) {
+  const paras = String(text ?? '').split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+  if (lead) paras[0] = `**${lead}** ${paras[0] ?? ''}`.trim();
+  return paras.map((para, i) => (
+    <p key={i}>
+      {para.split(/(\*\*[^*]+\*\*)/g).map((chunk, j) =>
+        /^\*\*[^*]+\*\*$/.test(chunk) ? <b key={j}>{chunk.slice(2, -2)}</b> : chunk
+      )}
+    </p>
+  ));
+}
+
+/* Optional admin-supplied photo shown under a checkpoint's instructions. */
+function CheckpointPhoto({ src }) {
+  if (!src) return null;
+  return (
+    <img src={src} alt="" style={{
+      display: 'block', width: '100%', maxHeight: 360, objectFit: 'cover',
+      border: 'var(--line)', borderRadius: 8, marginBottom: 14,
+    }} />
+  );
 }
 
 /* Stamp slot each submission fills. The cheer keeps its own key rather
@@ -258,6 +191,17 @@ function saveAnswers(next) {
 const SLOTS = Array.from({ length: 8 }, (_, i) => i);
 
 const CP_INDEX = { cp1: 0, cp2a: 1, cp2b: 1, cp3: 2, cp4: 3, ask: 4, bingo: 5, guess: 6, cheer: 7 };
+
+/* Label for each FLOW step, shown in the admin preview's jump menu. */
+function flowLabel(step, cp) {
+  const n = { cp1: 1, cp2a: 2, cp2b: 2, cp3: 3, cp4: 4, ask: 5, bingo: 6, guess: 7, cheer: 8 };
+  if (step.type === 'unlock') {
+    const key = step.to === 'cp2' ? 'cp2a' : step.to;
+    return `Unlock screen → ${n[key]}`;
+  }
+  if (step.type === 'finish') return 'Finish';
+  return `${n[step.key]}. ${cp[step.key]?.title ?? step.key}`;
+}
 
 const FLOW = [
   { type: 'cp', key: 'cp1' },
@@ -293,12 +237,12 @@ function blankState(team) {
   };
 }
 
-function askPoints(sub) {
+function askPoints(sub, CONFIG) {
   if (!sub) return 0;
   return CONFIG.ask.tasks.reduce((n, t) => n + (String(sub[t.key] || '').trim() ? t.pts : 0), 0);
 }
 
-function bingoPoints(tiles) {
+function bingoPoints(tiles, CONFIG) {
   const filled = (i) => !!(tiles || {})[i];
   const n = CONFIG.bingo.tiles.reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
   let p = n;
@@ -309,7 +253,7 @@ function bingoPoints(tiles) {
 
 /* Closeness scoring — a wrong answer still pays if it is in the region.
    Unanswered by the committee means unmarked, not zero. */
-function guessScore(guess, truth) {
+function guessScore(guess, truth, CONFIG) {
   const g = Number(guess);
   const t = Number(truth);
   if (guess === '' || guess == null || truth === '' || truth == null) return 0;
@@ -321,21 +265,21 @@ function guessScore(guess, truth) {
   return 0;
 }
 
-function guessPoints(sub) {
+function guessPoints(sub, CONFIG) {
   if (!sub) return 0;
   const truths = loadAnswers();
-  return CONFIG.guess.questions.reduce((n, _, i) => n + guessScore((sub.answers || [])[i], truths[i]), 0);
+  return CONFIG.guess.questions.reduce((n, _, i) => n + guessScore((sub.answers || [])[i], truths[i], CONFIG), 0);
 }
 
-function scoreOf(run) {
+function scoreOf(run, CONFIG) {
   let p = 0;
   Object.keys(run.subs).forEach((k) => {
     const sub = run.subs[k];
     p += CONFIG.points.checkpoint;
     if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
-    else if (k === 'ask') p += askPoints(sub);
+    else if (k === 'ask') p += askPoints(sub, CONFIG);
     else if (k === 'bingo') p += sub.points || 0;
-    else if (k === 'guess') p += guessPoints(sub);
+    else if (k === 'guess') p += guessPoints(sub, CONFIG);
   });
   Object.values(run.bonus || {}).forEach((v) => (p += v));
   return p;
@@ -345,7 +289,12 @@ function scoreOf(run) {
    Main Game Component
    ════════════════════════════════════════════════════════════ */
 
-export default function TreasureHunt({ onClose }) {
+export default function TreasureHunt({ onClose, teamId, config, preview = false }) {
+  const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
+  const store = useMemo(() => makeStore(preview), [preview]);
+  /* Preview only: which team the admin is playing as. */
+  const [previewTeam, setPreviewTeam] = useState(teamId ?? 'team-ruby');
+  const activeTeamId = preview ? previewTeam : teamId;
   const [view, setView] = useState('start'); // start | race | done | organizer
   const [S, setS] = useState(null);
   const [draft, setDraft] = useState({});
@@ -383,7 +332,7 @@ export default function TreasureHunt({ onClose }) {
   }, []);
 
   const save = useCallback((run) => {
-    saveState(run.teamId, run);
+    store.save(run.teamId, run);
   }, []);
 
   // Clock tick
@@ -438,61 +387,132 @@ export default function TreasureHunt({ onClose }) {
     );
   };
 
-  const renderStartScreen = () => (
-    <div>
-      <div className="card">
-        <div className="eyebrow" style={{ color: 'var(--red)' }}>Step 1</div>
-        <h2 className="display" style={{ fontSize: 24, margin: '4px 0 12px' }}>Pick your team</h2>
-        <div style={{ display: 'grid', gap: 9 }}>
-          {CONFIG.teams.map((t, i) => (
-            <button
-              key={t.id}
-              onClick={() => setDraft((d) => ({ ...d, teamId: t.id }))}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 11, padding: 12,
-                border: 'var(--line)', borderRadius: 8, background: 'var(--card)',
-                cursor: 'pointer', textAlign: 'left', width: '100%', boxShadow: 'var(--hard-sm)',
-                ...(draft.teamId === t.id ? { background: 'var(--gold)', boxShadow: 'var(--hard)' } : {}),
-              }}
-              type="button"
-            >
-              <span style={{
-                width: 30, height: 30, borderRadius: '50%', border: '2px solid var(--ink)',
-                display: 'grid', placeItems: 'center', fontWeight: 900, color: '#fff',
-                fontSize: 14, background: t.colour, flex: 'none',
-              }}>{i + 1}</span>
-              <span>
-                <b style={{ fontFamily: 'var(--display)', fontSize: 18, letterSpacing: '.03em', display: 'block' }}>{t.name}</b>
-                <small style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--ink-soft)' }}>Pose: {t.pose.title}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-        <button
-          className="btn block"
-          style={{ marginTop: 14 }}
-          disabled={!draft.teamId}
-          onClick={() => {
-            const t = CONFIG.teams.find((x) => x.id === draft.teamId);
-            const blank = blankState(t);
-            blank.members = draft.members || '';
-            blank.startedAt = Date.now();
-            saveState(blank.teamId, blank);
-            setS(blank);
-            setDraft({});
-            setView('race');
-          }}
-          type="button"
-        >
-          Start the clock
-        </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>Your clock starts the moment you tap. Keep this tab open.</p>
-      </div>
+  const renderStartScreen = () => {
+    const team = CONFIG.teams.find((t) => t.id === activeTeamId);
+    const existing = team ? store.load(team.id) : null;
+    const underway = Boolean(existing?.startedAt);
 
-      <div style={{ textAlign: 'center' }}>
-        <button className="linky" onClick={() => setView('organizer')} type="button">
-          Organiser view →
-        </button>
+    return (
+      <div>
+        <div className="card">
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Your team</div>
+          {team ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, margin: '8px 0 4px' }}>
+                <span aria-hidden="true" style={{
+                  width: 30, height: 30, borderRadius: '50%', border: '2px solid var(--ink)',
+                  background: team.colour, flex: 'none',
+                }} />
+                <b className="display" style={{ fontSize: 24 }}>{team.name}</b>
+              </div>
+              <button
+                className="btn block"
+                style={{ marginTop: 14 }}
+                onClick={() => {
+                  if (underway) {
+                    setS(existing);
+                    setView(existing.finishedAt ? 'done' : 'race');
+                    return;
+                  }
+                  const blank = blankState(team);
+                  blank.startedAt = Date.now();
+                  store.save(blank.teamId, blank);
+                  setS(blank);
+                  setDraft({});
+                  setView('race');
+                }}
+                type="button"
+              >
+                {underway ? (existing.finishedAt ? 'See your results' : 'Carry on') : 'Start the clock'}
+              </button>
+              <p className="note" style={{ margin: '12px 0 0' }}>
+                {underway
+                  ? 'Your clock is still running from when you started.'
+                  : 'Your clock starts the moment you tap. Keep this tab open.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>No team yet</h2>
+              <p style={{ margin: 0 }}>The committee hasn’t put you on a team. Ask them to assign you, then come back here.</p>
+            </>
+          )}
+        </div>
+
+        <div style={{ textAlign: 'center' }}>
+          <button className="linky" onClick={() => setView('organizer')} type="button">
+            Organiser view →
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  /* ── Admin preview controls ───────────────────────── */
+
+  const previewJump = (target) => {
+    const team = CONFIG.teams.find((t) => t.id === activeTeamId);
+    if (!team) return;
+    setDraft({});
+    if (target === 'start') {
+      store.remove(team.id);
+      setS(null);
+      setView('start');
+      return;
+    }
+    if (target === 'organizer') { setView('organizer'); return; }
+    const base = S && S.teamId === team.id ? S : { ...blankState(team), startedAt: Date.now() };
+    if (target === 'done') {
+      const next = { ...base, finishedAt: base.finishedAt ?? Date.now() };
+      store.save(team.id, next);
+      setS(next);
+      setView('done');
+      return;
+    }
+    const next = { ...base, stage: Number(target), finishedAt: null };
+    store.save(team.id, next);
+    setS(next);
+    setView('race');
+  };
+
+  const currentJumpValue =
+    view === 'race' && S ? String(S.stage) : view;
+
+  const renderPreviewBar = () => (
+    <div style={{
+      background: 'var(--gold)', color: '#17232F', border: 'var(--line)', borderRadius: 10,
+      padding: '10px 12px', margin: '0 0 12px', boxShadow: 'var(--hard-sm)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <b className="display" style={{ fontSize: 16 }}>Preview</b>
+        <span style={{ fontFamily: 'var(--mono)', fontSize: 10 }}>Unsaved edits included · nothing is saved</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr)', gap: 8 }}>
+        <label style={{ display: 'block', minWidth: 0 }}>
+          <span className="sr-only">Play as team</span>
+          <select
+            value={previewTeam}
+            onChange={(e) => { setPreviewTeam(e.target.value); setS(null); setDraft({}); setView('start'); }}
+            style={{ width: '100%', height: 36, borderRadius: 6, border: '2px solid #17232F', background: '#FFFFFF', color: '#17232F', fontSize: 13, padding: '0 6px' }}
+          >
+            {CONFIG.teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'block', minWidth: 0 }}>
+          <span className="sr-only">Jump to step</span>
+          <select
+            value={currentJumpValue}
+            onChange={(e) => previewJump(e.target.value)}
+            style={{ width: '100%', height: 36, borderRadius: 6, border: '2px solid #17232F', background: '#FFFFFF', color: '#17232F', fontSize: 13, padding: '0 6px' }}
+          >
+            <option value="start">Start screen</option>
+            {FLOW.map((step, i) => (step.type === 'finish' ? null : (
+              <option key={i} value={String(i)}>{flowLabel(step, CONFIG.cp)}</option>
+            )))}
+            <option value="done">Results</option>
+            <option value="organizer">Organiser view</option>
+          </select>
+        </label>
       </div>
     </div>
   );
@@ -585,17 +605,18 @@ export default function TreasureHunt({ onClose }) {
     if (!t) return null;
     return (
       <div className="card flag">
-        {renderCpHead(1, 'Copy the pose', 'ポーズを真似ろ')}
+        {renderCpHead(1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana)}
         <div className="task">
-          <p><b>{esc(t.pose.title)}.</b> {esc(t.pose.note)}</p>
-          <p style={{ margin: 0 }}>Everyone in the frame. Ask a stranger to hold the phone if you have to.</p>
+          <Rich text={CONFIG.cp.cp1.body} />
         </div>
         <div style={{
           background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
           position: 'relative', color: 'var(--card)', marginBottom: 14,
         }}>
           <div style={{ background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-            <div dangerouslySetInnerHTML={{ __html: poseArt(t.pose.key) }} style={{ width: '78%', height: '78%', color: '#FFFCF4' }} />
+            {t.pose.photo
+              ? <img src={t.pose.photo} alt={`Pose for ${t.name} to copy`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#FFFCF4', padding: 16, textAlign: 'center' }}>Pose photo not added yet — ask the committee.</span>}
           </div>
           <div style={{
             position: 'absolute', left: 12, right: 12, bottom: 9,
@@ -615,7 +636,7 @@ export default function TreasureHunt({ onClose }) {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp1: { photo: draft.photo, at: Date.now() } };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             showToast('Stamp collected.');
@@ -624,7 +645,7 @@ export default function TreasureHunt({ onClose }) {
         >
           Send photo
         </button>
-        <p className="note" style={{ marginTop: 12 }}>Stuck? The committee is in the WhatsApp group.</p>
+        {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
       </div>
     );
   };
@@ -635,9 +656,9 @@ export default function TreasureHunt({ onClose }) {
     const s = t.spot;
     return (
       <div className="card flag">
-        {renderCpHead(2, 'Find the place', '現地で自撮り')}
+        {renderCpHead(2, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana)}
         <div className="task">
-          <p style={{ margin: 0 }}>Work out where this is, go there, and take a team selfie on the spot. The riddle unlocks when the selfie lands.</p>
+          <Rich text={CONFIG.cp.cp2a.body} />
         </div>
         <div style={{
           background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
@@ -647,20 +668,20 @@ export default function TreasureHunt({ onClose }) {
             background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2',
             display: 'grid', placeItems: 'center', overflow: 'hidden',
           }}>
-            <svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" style={{ width: '78%', height: '78%' }}>
+            {s.photo ? <img src={s.photo} alt="The place to find" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" style={{ width: '78%', height: '78%' }}>
               <g stroke="currentColor" strokeWidth="6" fill="none" strokeLinejoin="round">
                 <rect x="44" y="46" width="152" height="86" rx="10" />
                 <path d="M92 46l12-16h32l12 16" />
                 <circle cx="120" cy="90" r="26" />
               </g>
-            </svg>
+            </svg>}
           </div>
           <div style={{
             position: 'absolute', left: 12, right: 12, bottom: 9,
             fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
             display: 'flex', justifyContent: 'space-between', gap: 8,
           }}>
-            <span>{esc(s.hint)}</span>
+            <span>{s.hint}</span>
             <b style={{ color: 'var(--gold)', fontWeight: 500 }}>NO.2</b>
           </div>
         </div>
@@ -673,7 +694,7 @@ export default function TreasureHunt({ onClose }) {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp2a: { photo: draft.photo, at: Date.now() } };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             showToast('Selfie in. Riddle unlocked.');
@@ -696,11 +717,11 @@ export default function TreasureHunt({ onClose }) {
 
   const renderCp2b = () => (
     <div className="card flag">
-      {renderCpHead(2, 'Three switches', 'スイッチの謎')}
+      {renderCpHead(2, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
       <div className="task">
-        <p>You're outside a room with the door shut. On the wall next to you are <b>three switches</b>. Inside the room are <b>three light bulbs</b>, one per switch.</p>
-        <p style={{ margin: 0 }}>You may flip the switches as much as you like. You may open the door and go in <b>once</b> — and once you're in, you can't touch the switches again. How do you tell which switch controls which bulb?</p>
+        <Rich text={CONFIG.cp.cp2b.body} />
       </div>
+      <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />
       <label className="f" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>Your method</span>
         <textarea
@@ -721,7 +742,7 @@ export default function TreasureHunt({ onClose }) {
           const newS = { ...S };
           newS.subs = { ...(newS.subs || {}), cp2b: { answer: draft.answer, at: Date.now() } };
           newS.stage = S.stage + 1;
-          saveState(newS.teamId, newS);
+          store.save(newS.teamId, newS);
           setS(newS);
           setDraft({});
           showToast('Answer sent. Stamp 2 collected.');
@@ -736,11 +757,12 @@ export default function TreasureHunt({ onClose }) {
 
   const renderCp3 = () => (
     <div className="card flag">
-      {renderCpHead(3, 'Buy it, try it', '買って食べる')}
+      {renderCpHead(3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana)}
       <div className="task">
-        <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {esc(CONFIG.buy.brief)}</p>
-        <p style={{ margin: 0 }}>Every member has to taste it. Photo has to show all of you eating or drinking, mid-bite.</p>
+        <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {CONFIG.buy.brief}</p>
+        <Rich text={CONFIG.cp.cp3.body} />
       </div>
+      <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
         <label className="f" style={{ flex: 1, display: 'block' }}>
           <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>What did you buy?</span>
@@ -779,7 +801,7 @@ export default function TreasureHunt({ onClose }) {
           const newS = { ...S };
           newS.subs = { ...(newS.subs || {}), cp3: { photo: draft.photo, item: draft.item, price: draft.price, at: Date.now() } };
           newS.stage = S.stage + 1;
-          saveState(newS.teamId, newS);
+          store.save(newS.teamId, newS);
           setS(newS);
           setDraft({});
           showToast('Stamp collected.');
@@ -796,13 +818,14 @@ export default function TreasureHunt({ onClose }) {
     const answers = draft.answers || [];
     return (
       <div className="card flag">
-        {renderCpHead(4, 'Look around you', '周りを見ろ')}
+        {renderCpHead(4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana)}
         <div className="task">
-          <p style={{ margin: 0 }}>Stop where the committee sent you. Every answer is somewhere in sight. Phones down — this one isn't on the internet.</p>
+          <Rich text={CONFIG.cp.cp4.body} />
         </div>
+        <CheckpointPhoto src={CONFIG.cp.cp4.photo} />
         {CONFIG.quiz.questions.map((q, i) => (
           <label key={i} className="f" style={{ display: 'block', marginBottom: 12 }}>
-            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {esc(q.q)}</span>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {q.q}</span>
             <input
               type="text"
               placeholder="Your answer"
@@ -827,13 +850,13 @@ export default function TreasureHunt({ onClose }) {
           onClick={() => {
             let correct = 0;
             CONFIG.quiz.questions.forEach((q, i) => {
-              if (!q.accept.length) return;
+              if (!q.accept?.length) return;
               if (q.accept.some((a) => norm(answers[i]).includes(norm(a)))) correct++;
             });
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp4: { answers, photo: draft.photo, correct, at: Date.now() } };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             showToast('Stamp collected.');
@@ -851,14 +874,15 @@ export default function TreasureHunt({ onClose }) {
 
   const renderAsk = () => {
     const done = CONFIG.ask.tasks.filter((t) => String(draft[t.key] || '').trim()).length;
-    const earned = askPoints(draft);
+    const earned = askPoints(draft, CONFIG);
+    const photoTask = CONFIG.ask.tasks.find((t) => t.key === 'photo');
     return (
       <div className="card flag">
-        {renderCpHead(5, 'Ask a stranger', '声かけ')}
+        {renderCpHead(5, CONFIG.cp.ask.title, CONFIG.cp.ask.kana)}
         <div className="task">
-          <p>Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.</p>
-          <p style={{ margin: 0 }}>Ask before you photograph anyone. If they say no, thank them and find someone else.</p>
+          <Rich text={CONFIG.cp.ask.body} />
         </div>
+        <CheckpointPhoto src={CONFIG.cp.ask.photo} />
         {CONFIG.ask.tasks.filter((t) => t.key !== 'photo').map((t) => (
           <label key={t.key} className="f" style={{ display: 'block', marginBottom: 12 }}>
             <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
@@ -877,11 +901,15 @@ export default function TreasureHunt({ onClose }) {
             />
           </label>
         ))}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
-          Photo with them
-          <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+5</b>
-        </div>
-        {renderShot(draft.photo, 'Add the photo', 'Them and your whole team · optional')}
+        {photoTask && (
+          <>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
+              {photoTask.label}
+              <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+{photoTask.pts}</b>
+            </div>
+            {renderShot(draft.photo, 'Add the photo', photoTask.hint ? `${photoTask.hint} · optional` : 'Optional')}
+          </>
+        )}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
@@ -893,7 +921,7 @@ export default function TreasureHunt({ onClose }) {
               ask: { word: draft.word || '', rec: draft.rec || '', photo: draft.photo || null, at: Date.now() },
             };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             showToast('Stamp collected.');
@@ -905,7 +933,7 @@ export default function TreasureHunt({ onClose }) {
         <p className="note" style={{ margin: '12px 0 0' }}>
           {done === 0
             ? 'One of the three is enough to move on.'
-            : `${done} of 3 done · ${earned} bonus points so far.`}
+            : `${done} of ${CONFIG.ask.tasks.length} done · ${earned} bonus points so far.`}
         </p>
       </div>
     );
@@ -918,7 +946,7 @@ export default function TreasureHunt({ onClose }) {
     try {
       const dataUrl = await compressImage(file, 420, 0.6);
       const newS = { ...S, bingo: { ...(S.bingo || {}), [i]: dataUrl } };
-      if (!saveState(newS.teamId, newS)) {
+      if (!store.save(newS.teamId, newS)) {
         showToast('Phone storage is full — clear a tile and retry.');
         return;
       }
@@ -932,7 +960,7 @@ export default function TreasureHunt({ onClose }) {
     const tiles = { ...(S.bingo || {}) };
     delete tiles[i];
     const newS = { ...S, bingo: tiles };
-    saveState(newS.teamId, newS);
+    store.save(newS.teamId, newS);
     setS(newS);
   };
 
@@ -1004,7 +1032,7 @@ export default function TreasureHunt({ onClose }) {
             }}
           >
             <b className="display" style={{ fontSize: 17 }}>Photo bingo</b>
-            <span className="note">{filled}/9 · {bingoPoints(tiles)} pts</span>
+            <span className="note">{filled}/9 · {bingoPoints(tiles, CONFIG)} pts</span>
             <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11 }}>{bingoOpen ? '▲' : '▼'}</span>
           </button>
           {bingoOpen && (
@@ -1019,24 +1047,25 @@ export default function TreasureHunt({ onClose }) {
 
     return (
       <div className="card flag">
-        {renderCpHead(6, 'Photo bingo', 'ビンゴ')}
+        {renderCpHead(6, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana)}
         <div className="task">
           <p>Nine prompts, one photo each. {lines > 0
             ? <b>{lines} line{lines > 1 ? 's' : ''} complete.</b>
-            : 'A full line — across, down or corner to corner — is worth an extra 3.'}</p>
+            : `A full line — across, down or corner to corner — is worth an extra ${CONFIG.bingo.linePts}.`}</p>
           <p style={{ margin: 0 }}>1 point a tile, +{CONFIG.bingo.linePts} a line, +{CONFIG.bingo.fullPts} for all nine.</p>
         </div>
+        <CheckpointPhoto src={CONFIG.cp.bingo.photo} />
         {renderBingoGrid(locked)}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
           onClick={() => {
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), bingo: { tiles: filled, points: bingoPoints(tiles), at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), bingo: { tiles: filled, points: bingoPoints(tiles, CONFIG), at: Date.now() } };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
-            showToast(`Card locked — ${bingoPoints(tiles)} points.`);
+            showToast(`Card locked — ${bingoPoints(tiles, CONFIG)} points.`);
           }}
           type="button"
         >
@@ -1054,7 +1083,7 @@ export default function TreasureHunt({ onClose }) {
     const filledAll = CONFIG.guess.questions.every((_, i) => String(answers[i] ?? '').trim() !== '');
     return (
       <div className="card flag">
-        {renderCpHead(7, 'Closest guess', '目分量')}
+        {renderCpHead(7, CONFIG.cp.guess.title, CONFIG.cp.guess.kana)}
         <div className="task">
           <p style={{ margin: 0 }}>
             Nothing to look up — just call it. Spot on is {CONFIG.guess.exactPts} points,
@@ -1062,9 +1091,10 @@ export default function TreasureHunt({ onClose }) {
             A wrong answer still pays if you are in the region.
           </p>
         </div>
+        <CheckpointPhoto src={CONFIG.cp.guess.photo} />
         {CONFIG.guess.questions.map((q, i) => (
           <label key={i} className="f" style={{ display: 'block', marginBottom: 12 }}>
-            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {esc(q)}</span>
+            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {q}</span>
             <input
               type="number"
               inputMode="numeric"
@@ -1089,7 +1119,7 @@ export default function TreasureHunt({ onClose }) {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), guess: { answers, at: Date.now() } };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             showToast('Numbers in. Stamp collected.');
@@ -1107,11 +1137,11 @@ export default function TreasureHunt({ onClose }) {
     const v = draft.video;
     return (
       <div className="card flag">
-        {renderCpHead(8, 'The team cheer', 'チームコール')}
+        {renderCpHead(8, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana)}
         <div className="task">
-          <p><b>{CONFIG.video.seconds} seconds. One take.</b> Your team cheer — chant, dance, war cry, whatever you invented on the way here.</p>
-          <p style={{ margin: 0 }}>Everyone on camera. Say "Atami" once. Loud enough to embarrass yourselves.</p>
+          <Rich text={CONFIG.cp.cheer.body} lead={`${CONFIG.video.seconds} seconds. One take.`} />
         </div>
+        <CheckpointPhoto src={CONFIG.cp.cheer.photo} />
         {v ? (
           <div>
             <div style={{ position: 'relative', border: 'var(--line)', borderRadius: 8, overflow: 'hidden', background: 'var(--ink)' }}>
@@ -1130,7 +1160,7 @@ export default function TreasureHunt({ onClose }) {
             </div>
             <p className="meta" style={{ marginTop: 8, fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
               {v.seconds}s · {(v.size / 1048576).toFixed(1)} MB
-              {v.seconds > CONFIG.video.maxSeconds ? ' · <span style="color:var(--red)">over ' + CONFIG.video.maxSeconds + 's</span>' : ''}
+              {v.seconds > CONFIG.video.maxSeconds && <span style={{ color: 'var(--red)' }}> · over {CONFIG.video.maxSeconds}s</span>}
             </p>
           </div>
         ) : (
@@ -1161,7 +1191,7 @@ export default function TreasureHunt({ onClose }) {
             newS.subs = { ...(newS.subs || {}), cheer: { name: v.name, seconds: v.seconds, at: Date.now() } };
             newS.finishedAt = Date.now();
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
             setView('done');
@@ -1175,36 +1205,7 @@ export default function TreasureHunt({ onClose }) {
   };
 
   const renderUnlock = (to) => {
-    const copy = {
-      cp2: {
-        h: 'Find the spot',
-        p: `Somewhere along the way is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team's, so following another team won't help.`,
-      },
-      cp3: {
-        h: 'Buy it, try it',
-        p: `Find the shops. ¥${CONFIG.buy.budgetYen} for the team, one thing none of you have tried, everyone tastes it.`,
-      },
-      cp4: {
-        h: 'Look around you',
-        p: `Five questions, every answer within sight of where you're standing. Nothing to google.`,
-      },
-      ask: {
-        h: 'Talk to a stranger',
-        p: `Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo. Start counting vending machines from here; you will be asked.`,
-      },
-      bingo: {
-        h: 'Bingo card — lock it in',
-        p: `Last call on the nine photo prompts. Anything still blank when you lock the card stays blank, so fill what you can on the way.`,
-      },
-      guess: {
-        h: 'Three numbers',
-        p: `No looking anything up, no counting twice. Closest guess takes the points — and being roughly right still pays.`,
-      },
-      cheer: {
-        h: 'Last one',
-        p: `Film your team cheer, then walk it in. ${CONFIG.finishPoint}`,
-      },
-    }[to];
+    const copy = CONFIG.unlocks[to] ?? { h: 'Next checkpoint', p: '' };
     return (
       <div style={{
         background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
@@ -1214,13 +1215,13 @@ export default function TreasureHunt({ onClose }) {
         <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
           {copy.h}
         </h2>
-        <p style={{ color: 'var(--th-body-alt)' }}>{esc(copy.p)}</p>
+        <p style={{ color: 'var(--th-body-alt)' }}>{copy.p}</p>
         <button
           className="btn block sea"
           onClick={() => {
             const newS = { ...S };
             newS.stage = S.stage + 1;
-            saveState(newS.teamId, newS);
+            store.save(newS.teamId, newS);
             setS(newS);
           }}
           type="button"
@@ -1228,7 +1229,7 @@ export default function TreasureHunt({ onClose }) {
           Open it
         </button>
         <p className="note" style={{ marginTop: 12, color: 'var(--th-label)' }}>
-          Points so far: {scoreOf(S)}. Time left: {mmss(clockLeft())}.
+          Points so far: {scoreOf(S, CONFIG)}. Time left: {mmss(clockLeft())}.
         </p>
       </div>
     );
@@ -1245,7 +1246,7 @@ export default function TreasureHunt({ onClose }) {
         if (view !== 'done') {
           const newS = { ...S };
           newS.finishedAt = Date.now();
-          saveState(newS.teamId, newS);
+          store.save(newS.teamId, newS);
           setS(newS);
           setView('done');
         }
@@ -1266,9 +1267,9 @@ export default function TreasureHunt({ onClose }) {
       ['2', 'Selfie + riddle', CONFIG.points.checkpoint],
       ['3', 'Buy &amp; try', CONFIG.points.checkpoint],
       ['4', `Observation quiz (${S.subs?.cp4?.correct ?? 0} auto-marked)`, CONFIG.points.checkpoint + (S.subs?.cp4?.correct || 0) * CONFIG.points.quizPerAnswer],
-      ['5', 'Ask a stranger', CONFIG.points.checkpoint + askPoints(S.subs?.ask)],
+      ['5', 'Ask a stranger', CONFIG.points.checkpoint + askPoints(S.subs?.ask, CONFIG)],
       ['6', `Photo bingo (${S.subs?.bingo?.tiles ?? 0}/9)`, CONFIG.points.checkpoint + (S.subs?.bingo?.points || 0)],
-      ['7', 'Closest guess (committee marks it)', CONFIG.points.checkpoint + guessPoints(S.subs?.guess)],
+      ['7', 'Closest guess (committee marks it)', CONFIG.points.checkpoint + guessPoints(S.subs?.guess, CONFIG)],
       ['8', 'Team cheer', CONFIG.points.checkpoint],
     ];
     const used = CONFIG.raceMinutes * 60 - clockLeft();
@@ -1303,7 +1304,7 @@ export default function TreasureHunt({ onClose }) {
           }}>
             <span className="eyebrow">Running total</span>
             <span className="display" style={{ fontSize: 38, marginLeft: 'auto', color: 'var(--red)' }}>
-              {scoreOf(S)}
+              {scoreOf(S, CONFIG)}
             </span>
           </div>
           <p className="note" style={{ margin: '12px 0 0' }}>Creativity bonuses get added by the committee at the finish point.</p>
@@ -1316,7 +1317,7 @@ export default function TreasureHunt({ onClose }) {
           <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
             Walk it in
           </h2>
-          <p style={{ color: 'var(--th-body-alt)' }}>{esc(CONFIG.finishPoint)}</p>
+          <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>
         </div>
         <div style={{ textAlign: 'center' }}>
           <button className="linky" onClick={() => setView('organizer')} type="button">Organiser view →</button>
@@ -1327,9 +1328,9 @@ export default function TreasureHunt({ onClose }) {
 
   const renderOrganizer = () => {
     const allRuns = CONFIG.teams
-      .map((t) => loadState(t.id))
+      .map((t) => store.load(t.id))
       .filter(Boolean)
-      .sort((a, b) => scoreOf(b) - scoreOf(a));
+      .sort((a, b) => scoreOf(b, CONFIG) - scoreOf(a, CONFIG));
 
     const bonuses = [
       ['photo', 'Best pose photo', 5],
@@ -1339,19 +1340,19 @@ export default function TreasureHunt({ onClose }) {
     ];
 
     const handleBonus = (teamId, key, val) => {
-      const run = loadState(teamId);
+      const run = store.load(teamId);
       if (!run) return;
       run.bonus = run.bonus || {};
       if (run.bonus[key]) delete run.bonus[key];
       else run.bonus[key] = val;
-      saveState(teamId, run);
+      store.save(teamId, run);
       // force re-render
-      setOrgS({ ...(orgS || {}), _tick: Date.now() });
+      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
     };
 
     const handleReset = (teamId) => {
-      localStorage.removeItem('treasure:' + teamId);
-      setOrgS({ ...(orgS || {}), _tick: Date.now() });
+      store.remove(teamId);
+      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
     };
 
     return (
@@ -1426,7 +1427,7 @@ export default function TreasureHunt({ onClose }) {
                           {run.finishedAt ? 'DONE' : mmss(left)}
                         </td>
                         <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', textAlign: 'right' }}>
-                          <b className="display" style={{ fontSize: 20 }}>{scoreOf(run)}</b>
+                          <b className="display" style={{ fontSize: 20 }}>{scoreOf(run, CONFIG)}</b>
                         </td>
                       </tr>
                     );
@@ -1440,7 +1441,7 @@ export default function TreasureHunt({ onClose }) {
               <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Closest guess — true answers</div>
               {CONFIG.guess.questions.map((q, i) => (
                 <label key={i} className="f" style={{ display: 'block', marginBottom: 10 }}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 5 }}>{i + 1}. {esc(q)}</span>
+                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 5 }}>{i + 1}. {q}</span>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -1485,7 +1486,7 @@ export default function TreasureHunt({ onClose }) {
                   {s.ask && (
                     <p className="note">
                       STRANGER — word: {esc(s.ask.word || '—')} · rec: {esc(s.ask.rec || '—')} · photo: {s.ask.photo ? 'yes' : 'no'}
-                      <span className="tag">+{askPoints(s.ask)}</span>
+                      <span className="tag">+{askPoints(s.ask, CONFIG)}</span>
                     </p>
                   )}
                   {s.bingo && (
@@ -1503,7 +1504,7 @@ export default function TreasureHunt({ onClose }) {
                   {s.guess && (
                     <p className="note">
                       GUESSES — {(s.guess.answers || []).map((a, gi) => `${gi + 1}. ${esc(a)}`).join(' · ')}
-                      <span className="tag">+{guessPoints(s.guess)}</span>
+                      <span className="tag">+{guessPoints(s.guess, CONFIG)}</span>
                     </p>
                   )}
                   {s.cheer && <p className="note">VIDEO — {esc(s.cheer.name)} · {s.cheer.seconds}s (held on the team's phone)</p>}
@@ -1552,10 +1553,11 @@ export default function TreasureHunt({ onClose }) {
           type="button"
           className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card border-red transition-all duration-100 hover:opacity-90"
         >
-          ← Back to Day 4
+          {preview ? '← Back to editor' : '← Back to Day 4'}
         </button>
       </div>
 
+      {preview && renderPreviewBar()}
       {renderHeader()}
 
       {view === 'start' && renderStartScreen()}

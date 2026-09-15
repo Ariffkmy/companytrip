@@ -45,6 +45,18 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
+            // Treasure hunt reference photos (Supabase Storage). File names
+            // are random and never overwritten, so the first copy is final —
+            // and the hunt happens where signal is patchy.
+            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/hunt-media\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'hunt-media',
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Google Fonts stylesheet — small, changes rarely.
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
             handler: 'StaleWhileRevalidate',
