@@ -106,66 +106,65 @@ function PersonRow({ person, joined, isSelf, onPatch, onRemove, selected, onSele
   const [confirming, setConfirming] = useState(false);
   const base = `p-${person.email.replace(/[^a-z0-9]/gi, '-')}`;
 
+  const who = person.full_name || person.email;
+
   return (
-    <li className="bg-white border border-gray-200 rounded-lg p-3.5">
-      <div className="flex items-start justify-between gap-3">
+    <tr className="border-t border-gray-200 align-middle">
+      <td className="pl-3 pr-1 py-2.5 w-8">
         {!joined && (
           <input type="checkbox" checked={selected} onChange={(e) => onSelect(e.target.checked)}
-            aria-label={`Select ${person.full_name || person.email} for invite`}
-            className="mt-0.5 w-4 h-4 shrink-0 accent-[var(--color-red)] cursor-pointer" />
+            aria-label={`Select ${who} for invite`}
+            className="w-4 h-4 accent-[var(--color-red)] cursor-pointer" />
         )}
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-snug truncate">
-            {person.full_name || person.email}
-            {isSelf && <span className="ml-1.5 text-gray-400 font-normal">(you)</span>}
-          </p>
-          {person.full_name && <p className="font-mono text-[11px] text-gray-400 truncate">{person.email}</p>}
-        </div>
-        <span className={`shrink-0 font-mono text-[10px] uppercase tracking-wider text-right ${joined ? 'text-sea' : person.invited_at ? 'text-amber-600' : 'text-gray-400'}`}>
+      </td>
+      <td className="px-2 py-2.5 max-w-[220px]">
+        <p className="text-sm font-medium leading-snug truncate">
+          {who}
+          {isSelf && <span className="ml-1.5 text-gray-400 font-normal">(you)</span>}
+        </p>
+        {person.full_name && <p className="font-mono text-[11px] text-gray-400 truncate">{person.email}</p>}
+      </td>
+      <td className="px-2 py-2.5 whitespace-nowrap">
+        <span className={`font-mono text-[10px] uppercase tracking-wider ${joined ? 'text-sea' : person.invited_at ? 'text-amber-600' : 'text-gray-400'}`}>
           {joined ? 'Joined' : person.invited_at ? 'Invited' : 'Not invited'}
-          {!joined && person.invited_at && <span className="block normal-case tracking-normal">{shortDate(person.invited_at)}</span>}
         </span>
-      </div>
-
-      {!joined && (
-        <div className="flex items-center gap-3 mt-2.5">
-          <button type="button" onClick={onInvite} disabled={inviting}
-            className="h-8 px-3 rounded-md border border-gray-200 bg-white text-xs font-medium text-ink cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-wait">
-            {inviting ? 'Sending…' : person.invited_at ? 'Resend invite' : 'Send invite'}
-          </button>
+        {!joined && person.invited_at && <span className="block text-[11px] text-gray-400">{shortDate(person.invited_at)}</span>}
+      </td>
+      <td className="px-2 py-2.5 min-w-[130px]">
+        <label htmlFor={`${base}-team`} className="sr-only">Team for {who}</label>
+        <TeamSelect id={`${base}-team`} value={person.team} onChange={(v) => onPatch({ team: v })} />
+      </td>
+      <td className="px-2 py-2.5 min-w-[120px]">
+        <label htmlFor={`${base}-role`} className="sr-only">Role for {who}</label>
+        <RoleSelect id={`${base}-role`} value={person.role} onChange={(v) => onPatch({ role: v })} />
+      </td>
+      <td className="px-2 py-2.5 text-center">
+        <input type="checkbox" checked={person.is_admin} disabled={isSelf}
+          onChange={(e) => onPatch({ is_admin: e.target.checked })}
+          aria-label={isSelf ? 'Admin (can’t remove your own)' : `Admin: ${who}`}
+          title={isSelf ? 'Can’t remove your own admin' : undefined}
+          className="w-4 h-4 accent-[var(--color-red)] cursor-pointer disabled:cursor-not-allowed" />
+      </td>
+      <td className="pl-2 pr-3 py-2.5">
+        <div className="flex items-center justify-end gap-3 whitespace-nowrap">
           {inviteNote && <span className={`text-xs ${inviteNote.ok ? 'text-sea' : 'text-red'}`}>{inviteNote.text}</span>}
+          {!joined && (
+            <button type="button" onClick={onInvite} disabled={inviting}
+              className="h-8 px-3 rounded-md border border-gray-200 bg-white text-xs font-medium text-ink cursor-pointer hover:border-gray-400 disabled:opacity-50 disabled:cursor-wait">
+              {inviting ? 'Sending…' : person.invited_at ? 'Resend' : 'Invite'}
+            </button>
+          )}
+          {!isSelf && (
+            <button type="button"
+              onClick={() => (confirming ? onRemove() : setConfirming(true))}
+              onBlur={() => setConfirming(false)}
+              className={`text-xs font-medium cursor-pointer rounded-sm underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-red ${confirming ? 'text-red' : 'text-gray-400 hover:text-red'}`}>
+              {confirming ? 'Tap again' : 'Remove'}
+            </button>
+          )}
         </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-2 mt-3">
-        <div>
-          <label htmlFor={`${base}-team`} className="sr-only">Team</label>
-          <TeamSelect id={`${base}-team`} value={person.team} onChange={(v) => onPatch({ team: v })} />
-        </div>
-        <div>
-          <label htmlFor={`${base}-role`} className="sr-only">Role</label>
-          <RoleSelect id={`${base}-role`} value={person.role} onChange={(v) => onPatch({ role: v })} />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 mt-3">
-        <label className={`flex items-center gap-2 text-sm ${isSelf ? 'text-gray-400' : 'text-gray-600 cursor-pointer'}`}>
-          <input type="checkbox" checked={person.is_admin} disabled={isSelf}
-            onChange={(e) => onPatch({ is_admin: e.target.checked })}
-            className="w-4 h-4 accent-[var(--color-red)]" />
-          Admin
-          {isSelf && <span className="note">can’t remove your own</span>}
-        </label>
-        {!isSelf && (
-          <button type="button"
-            onClick={() => (confirming ? onRemove() : setConfirming(true))}
-            onBlur={() => setConfirming(false)}
-            className={`text-xs font-medium cursor-pointer rounded-sm underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-red ${confirming ? 'text-red' : 'text-gray-400 hover:text-red'}`}>
-            {confirming ? 'Tap again to remove' : 'Remove'}
-          </button>
-        )}
-      </div>
-    </li>
+      </td>
+    </tr>
   );
 }
 
@@ -319,7 +318,29 @@ function TripList({ currentEmail, onSelfChanged }) {
         <p className="text-sm text-gray-500">{filter === 'all' ? 'Nobody on the list yet. Add the first person above.' : 'Nobody here.'}</p>
       )}
 
-      <ul className="space-y-2.5 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2.5">
+      {shown.length > 0 && (
+      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+      <table className="w-full min-w-[760px] text-left">
+        <thead>
+          <tr className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
+            <th scope="col" className="pl-3 pr-1 py-2.5 w-8">
+              {invitable.length > 0 && (
+                <input type="checkbox"
+                  checked={invitable.every((p) => selected.has(p.email))}
+                  onChange={(e) => setSelected(e.target.checked ? new Set(invitable.map((p) => p.email)) : new Set())}
+                  aria-label="Select everyone not joined"
+                  className="w-4 h-4 accent-[var(--color-red)] cursor-pointer" />
+              )}
+            </th>
+            <th scope="col" className="px-2 py-2.5 font-normal">Name</th>
+            <th scope="col" className="px-2 py-2.5 font-normal">Status</th>
+            <th scope="col" className="px-2 py-2.5 font-normal">Team</th>
+            <th scope="col" className="px-2 py-2.5 font-normal">Role</th>
+            <th scope="col" className="px-2 py-2.5 font-normal text-center">Admin</th>
+            <th scope="col" className="pl-2 pr-3 py-2.5 font-normal"><span className="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
         {shown.map((p) => (
           <PersonRow
             key={p.email}
@@ -335,7 +356,10 @@ function TripList({ currentEmail, onSelfChanged }) {
             inviteNote={notes[p.email]}
           />
         ))}
-      </ul>
+        </tbody>
+      </table>
+      </div>
+      )}
 
       {people && people.length > 0 && (
         <p className="note mt-6 leading-relaxed">
@@ -348,7 +372,7 @@ function TripList({ currentEmail, onSelfChanged }) {
 }
 
 const SECTIONS = [
-  { id: 'people', label: 'Trip list', lede: 'Who can join, which team they’re on, and who else can manage this list. Teams set here are what people see in the treasure hunt.' },
+  { id: 'people', label: 'Trip list' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every checkpoint’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
 ];
 
@@ -370,7 +394,7 @@ export default function Admin({ currentEmail, onSelfChanged }) {
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
           Admin <span className="text-red">{current.id === 'hunt' ? 'hunt' : 'list'}</span>
         </h1>
-        <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>
+        {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
 
       <div role="tablist" aria-label="Admin sections" className="grid grid-cols-2 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-md">

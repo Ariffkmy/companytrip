@@ -319,8 +319,28 @@ export default function HuntEditor() {
             </div>
           ))}
         </div>
-        <Sub>Part B — riddle</Sub>
-        {commonFields('cp2b')}
+        <Sub>Part B — riddles</Sub>
+        {commonFields('cp2b', { body: false })}
+        <Area label="Intro above the riddles (optional)" hint={TEXT_HINT} value={val([...cp('cp2b'), 'body'])} onChange={set([...cp('cp2b'), 'body'])} rows={2} />
+        <div>
+          <p className="text-xs font-semibold text-gray-600 mb-1">Riddles</p>
+          <ol className="space-y-3">
+            {val([...cp('cp2b'), 'riddles']).map((r, i, all) => (
+              <li key={i} className="flex gap-2 items-start">
+                <span className="font-mono text-[11px] text-gray-400 w-5 shrink-0 text-right pt-3">{i + 1}</span>
+                <textarea aria-label={`Riddle ${i + 1}`} value={r} rows={4}
+                  onChange={(e) => set([...cp('cp2b'), 'riddles', i])(e.target.value)}
+                  className={`${inputCls} py-2 leading-relaxed resize-y`} />
+                <button type="button" aria-label={`Remove riddle ${i + 1}`} disabled={all.length <= 1}
+                  onClick={() => set([...cp('cp2b'), 'riddles'])(all.filter((_, j) => j !== i))}
+                  className="shrink-0 h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">×</button>
+              </li>
+            ))}
+          </ol>
+          <button type="button" onClick={() => set([...cp('cp2b'), 'riddles'])([...val([...cp('cp2b'), 'riddles']), ''])}
+            className="mt-2 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add riddle</button>
+          <p className="note mt-1">{TEXT_HINT} Teams must answer every riddle to collect the stamp.</p>
+        </div>
       </Section>
 
       <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>

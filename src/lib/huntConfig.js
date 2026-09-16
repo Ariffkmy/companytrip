@@ -49,11 +49,11 @@ export const DEFAULT_HUNT_CONFIG = {
         'A vending machine nobody has seen the like of',
         'A cat (real or on a sign)',
         'A sign you cannot read',
-        'Someone in uniform',
+        'A traffic cone',
         'Something perfectly round',
         'A door you want to open',
         'The colour orange',
-        'A view of the sea worth stopping for',
+        'A convenience store',
       ]),
     },
     'team-sapphire': {
@@ -61,13 +61,13 @@ export const DEFAULT_HUNT_CONFIG = {
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'Steam rising from anything',
-        'A manhole cover with a picture on it',
-        'A red postbox',
+        'A taxi',
+        'A street light',
         'A shop mascot or character',
         'Something shaped like a fish',
         'A bicycle with a basket',
         'A tiny shrine or statue',
-        'The colour blue, loudly',
+        'An umbrella',
         'Your shadow doing something silly',
       ]),
     },
@@ -78,12 +78,12 @@ export const DEFAULT_HUNT_CONFIG = {
         'A lantern',
         'A plastic food display',
         'A crosswalk with nobody breaking the rules',
-        'A plant growing where it should not',
+        'A parked car',
         'A sign with an arrow',
         'Something made of bamboo',
         'A bird',
-        'A staircase with more than 20 steps',
-        'The colour green, loudly',
+        'A bus stop',
+        'A traffic light',
       ]),
     },
     'team-diamond': {
@@ -92,12 +92,12 @@ export const DEFAULT_HUNT_CONFIG = {
       bingo: bingoCard([
         'A torii gate',
         'A souvenir shaped like food',
-        'A bench facing the water',
+        'A vending machine',
         'Someone waving back at you',
         'A clock showing the wrong time',
         'A noren curtain in a doorway',
         'Something striped',
-        'A roof with curved tiles',
+        'A bicycle',
         'The colour purple',
       ]),
     },
@@ -107,10 +107,10 @@ export const DEFAULT_HUNT_CONFIG = {
       bingo: bingoCard([
         'A hot spring sign (♨)',
         'A drink you have never tried, in a can',
-        'A boat',
-        'A pair of shoes left outside',
-        'A mailbox that is not red',
-        'Something written in English that is slightly wrong',
+        'A tree',
+        'A shop menu',
+        'Your selfie with a sad face',
+        'Your selfie with a happy face',
         'A reflection in a window',
         'A flower in a pot',
         'The colour yellow',
@@ -129,7 +129,11 @@ export const DEFAULT_HUNT_CONFIG = {
     },
     cp2b: {
       title: 'Three switches', kana: 'スイッチの謎', photo: null,
-      body: 'You\'re outside a room with the door shut. On the wall next to you are **three switches**. Inside the room are **three light bulbs**, one per switch.\n\nYou may flip the switches as much as you like. You may open the door and go in **once** — and once you\'re in, you can\'t touch the switches again. How do you tell which switch controls which bulb?',
+      /* Optional intro above the riddles; every riddle must be answered. */
+      body: '',
+      riddles: [
+        'You\'re outside a room with the door shut. On the wall next to you are **three switches**. Inside the room are **three light bulbs**, one per switch.\n\nYou may flip the switches as much as you like. You may open the door and go in **once** — and once you\'re in, you can\'t touch the switches again. How do you tell which switch controls which bulb?',
+      ],
     },
     cp3: {
       title: 'Buy it, try it', kana: '買って食べる', photo: null,
@@ -203,7 +207,14 @@ function deepMerge(base, over) {
 }
 
 export function withDefaults(stored) {
-  return deepMerge(structuredClone(DEFAULT_HUNT_CONFIG), stored || {});
+  const merged = deepMerge(structuredClone(DEFAULT_HUNT_CONFIG), stored || {});
+  /* Saved before riddles became a list: its one riddle lived in `body`. */
+  const oldRiddle = stored?.checkpoints?.cp2b;
+  if (oldRiddle && !Array.isArray(oldRiddle.riddles) && String(oldRiddle.body ?? '').trim()) {
+    merged.checkpoints.cp2b.riddles = [oldRiddle.body];
+    merged.checkpoints.cp2b.body = '';
+  }
+  return merged;
 }
 
 /* Fill {tokens} in unlock text from the rest of the config. */
@@ -253,14 +264,15 @@ export function validate(config) {
   const cp = config.checkpoints;
   const posInt = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
   if (!(Number(config.raceMinutes) > 0)) errs.push('General: race length must be more than 0 minutes.');
-  if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Checkpoint 4: every question needs text, and there must be at least one.');
+  if (!cp.cp2b.riddles.length || cp.cp2b.riddles.some((r) => !String(r ?? '').trim())) errs.push('Checkpoint 3: every riddle needs text, and there must be at least one.');
+  if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Checkpoint 5: every question needs text, and there must be at least one.');
   groupRoster.forEach((g) => {
     const card = config.teams[g.id]?.bingo ?? [];
-    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Checkpoint 6: all nine of ${g.name}’s bingo tiles need a prompt.`);
+    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Checkpoint 1: all nine of ${g.name}’s bingo tiles need a prompt.`);
   });
   if (!cp.guess.questions.length || cp.guess.questions.some((q) => !q.trim())) errs.push('Checkpoint 7: every question needs text, and there must be at least one.');
   if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Checkpoint 8: the maximum video length must be at least the target length.');
-  if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Checkpoint 5: each task needs a label and a points value.');
+  if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Checkpoint 6: each task needs a label and a points value.');
   return errs;
 }
 

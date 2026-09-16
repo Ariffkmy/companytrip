@@ -11,10 +11,14 @@ import { supabase } from './supabase';
 
 const BATCH = 100;
 
+/* Invite links always point at the live app, even when an admin sends
+   them from a local dev server. */
+const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://companytrip-seven.vercel.app';
+
 /** Invite one or many emails. Resolves to [{ email, status, message? }]
     with status 'sent' | 'joined' | 'not_on_list' | 'error'. */
 export async function sendInvites(emails, onProgress) {
-  const redirectTo = window.location.origin;
+  const redirectTo = SITE_URL;
   const results = [];
   for (let i = 0; i < emails.length; i += BATCH) {
     const chunk = emails.slice(i, i + BATCH);

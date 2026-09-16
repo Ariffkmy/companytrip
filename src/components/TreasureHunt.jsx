@@ -737,45 +737,69 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
-  const renderCp2b = () => (
-    <div className="card flag">
-      {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
-      <div className="task">
-        <Rich text={CONFIG.cp.cp2b.body} />
-      </div>
-      <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />
-      <label className="f" style={{ display: 'block', marginBottom: 12 }}>
-        <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>Your method</span>
-        <textarea
-          placeholder="Write the steps your team agreed on."
-          value={draft.answer || ''}
-          onChange={(e) => setDraft((d) => ({ ...d, answer: e.target.value }))}
-          style={{
-            width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-            border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-            minHeight: 110, resize: 'vertical', lineHeight: 1.5,
+  /* Every configured riddle needs an answer before the stamp. */
+  const renderCp2b = () => {
+    const riddles = CONFIG.cp.cp2b.riddles;
+    const answers = draft.riddleAnswers || [];
+    const answered = riddles.filter((_, i) => String(answers[i] || '').trim()).length;
+    const many = riddles.length > 1;
+    return (
+      <div className="card flag">
+        {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
+        {String(CONFIG.cp.cp2b.body || '').trim() && (
+          <div className="task">
+            <Rich text={CONFIG.cp.cp2b.body} />
+          </div>
+        )}
+        <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />
+        {riddles.map((riddle, i) => (
+          <div key={i} style={{ marginBottom: 16 }}>
+            <div className="task">
+              {many && <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 6 }}>Riddle {i + 1} of {riddles.length}</div>}
+              <Rich text={riddle} />
+            </div>
+            <label className="f" style={{ display: 'block' }}>
+              <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
+                {many ? `Your answer to riddle ${i + 1}` : 'Your answer'}
+              </span>
+              <textarea
+                placeholder="Write the answer your team agreed on."
+                value={answers[i] || ''}
+                onChange={(e) => setDraft((d) => {
+                  const next = [...(d.riddleAnswers || [])];
+                  next[i] = e.target.value;
+                  return { ...d, riddleAnswers: next };
+                })}
+                style={{
+                  width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
+                  border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
+                  minHeight: 90, resize: 'vertical', lineHeight: 1.5,
+                }}
+              />
+            </label>
+          </div>
+        ))}
+        <button
+          className="btn block"
+          disabled={answered < riddles.length}
+          onClick={() => {
+            const list = riddles.map((_, i) => String(answers[i] || '').trim());
+            const newS = { ...S };
+            newS.subs = { ...(newS.subs || {}), cp2b: { answers: list, answer: list.join('\n\n'), at: Date.now() } };
+            newS.stage = S.stage + 1;
+            store.save(newS.teamId, newS);
+            setS(newS);
+            setDraft({});
+            showToast(`${many ? 'Answers' : 'Answer'} sent. Stamp ${CP_NUM.cp2b} collected.`);
           }}
-        />
-      </label>
-      <button
-        className="btn block"
-        disabled={(draft.answer || '').trim().length <= 15}
-        onClick={() => {
-          const newS = { ...S };
-          newS.subs = { ...(newS.subs || {}), cp2b: { answer: draft.answer, at: Date.now() } };
-          newS.stage = S.stage + 1;
-          store.save(newS.teamId, newS);
-          setS(newS);
-          setDraft({});
-          showToast('Answer sent. Stamp 2 collected.');
-        }}
-        type="button"
-      >
-        Send answer
-      </button>
-      <p className="note" style={{ margin: '12px 0 0' }}>Describe the steps — one line won't be enough.</p>
-    </div>
-  );
+          type="button"
+        >
+          {many ? `Send answers · ${answered}/${riddles.length}` : 'Send answer'}
+        </button>
+        {many && <p className="note" style={{ margin: '12px 0 0' }}>Answer all {riddles.length} riddles to collect the stamp.</p>}
+      </div>
+    );
+  };
 
   const renderCp3 = () => (
     <div className="card flag">
@@ -1560,7 +1584,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
                       {imgs.map((img, ii) => <img key={ii} src={img} alt="" style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 6 }} />)}
                     </div>
                   )}
-                  {s.cp2b && <p className="note" style={{ marginTop: 12 }}>RIDDLE — {esc(s.cp2b.answer).slice(0, 220)}</p>}
+                  {s.cp2b && (s.cp2b.answers ?? [s.cp2b.answer]).map((a, ai, all) => (
+                    <p key={ai} className="note" style={{ marginTop: ai ? 4 : 12 }}>
+                      RIDDLE{all.length > 1 ? ` ${ai + 1}` : ''} — {esc(a).slice(0, 220)}
+                    </p>
+                  ))}
                   {s.cp3 && <p className="note">BOUGHT — {esc(s.cp3.item)} · ¥{esc(s.cp3.price || '?')}</p>}
                   {s.cp4 && <p className="note">QUIZ — {s.cp4.answers.map((a, ai) => `${ai + 1}. ${esc(a)}`).join(' · ')} <span className="tag" style={{
                     background: s.cp4.correct ? 'rgba(143,190,126,.3)' : 'var(--th-slot)',
