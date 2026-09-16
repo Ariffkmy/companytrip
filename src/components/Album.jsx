@@ -13,6 +13,13 @@ function dateKey(iso) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/* Defaults to today's leg of the trip, so whoever opens the album on
+   Day 3 lands straight on Day 3's photos instead of "All". */
+function todaysTab() {
+  const today = dateKey(new Date());
+  return DAY_TABS.find((t) => t.date === today)?.id ?? 'all';
+}
+
 function friendly(err) {
   const msg = err?.message ?? '';
   if (/fetch|network/i.test(msg)) return 'No connection. Photos need internet to upload and load.';
@@ -94,7 +101,7 @@ export default function Album({ userId, isAdmin }) {
   const [upload, setUpload] = useState(null); // { done, total, failed }
   const [open, setOpen] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [dayFilter, setDayFilter] = useState('all');
+  const [dayFilter, setDayFilter] = useState(todaysTab);
 
   const load = useCallback(async () => {
     try {
