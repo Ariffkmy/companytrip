@@ -121,9 +121,96 @@ function ActivityCard({ act, i }) {
   );
 }
 
+/* ── Checklist (Day 0) ────────────────────────────────
+   Prep day, not a day of activities — a to-do list reads better
+   than a timeline of collapsible cards nobody needs to expand twice. */
+const CHECKLIST_KEY = 'olc-checklist-d0';
+
+function useChecklist(key) {
+  const [checked, setChecked] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(key)) ?? []); } catch (e) { return new Set(); }
+  });
+
+  const toggle = (id) => setChecked((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    try { localStorage.setItem(key, JSON.stringify([...next])); } catch (e) { /* silent */ }
+    return next;
+  });
+
+  return [checked, toggle];
+}
+
+function ChecklistItem({ id, label, sub, checked, onToggle, compact }) {
+  if (compact) {
+    return (
+      <label className="flex items-start gap-2 text-sm leading-relaxed cursor-pointer">
+        <input type="checkbox" checked={checked} onChange={() => onToggle(id)}
+          className="mt-1 w-3.5 h-3.5 rounded border-gray-300 text-red focus:ring-red shrink-0 cursor-pointer" />
+        <span className={checked ? 'line-through text-gray-400' : 'text-gray-600'}>{label}</span>
+      </label>
+    );
+  }
+  return (
+    <label className="flex items-start gap-3 px-3.5 py-3 bg-white border border-gray-200 rounded-lg cursor-pointer transition-colors hover:bg-gray-50">
+      <input type="checkbox" checked={checked} onChange={() => onToggle(id)}
+        className="mt-1 w-4 h-4 rounded border-gray-300 text-red focus:ring-red shrink-0 cursor-pointer" />
+      <span className="min-w-0">
+        <span className={`block text-sm font-medium leading-snug ${checked ? 'line-through text-gray-400' : 'text-ink'}`}>{label}</span>
+        {sub && <span className={`block text-xs mt-0.5 leading-relaxed ${checked ? 'text-gray-300' : 'text-gray-500'}`}>{sub}</span>}
+      </span>
+    </label>
+  );
+}
+
+function ChecklistDayPanel({ day }) {
+  const [checked, toggle] = useChecklist(CHECKLIST_KEY);
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {day.activities.map((act, i) => {
+          const id = `act-${i}`;
+          return (
+            <ChecklistItem key={id} id={id} label={act.activity} sub={act.note}
+              checked={checked.has(id)} onToggle={toggle} />
+          );
+        })}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="text-[11px] font-semibold tracking-wider uppercase text-sea mb-2.5">🎒 Participants</h4>
+          <div className="space-y-2">
+            {day.participantPrep.map((item, i) => {
+              const id = `pp-${i}`;
+              return <ChecklistItem key={id} id={id} label={item} compact
+                checked={checked.has(id)} onToggle={toggle} />;
+            })}
+          </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 className="text-[11px] font-semibold tracking-wider uppercase text-red mb-2.5">📋 Committee</h4>
+          <div className="space-y-2">
+            {day.committeePrep.map((item, i) => {
+              const id = `cp-${i}`;
+              return <ChecklistItem key={id} id={id} label={item} compact
+                checked={checked.has(id)} onToggle={toggle} />;
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── DayPanel ──────────────────────────────────────── */
 function DayPanel({ day, index, active, onOpenTreasureHunt }) {
   if (!active) return null;
+
+  if (index === 0) {
+    return <ChecklistDayPanel day={day} />;
+  }
 
   return (
     <div className="space-y-4">
