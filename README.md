@@ -28,7 +28,7 @@ The app requires sign-in (email + password). Accounts are invite-only: the commi
    ```sql
    update public.allowed_emails set is_admin = true where email = 'someone@company.com';
    ```
-4. Invite them: Authentication → Users → **Invite user**. The email link opens the app on a "Welcome aboard" screen where they set their password. Invites for emails not on the allowlist are refused.
+4. Invite them from the app: **Admin → Trip list** → **Send invite** on one person, or tick several and **Send invites** (needs the `invite-members` Edge Function: `supabase functions deploy invite-members`; the dashboard's Authentication → Users → **Invite user** still works too). Supabase's built-in email sender only allows a few emails an hour — set up custom SMTP (Authentication → Emails → SMTP Settings) before bulk-inviting. The email link opens the app on a "Welcome aboard" screen where they set their password. Invites for emails not on the allowlist are refused.
 5. Authentication → Sign In / Providers: turn **off** "Allow new users to sign up". There is no sign-up form in the app; this closes the API route too (invites still work).
 6. Authentication → URL Configuration: set **Site URL** to the deployed app URL and add `http://localhost:5173` to **Redirect URLs**, so invite and password-reset links land back in the app.
 

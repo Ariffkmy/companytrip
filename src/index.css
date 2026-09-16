@@ -170,6 +170,9 @@
       linear-gradient(var(--bg-scrim), var(--bg-scrim)),
       url("/bg-japan.webp") center / cover no-repeat;
   }
+
+  /* Admin is a working screen — plain paper, no illustration. */
+  body.no-bg-art::before { content: none; }
 }
 
 @layer utilities {

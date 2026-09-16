@@ -25,3 +25,6 @@ dist-ssr
 
 # PWA service worker emitted by `vite dev`
 dev-dist
+
+# Supabase CLI local state (project link, versions)
+supabase/.temp/

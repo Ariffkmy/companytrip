@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
+import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
@@ -16,8 +17,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf]/g, '');
 
-/* Downscale to a JPEG data URL. Bingo tiles pass a smaller max/quality —
-   nine of them per team has to fit in localStorage alongside everything else. */
+/* Downscale to a JPEG data URL. Preview bingo tiles pass a smaller max/quality. */
 function compressImage(file, max = 760, quality = 0.72) {
   return new Promise((res, rej) => {
     const img = new Image();
@@ -190,11 +190,13 @@ function saveAnswers(next) {
 
 const SLOTS = Array.from({ length: 8 }, (_, i) => i);
 
-const CP_INDEX = { cp1: 0, cp2a: 1, cp2b: 1, cp3: 2, cp4: 3, ask: 4, bingo: 5, guess: 6, cheer: 7 };
+/* Photo bingo is its own game and comes first; the stamp rally follows. */
+const CP_INDEX = { bingo: 0, cp1: 1, cp2a: 2, cp2b: 2, cp3: 3, cp4: 4, ask: 5, guess: 6, cheer: 7 };
+const CP_NUM = Object.fromEntries(Object.entries(CP_INDEX).map(([k, v]) => [k, v + 1]));
 
 /* Label for each FLOW step, shown in the admin preview's jump menu. */
 function flowLabel(step, cp) {
-  const n = { cp1: 1, cp2a: 2, cp2b: 2, cp3: 3, cp4: 4, ask: 5, bingo: 6, guess: 7, cheer: 8 };
+  const n = CP_NUM;
   if (step.type === 'unlock') {
     const key = step.to === 'cp2' ? 'cp2a' : step.to;
     return `Unlock screen → ${n[key]}`;
@@ -204,6 +206,8 @@ function flowLabel(step, cp) {
 }
 
 const FLOW = [
+  { type: 'cp', key: 'bingo' },
+  { type: 'unlock', to: 'cp1' },
   { type: 'cp', key: 'cp1' },
   { type: 'unlock', to: 'cp2' },
   { type: 'cp', key: 'cp2a' },
@@ -214,8 +218,6 @@ const FLOW = [
   { type: 'cp', key: 'cp4' },
   { type: 'unlock', to: 'ask' },
   { type: 'cp', key: 'ask' },
-  { type: 'unlock', to: 'bingo' },
-  { type: 'cp', key: 'bingo' },
   { type: 'unlock', to: 'guess' },
   { type: 'cp', key: 'guess' },
   { type: 'unlock', to: 'cheer' },
@@ -232,7 +234,6 @@ function blankState(team) {
     finishedAt: null,
     stage: 0,
     subs: {},
-    bingo: {},
     bonus: {},
   };
 }
@@ -244,10 +245,10 @@ function askPoints(sub, CONFIG) {
 
 function bingoPoints(tiles, CONFIG) {
   const filled = (i) => !!(tiles || {})[i];
-  const n = CONFIG.bingo.tiles.reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
+  const n = Array.from({ length: CONFIG.bingo.size }).reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
   let p = n;
   p += BINGO_LINES.filter((line) => line.every(filled)).length * CONFIG.bingo.linePts;
-  if (n === CONFIG.bingo.tiles.length) p += CONFIG.bingo.fullPts;
+  if (n === CONFIG.bingo.size) p += CONFIG.bingo.fullPts;
   return p;
 }
 
@@ -289,7 +290,8 @@ function scoreOf(run, CONFIG) {
    Main Game Component
    ════════════════════════════════════════════════════════════ */
 
-export default function TreasureHunt({ onClose, teamId, config, preview = false }) {
+/* `me` is the signed-in member: { email, team, role, isAdmin }. */
+export default function TreasureHunt({ onClose, teamId, me, config, preview = false }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const store = useMemo(() => makeStore(preview), [preview]);
   /* Preview only: which team the admin is playing as. */
@@ -301,7 +303,18 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
   const [tick, setTick] = useState(null);
   const [toast, setToast] = useState(null);
   const [, setOrgS] = useState(null); // for organizer bonus toggle
-  const [bingoOpen, setBingoOpen] = useState(false);
+  /* Shared bingo card for the active team: { [tile]: shot }. Preview keeps
+     its shots in memory and plays as the team's lead. */
+  const [shots, setShots] = useState({});
+  const [assignees, setAssignees] = useState({});
+  const [allShots, setAllShots] = useState([]);
+  const [busyTile, setBusyTile] = useState(null);
+  const [coverTile, setCoverTile] = useState(null);
+  const [bingoMissing, setBingoMissing] = useState(null);
+  const [bingoChecking, setBingoChecking] = useState(false);
+  /* Scores and times are for the committee only. */
+  const canOrganise = preview || !!me?.isAdmin;
+  const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -335,25 +348,35 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     store.save(run.teamId, run);
   }, []);
 
-  // Clock tick
-  useEffect(() => {
-    if (view !== 'race' && view !== 'done') return;
-    if (!S?.startedAt) return;
-    const id = setInterval(() => {
-      // force re-render to update clock
-      setS((prev) => ({ ...prev }));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [view, S?.startedAt]);
-
-  const clockLeft = useCallback(() => {
-    if (!S?.startedAt) return CONFIG.raceMinutes * 60;
-    const end = S.startedAt + CONFIG.raceMinutes * 60000;
-    const now = S.finishedAt || Date.now();
-    return Math.max(0, Math.round((now > end ? 0 : end - now) / 1000));
-  }, [S]);
-
   const currentTeam = S ? CONFIG.teams.find((t) => t.id === S.teamId) : null;
+  const bingoCard = CONFIG.teams.find((t) => t.id === activeTeamId)?.bingo ?? [];
+
+  /* Teammates fill tiles from their own phones — keep the card fresh
+     while it can be seen. */
+  /* Resolves to the fresh { [tile]: shot }, or null when offline. */
+  const refreshShots = useCallback(async () => {
+    if (preview || !activeTeamId) return null;
+    try {
+      const [card, rows] = await Promise.all([fetchCard(activeTeamId), listShots(activeTeamId)]);
+      const next = Object.fromEntries(rows.map((r) => [r.tile, r]));
+      setAssignees(card);
+      setShots(next);
+      return next;
+    } catch { return null; /* offline — keep what is on screen */ }
+  }, [preview, activeTeamId]);
+
+  useEffect(() => {
+    if (preview) { setShots({}); setAssignees(previewCard(activeTeamId)); return undefined; }
+    if (view !== 'start' && view !== 'race') return undefined;
+    refreshShots();
+    const id = setInterval(() => { if (!document.hidden) refreshShots(); }, 20000);
+    return () => clearInterval(id);
+  }, [preview, view, refreshShots, activeTeamId]);
+
+  useEffect(() => {
+    if (preview || view !== 'organizer') return;
+    listShots().then(setAllShots).catch(() => {});
+  }, [preview, view]);
 
   /* ── Render views ──────────────────────────────────── */
 
@@ -423,12 +446,10 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
                 }}
                 type="button"
               >
-                {underway ? (existing.finishedAt ? 'See your results' : 'Carry on') : 'Start the clock'}
+                {underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
               </button>
               <p className="note" style={{ margin: '12px 0 0' }}>
-                {underway
-                  ? 'Your clock is still running from when you started.'
-                  : 'Your clock starts the moment you tap. Keep this tab open.'}
+                {underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
               </p>
             </>
           ) : (
@@ -439,11 +460,13 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
           )}
         </div>
 
-        <div style={{ textAlign: 'center' }}>
-          <button className="linky" onClick={() => setView('organizer')} type="button">
-            Organiser view →
-          </button>
-        </div>
+        {canOrganise && (
+          <div style={{ textAlign: 'center' }}>
+            <button className="linky" onClick={() => setView('organizer')} type="button">
+              Organiser view →
+            </button>
+          </div>
+        )}
       </div>
     );
   };
@@ -605,7 +628,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     if (!t) return null;
     return (
       <div className="card flag">
-        {renderCpHead(1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana)}
+        {renderCpHead(CP_NUM.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana)}
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
         </div>
@@ -645,7 +668,6 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         >
           Send photo
         </button>
-        {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
       </div>
     );
   };
@@ -656,7 +678,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     const s = t.spot;
     return (
       <div className="card flag">
-        {renderCpHead(2, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana)}
+        {renderCpHead(CP_NUM.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana)}
         <div className="task">
           <Rich text={CONFIG.cp.cp2a.body} />
         </div>
@@ -717,7 +739,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
 
   const renderCp2b = () => (
     <div className="card flag">
-      {renderCpHead(2, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
+      {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
       <div className="task">
         <Rich text={CONFIG.cp.cp2b.body} />
       </div>
@@ -757,7 +779,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
 
   const renderCp3 = () => (
     <div className="card flag">
-      {renderCpHead(3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana)}
+      {renderCpHead(CP_NUM.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana)}
       <div className="task">
         <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {CONFIG.buy.brief}</p>
         <Rich text={CONFIG.cp.cp3.body} />
@@ -818,7 +840,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     const answers = draft.answers || [];
     return (
       <div className="card flag">
-        {renderCpHead(4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana)}
+        {renderCpHead(CP_NUM.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana)}
         <div className="task">
           <Rich text={CONFIG.cp.cp4.body} />
         </div>
@@ -865,20 +887,18 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         >
           Send answers
         </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>{CONFIG.points.quizPerAnswer} points per correct answer, on top of the stamp.</p>
       </div>
     );
   };
 
-  /* ── CP5 — ask a stranger ─────────────────────────── */
+  /* ── CP6 — ask a stranger ─────────────────────────── */
 
   const renderAsk = () => {
     const done = CONFIG.ask.tasks.filter((t) => String(draft[t.key] || '').trim()).length;
-    const earned = askPoints(draft, CONFIG);
     const photoTask = CONFIG.ask.tasks.find((t) => t.key === 'photo');
     return (
       <div className="card flag">
-        {renderCpHead(5, CONFIG.cp.ask.title, CONFIG.cp.ask.kana)}
+        {renderCpHead(CP_NUM.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.kana)}
         <div className="task">
           <Rich text={CONFIG.cp.ask.body} />
         </div>
@@ -887,7 +907,6 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
           <label key={t.key} className="f" style={{ display: 'block', marginBottom: 12 }}>
             <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
               {t.label}
-              <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+{t.pts}</b>
             </span>
             <input
               type="text"
@@ -905,7 +924,6 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
           <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
               {photoTask.label}
-              <b style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--red)' }}>+{photoTask.pts}</b>
             </div>
             {renderShot(draft.photo, 'Add the photo', photoTask.hint ? `${photoTask.hint} · optional` : 'Optional')}
           </>
@@ -933,145 +951,223 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         <p className="note" style={{ margin: '12px 0 0' }}>
           {done === 0
             ? 'One of the three is enough to move on.'
-            : `${done} of ${CONFIG.ask.tasks.length} done · ${earned} bonus points so far.`}
+            : `${done} of ${CONFIG.ask.tasks.length} done.`}
         </p>
       </div>
     );
   };
 
-  /* ── CP6 — photo bingo ────────────────────────────────
-     Open as a panel from the first stamp, locked in here. */
+  /* ── Game 1 — photo bingo ────────────────────────────────
+     One shared card per team. Each tile belongs to one member; the Team
+     Lead can fill any tile, as backup for a member who can't upload.
+     The first game of the hunt: fill the card, lock it, and the stamp
+     rally opens. */
 
   const addBingoTile = async (i, file) => {
+    setCoverTile(null);
+    setBusyTile(i);
     try {
-      const dataUrl = await compressImage(file, 420, 0.6);
-      const newS = { ...S, bingo: { ...(S.bingo || {}), [i]: dataUrl } };
-      if (!store.save(newS.teamId, newS)) {
-        showToast('Phone storage is full — clear a tile and retry.');
-        return;
+      if (preview) {
+        const src = await compressImage(file, 420, 0.6);
+        setShots((prev) => ({ ...prev, [i]: { tile: i, src, uploader_name: 'You', on_behalf: true } }));
+      } else {
+        await uploadShot(activeTeamId, i, file);
+        await refreshShots();
       }
-      setS(newS);
-    } catch {
-      showToast("That file didn't load. Try another.");
+    } catch (e) {
+      const msg = e?.message ?? '';
+      showToast(/row-level|policy|unauthori[sz]ed|403/i.test(msg)
+        ? 'This tile isn’t yours to snap.'
+        : /fetch|network/i.test(msg) ? 'No signal — try again in a moment.' : "That photo didn't upload. Try another.");
+    } finally {
+      setBusyTile(null);
     }
   };
 
-  const clearBingoTile = (i) => {
-    const tiles = { ...(S.bingo || {}) };
-    delete tiles[i];
-    const newS = { ...S, bingo: tiles };
-    store.save(newS.teamId, newS);
-    setS(newS);
+  const clearBingoTile = async (i) => {
+    if (preview) {
+      setShots((prev) => { const next = { ...prev }; delete next[i]; return next; });
+      return;
+    }
+    try {
+      await deleteShot(shots[i]);
+      await refreshShots();
+    } catch {
+      showToast('Couldn’t clear that tile.');
+    }
   };
 
-  const renderBingoGrid = (locked) => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
-      {CONFIG.bingo.tiles.map((label, i) => {
-        const shot = (S.bingo || {})[i];
-        const inner = (
-          <>
-            {shot && <img src={shot} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-            <span style={{
-              position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
-              fontSize: 9.5, lineHeight: 1.3, padding: 5,
-              color: shot ? '#fff' : 'var(--ink-soft)',
-              textShadow: shot ? '0 1px 4px rgba(0,0,0,.95)' : 'none',
-            }}>{label}</span>
-            {shot && !locked && (
-              <span
-                onClick={(e) => { e.preventDefault(); clearBingoTile(i); }}
-                style={{
-                  position: 'absolute', top: 3, right: 3, zIndex: 2, background: 'var(--card)',
-                  border: '2px solid var(--ink)', borderRadius: 5, width: 19, height: 19,
-                  display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900, lineHeight: 1,
-                }}
-              >×</span>
-            )}
-          </>
-        );
-        const box = {
-          position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
-          textAlign: 'center', overflow: 'hidden', borderRadius: 8,
-          border: shot ? 'var(--line)' : '3px dashed var(--th-dash)',
-          background: shot ? 'var(--ink)' : 'var(--th-parchment)',
-        };
-        if (locked) return <div key={i} style={box}>{inner}</div>;
-        return (
-          <label key={i} style={{ ...box, cursor: 'pointer' }}>
-            {inner}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: 'none' }}
-              onChange={(e) => { const f = e.target.files[0]; if (f) addBingoTile(i, f); e.target.value = ''; }}
-            />
-          </label>
-        );
-      })}
-    </div>
+  const bingoFileInput = (i, id) => (
+    <input
+      id={id}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      style={{ display: 'none' }}
+      onChange={(e) => { const f = e.target.files[0]; if (f) addBingoTile(i, f); e.target.value = ''; }}
+    />
   );
 
-  const renderBingo = (compact) => {
-    const tiles = S.bingo || {};
-    const filled = CONFIG.bingo.tiles.reduce((n, _, i) => n + (tiles[i] ? 1 : 0), 0);
-    const locked = !!S.subs?.bingo;
-    const lines = BINGO_LINES.filter((line) => line.every((i) => tiles[i])).length;
-
-    if (compact) {
-      if (locked) return null;
-      return (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <button
-            onClick={() => setBingoOpen((o) => !o)}
-            type="button"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-              color: 'var(--ink)', textAlign: 'left',
-            }}
-          >
-            <b className="display" style={{ fontSize: 17 }}>Photo bingo</b>
-            <span className="note">{filled}/9 · {bingoPoints(tiles, CONFIG)} pts</span>
-            <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 11 }}>{bingoOpen ? '▲' : '▼'}</span>
-          </button>
-          {bingoOpen && (
-            <div style={{ marginTop: 12 }}>
-              {renderBingoGrid(false)}
-              <p className="note" style={{ margin: '10px 0 0' }}>Fill these in whenever — walking, queueing, waiting. Locked in at checkpoint 6.</p>
-            </div>
-          )}
+  const renderBingoGrid = (locked) => {
+    const lead = player?.role === 'Team Lead' && player?.team === activeTeamId;
+    const cover = coverTile != null ? { ...bingoCard[coverTile], ...assignees[coverTile] } : null;
+    return (
+      <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          {bingoCard.map((tile, i) => {
+            const shot = shots[i];
+            const assignee = assignees[i];
+            const access = tileAccess(assignee, player, activeTeamId);
+            const who = assignee?.name ?? '…';
+            const mine = access === 'mine';
+            const inner = (
+              <>
+                {shot?.src && <img src={shot.src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                <span style={{
+                  position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
+                  fontSize: 9.5, lineHeight: 1.3, padding: 5,
+                  color: shot ? '#fff' : 'var(--ink-soft)',
+                  textShadow: shot ? '0 1px 4px rgba(0,0,0,.95)' : 'none',
+                }}>{busyTile === i ? 'Uploading…' : tile.prompt}</span>
+                <span style={{
+                  position: 'absolute', left: 3, right: 3, bottom: 3, zIndex: 1,
+                  fontFamily: '"DM Mono", monospace', fontSize: 9, fontWeight: 700, lineHeight: 1.2,
+                  padding: '2px 4px', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  background: mine ? 'var(--gold)' : 'var(--card)', color: 'var(--ink)', border: '1px solid var(--ink)',
+                }}>
+                  📷 {mine ? 'You' : who}{shot?.on_behalf ? ` · by ${shot.uploader_name}` : ''}
+                </span>
+                {shot && !locked && access !== 'no' && (
+                  <span
+                    onClick={(e) => { e.preventDefault(); clearBingoTile(i); }}
+                    style={{
+                      position: 'absolute', top: 3, right: 3, zIndex: 2, background: 'var(--card)',
+                      border: '2px solid var(--ink)', borderRadius: 5, width: 19, height: 19,
+                      display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900, lineHeight: 1,
+                    }}
+                  >×</span>
+                )}
+              </>
+            );
+            const box = {
+              position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
+              textAlign: 'center', overflow: 'hidden', borderRadius: 8, paddingBottom: 16,
+              border: shot ? 'var(--line)' : mine ? '3px dashed var(--red)' : '3px dashed var(--th-dash)',
+              background: shot ? 'var(--ink)' : 'var(--th-parchment)',
+              opacity: !shot && access === 'no' && !locked ? 0.6 : 1,
+            };
+            if (locked || busyTile === i) return <div key={i} style={box}>{inner}</div>;
+            if (access === 'no') {
+              return (
+                <button key={i} type="button" style={{ ...box, cursor: 'not-allowed', color: 'inherit', font: 'inherit' }}
+                  onClick={() => showToast(assignee ? `This tile is ${assignee.name}’s to snap.` : 'Still loading who snaps this one.')}>
+                  {inner}
+                </button>
+              );
+            }
+            if (access === 'cover') {
+              return (
+                <button key={i} type="button" style={{ ...box, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
+                  onClick={() => setCoverTile(coverTile === i ? null : i)}>
+                  {inner}
+                </button>
+              );
+            }
+            return (
+              <label key={i} style={{ ...box, cursor: 'pointer' }}>
+                {inner}
+                {bingoFileInput(i)}
+              </label>
+            );
+          })}
         </div>
-      );
-    }
+
+        {cover && !locked && (
+          <div style={{
+            marginTop: 10, padding: '10px 12px', border: 'var(--line)', borderRadius: 8,
+            background: 'var(--th-parchment)',
+          }}>
+            <p style={{ margin: '0 0 8px', fontSize: 13 }}>
+              <b>“{cover.prompt}”</b> is {cover.name || 'a teammate'}’s tile. Only upload it for them if they have a technical
+              problem — a dead phone, no signal, the upload won’t go through.
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <label className="mini" htmlFor={`bingo-cover-${coverTile}`} style={{ cursor: 'pointer' }}>
+                {shots[coverTile] ? 'Replace' : 'Snap'} it for {cover.name || 'them'}
+              </label>
+              {bingoFileInput(coverTile, `bingo-cover-${coverTile}`)}
+              <button className="mini" type="button" onClick={() => setCoverTile(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        <p className="note" style={{ margin: '10px 0 0' }}>
+          {lead
+            ? 'Each tile has a name on it — that person snaps it on their own phone. As Team Lead you can upload any tile, but only when its owner has a technical issue uploading.'
+            : 'Each tile has a name on it — only that person can snap it. Yours are marked 📷 You. Can’t upload? Ask your Team Lead to do it for you.'}
+        </p>
+      </>
+    );
+  };
+
+  const renderBingo = () => {
+    const tiles = shots;
+    const filled = bingoCard.reduce((n, _, i) => n + (tiles[i] ? 1 : 0), 0);
+    const locked = !!S?.subs?.bingo;
+    /* The warning shrinks as the missing photos land. */
+    const stillMissing = (bingoMissing ?? []).filter((i) => !tiles[i]);
 
     return (
       <div className="card flag">
-        {renderCpHead(6, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana)}
+        {renderCpHead(CP_NUM.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana)}
         <div className="task">
-          <p>Nine prompts, one photo each. {lines > 0
-            ? <b>{lines} line{lines > 1 ? 's' : ''} complete.</b>
-            : `A full line — across, down or corner to corner — is worth an extra ${CONFIG.bingo.linePts}.`}</p>
-          <p style={{ margin: 0 }}>1 point a tile, +{CONFIG.bingo.linePts} a line, +{CONFIG.bingo.fullPts} for all nine.</p>
+          <p style={{ margin: 0 }}>The first game. Nine prompts, one photo each, each snapped by the teammate named on it. Fill all nine to move on.</p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.bingo.photo} />
         {renderBingoGrid(locked)}
+        {stillMissing.length > 0 && (
+          <div role="alert" style={{
+            marginTop: 14, padding: '10px 12px', borderRadius: 8,
+            border: '2px solid var(--red)', background: 'var(--th-parchment)', fontSize: 13,
+          }}>
+            <b>All nine photos are needed before you can move on.</b> Still missing {stillMissing.length}:
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {stillMissing.map((i) => (
+                <li key={i}>{i + 1}. {bingoCard[i]?.prompt} — {assignees[i]?.name ?? 'teammate'}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <button
           className="btn block"
-          style={{ marginTop: 14 }}
-          onClick={() => {
+          style={{ marginTop: 14, opacity: filled === bingoCard.length ? 1 : 0.75 }}
+          disabled={bingoChecking}
+          onClick={async () => {
+            /* Teammates upload from their own phones — check the latest
+               card, not just what this screen last loaded. */
+            setBingoChecking(true);
+            const fresh = (await refreshShots()) ?? tiles;
+            setBingoChecking(false);
+            const missing = bingoCard.map((_, i) => i).filter((i) => !fresh[i]);
+            if (missing.length) {
+              setBingoMissing(missing);
+              showToast(`${missing.length} photo${missing.length > 1 ? 's' : ''} still missing.`);
+              return;
+            }
+            setBingoMissing(null);
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), bingo: { tiles: filled, points: bingoPoints(tiles, CONFIG), at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(fresh, CONFIG), at: Date.now() } };
             newS.stage = S.stage + 1;
             store.save(newS.teamId, newS);
             setS(newS);
-            showToast(`Card locked — ${bingoPoints(tiles, CONFIG)} points.`);
+            showToast('Stamp collected.');
           }}
           type="button"
         >
-          Lock the card in · {filled}/9
+          {bingoChecking ? 'Checking…' : `Next · ${filled}/9`}
         </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>Blank tiles score nothing, but they do not cost you the stamp.</p>
+        <p className="note" style={{ margin: '12px 0 0' }}>Next opens once all nine tiles have a photo.</p>
+        {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
       </div>
     );
   };
@@ -1083,12 +1179,10 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     const filledAll = CONFIG.guess.questions.every((_, i) => String(answers[i] ?? '').trim() !== '');
     return (
       <div className="card flag">
-        {renderCpHead(7, CONFIG.cp.guess.title, CONFIG.cp.guess.kana)}
+        {renderCpHead(CP_NUM.guess, CONFIG.cp.guess.title, CONFIG.cp.guess.kana)}
         <div className="task">
           <p style={{ margin: 0 }}>
-            Nothing to look up — just call it. Spot on is {CONFIG.guess.exactPts} points,
-            within 10% is {CONFIG.guess.nearPts}, within 25% is {CONFIG.guess.closePts}.
-            A wrong answer still pays if you are in the region.
+            Nothing to look up — just call it. You don’t have to be exact; being close still counts.
           </p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.guess.photo} />
@@ -1137,7 +1231,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     const v = draft.video;
     return (
       <div className="card flag">
-        {renderCpHead(8, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana)}
+        {renderCpHead(CP_NUM.cheer, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana)}
         <div className="task">
           <Rich text={CONFIG.cp.cheer.body} lead={`${CONFIG.video.seconds} seconds. One take.`} />
         </div>
@@ -1228,9 +1322,6 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         >
           Open it
         </button>
-        <p className="note" style={{ marginTop: 12, color: 'var(--th-label)' }}>
-          Points so far: {scoreOf(S, CONFIG)}. Time left: {mmss(clockLeft())}.
-        </p>
       </div>
     );
   };
@@ -1255,7 +1346,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
     }
     const renderers = {
       cp1: renderCp1, cp2a: renderCp2a, cp2b: renderCp2b, cp3: renderCp3, cp4: renderCp4,
-      ask: renderAsk, bingo: () => renderBingo(false), guess: renderGuess, cheer: renderCheer,
+      ask: renderAsk, bingo: renderBingo, guess: renderGuess, cheer: renderCheer,
     };
     const fn = renderers[st.key];
     return fn ? fn() : null;
@@ -1263,16 +1354,15 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
 
   const renderDoneScreen = () => {
     const rows = [
-      ['1', 'Pose photo', CONFIG.points.checkpoint],
-      ['2', 'Selfie + riddle', CONFIG.points.checkpoint],
-      ['3', 'Buy &amp; try', CONFIG.points.checkpoint],
-      ['4', `Observation quiz (${S.subs?.cp4?.correct ?? 0} auto-marked)`, CONFIG.points.checkpoint + (S.subs?.cp4?.correct || 0) * CONFIG.points.quizPerAnswer],
-      ['5', 'Ask a stranger', CONFIG.points.checkpoint + askPoints(S.subs?.ask, CONFIG)],
-      ['6', `Photo bingo (${S.subs?.bingo?.tiles ?? 0}/9)`, CONFIG.points.checkpoint + (S.subs?.bingo?.points || 0)],
-      ['7', 'Closest guess (committee marks it)', CONFIG.points.checkpoint + guessPoints(S.subs?.guess, CONFIG)],
-      ['8', 'Team cheer', CONFIG.points.checkpoint],
+      ['1', 'Photo bingo', 'bingo'],
+      ['2', 'Pose photo', 'cp1'],
+      ['3', 'Selfie + riddle', 'cp2b'],
+      ['4', 'Buy &amp; try', 'cp3'],
+      ['5', 'Observation quiz', 'cp4'],
+      ['6', 'Ask a stranger', 'ask'],
+      ['7', 'Closest guess', 'guess'],
+      ['8', 'Team cheer', 'cheer'],
     ];
-    const used = CONFIG.raceMinutes * 60 - clockLeft();
     const doneStamps = new Set(
       Object.keys(S.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter((v) => v != null)
     );
@@ -1285,7 +1375,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         </div>
         <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>{esc(S.teamName)}</div>
-          <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>Finished in {mmss(used)}</h2>
+          <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>Hunt complete</h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {rows.map((r, i) => (
               <li key={i} style={{
@@ -1294,20 +1384,11 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
               }}>
                 <span style={{ fontFamily: 'var(--body)', fontWeight: 900, color: 'var(--red)', width: 22 }}>{r[0]}</span>
                 <span dangerouslySetInnerHTML={{ __html: r[1] }} />
-                <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 12 }}>+{r[2]}</span>
+                <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 12 }}>{S.subs?.[r[2]] ? '✓' : '—'}</span>
               </li>
             ))}
           </ul>
-          <div style={{
-            display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 14,
-            paddingTop: 12, borderTop: 'var(--line)',
-          }}>
-            <span className="eyebrow">Running total</span>
-            <span className="display" style={{ fontSize: 38, marginLeft: 'auto', color: 'var(--red)' }}>
-              {scoreOf(S, CONFIG)}
-            </span>
-          </div>
-          <p className="note" style={{ margin: '12px 0 0' }}>Creativity bonuses get added by the committee at the finish point.</p>
+          <p className="note" style={{ margin: '12px 0 0' }}>The committee tallies the results at the finish point.</p>
         </div>
         <div style={{
           background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
@@ -1319,9 +1400,11 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
           </h2>
           <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>
         </div>
-        <div style={{ textAlign: 'center' }}>
-          <button className="linky" onClick={() => setView('organizer')} type="button">Organiser view →</button>
-        </div>
+        {canOrganise && (
+          <div style={{ textAlign: 'center' }}>
+            <button className="linky" onClick={() => setView('organizer')} type="button">Organiser view →</button>
+          </div>
+        )}
       </div>
     );
   };
@@ -1363,7 +1446,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
         </div>
         {allRuns.length === 0 ? (
           <div className="card">
-            <p style={{ margin: 0 }}>No teams have started yet. Once a team taps <b>Start the clock</b>, they show up here.</p>
+            <p style={{ margin: 0 }}>No teams have started yet. Once a team taps <b>Start the hunt</b>, they show up here.</p>
             <div style={{ textAlign: 'center', marginTop: 12 }}>
               <button className="linky" onClick={() => setView('start')} type="button">← Back to start</button>
             </div>
@@ -1465,7 +1548,7 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
             {allRuns.map((run, i) => {
               const s = run.subs || {};
               const imgs = [s.cp1?.photo, s.cp2a?.photo, s.cp3?.photo, s.cp4?.photo, s.ask?.photo].filter(Boolean);
-              const bingoShots = Object.keys(run.bingo || {}).map((k) => run.bingo[k]);
+              const bingoShots = allShots.filter((b) => b.team === run.teamId && b.src).sort((a, b) => a.tile - b.tile);
               return (
                 <div key={i} className="card">
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -1494,8 +1577,9 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
                       <p className="note">BINGO — {s.bingo.tiles}/9 <span className="tag">+{s.bingo.points}</span></p>
                       {bingoShots.length > 0 && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 5 }}>
-                          {bingoShots.map((img, bi) => (
-                            <img key={bi} src={img} alt="" style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
+                          {bingoShots.map((b) => (
+                            <img key={b.tile} src={b.src} alt="" title={`Tile ${b.tile + 1} · ${b.uploader_name}${b.on_behalf ? ' (on behalf)' : ''}`}
+                              style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
                           ))}
                         </div>
                       )}
@@ -1564,7 +1648,6 @@ export default function TreasureHunt({ onClose, teamId, config, preview = false 
       {view === 'race' && (
         <div>
           {renderStampRally()}
-          {FLOW[S.stage]?.key !== 'bingo' && renderBingo(true)}
           {renderStage()}
         </div>
       )}

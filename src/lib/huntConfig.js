@@ -4,7 +4,7 @@
 
    Everything an admin can change lives in one JSON document
    (public.hunt_config, id 'atami'). The flow itself — eight stamps in a
-   fixed order, and the scoring rules — stays in TreasureHunt.jsx.
+   fixed order (photo bingo first), and the scoring rules — stays in TreasureHunt.jsx.
 
    DEFAULT_HUNT_CONFIG is the game as originally written. A stored
    document is merged over it, so a field added here later still has a
@@ -30,6 +30,10 @@ const TEAM_COLOURS = {
   'team-pearl': '#8A4B9E',
 };
 
+/* Nine prompts for one team's bingo card. Who snaps each tile is drawn
+   at random by the server, not set here. */
+const bingoCard = (prompts) => prompts.map((prompt) => ({ prompt }));
+
 export const DEFAULT_HUNT_CONFIG = {
   raceMinutes: 90,
   points: { checkpoint: 10, quizPerAnswer: 2 },
@@ -40,22 +44,77 @@ export const DEFAULT_HUNT_CONFIG = {
     'team-ruby': {
       pose: { photo: null },
       spot: { hint: 'Recce photo goes here.', photo: null },
+      bingo: bingoCard([
+        'Something older than everyone here',
+        'A vending machine nobody has seen the like of',
+        'A cat (real or on a sign)',
+        'A sign you cannot read',
+        'Someone in uniform',
+        'Something perfectly round',
+        'A door you want to open',
+        'The colour orange',
+        'A view of the sea worth stopping for',
+      ]),
     },
     'team-sapphire': {
       pose: { photo: null },
       spot: { hint: 'Recce photo goes here.', photo: null },
+      bingo: bingoCard([
+        'Steam rising from anything',
+        'A manhole cover with a picture on it',
+        'A red postbox',
+        'A shop mascot or character',
+        'Something shaped like a fish',
+        'A bicycle with a basket',
+        'A tiny shrine or statue',
+        'The colour blue, loudly',
+        'Your shadow doing something silly',
+      ]),
     },
     'team-emerald': {
       pose: { photo: null },
       spot: { hint: 'Recce photo goes here.', photo: null },
+      bingo: bingoCard([
+        'A lantern',
+        'A plastic food display',
+        'A crosswalk with nobody breaking the rules',
+        'A plant growing where it should not',
+        'A sign with an arrow',
+        'Something made of bamboo',
+        'A bird',
+        'A staircase with more than 20 steps',
+        'The colour green, loudly',
+      ]),
     },
     'team-diamond': {
       pose: { photo: null },
       spot: { hint: 'Recce photo goes here.', photo: null },
+      bingo: bingoCard([
+        'A torii gate',
+        'A souvenir shaped like food',
+        'A bench facing the water',
+        'Someone waving back at you',
+        'A clock showing the wrong time',
+        'A noren curtain in a doorway',
+        'Something striped',
+        'A roof with curved tiles',
+        'The colour purple',
+      ]),
     },
     'team-pearl': {
       pose: { photo: null },
       spot: { hint: 'Recce photo goes here.', photo: null },
+      bingo: bingoCard([
+        'A hot spring sign (♨)',
+        'A drink you have never tried, in a can',
+        'A boat',
+        'A pair of shoes left outside',
+        'A mailbox that is not red',
+        'Something written in English that is slightly wrong',
+        'A reflection in a window',
+        'A flower in a pot',
+        'The colour yellow',
+      ]),
     },
   },
 
@@ -102,17 +161,6 @@ export const DEFAULT_HUNT_CONFIG = {
       title: 'Photo bingo', kana: 'ビンゴ', photo: null,
       linePts: 3,
       fullPts: 5,
-      tiles: [
-        'Something older than everyone here',
-        'A vending machine nobody has seen the like of',
-        'An animal',
-        'A sign you cannot read',
-        'Someone in uniform',
-        'Something perfectly round',
-        'A door you want to open',
-        'The colour orange',
-        'A view worth stopping for',
-      ],
     },
     guess: {
       title: 'Closest guess', kana: '目分量', photo: null,
@@ -132,12 +180,12 @@ export const DEFAULT_HUNT_CONFIG = {
 
   /* The "Stamp collected" screen shown before each checkpoint opens. */
   unlocks: {
+    cp1: { h: 'Copy the pose', p: 'Bingo card is in. Now the stamp rally: your first stamp is a team photo copying the pose in the next picture — everyone in the frame.' },
     cp2: { h: 'Find the spot', p: 'Somewhere along the way is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team\'s, so following another team won\'t help.' },
     cp3: { h: 'Buy it, try it', p: 'Find the shops. ¥{budget} for the team, one thing none of you have tried, everyone tastes it.' },
     cp4: { h: 'Look around you', p: '{quizCount} questions, every answer within sight of where you\'re standing. Nothing to google.' },
     ask: { h: 'Talk to a stranger', p: 'Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo. Start counting vending machines from here; you will be asked.' },
-    bingo: { h: 'Bingo card — lock it in', p: 'Last call on the nine photo prompts. Anything still blank when you lock the card stays blank, so fill what you can on the way.' },
-    guess: { h: 'Three numbers', p: 'No looking anything up, no counting twice. Closest guess takes the points — and being roughly right still pays.' },
+    guess: { h: 'Three numbers', p: 'No looking anything up, no counting twice. Closest guess wins — and being roughly right still counts.' },
     cheer: { h: 'Last one', p: 'Film your team cheer, then walk it in. {finish}' },
   },
 };
@@ -184,11 +232,12 @@ export function toRuntime(config) {
       colour: TEAM_COLOURS[g.id] ?? 'var(--ink)',
       pose: config.teams[g.id]?.pose ?? { photo: null },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
+      bingo: config.teams[g.id]?.bingo ?? [],
     })),
     buy: { budgetYen: cp.cp3.budgetYen, brief: cp.cp3.brief },
     quiz: { questions: cp.cp4.questions },
     ask: { tasks: cp.ask.tasks },
-    bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, tiles: cp.bingo.tiles },
+    bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, size: 9 },
     guess: { exactPts: cp.guess.exactPts, nearPts: cp.guess.nearPts, closePts: cp.guess.closePts, questions: cp.guess.questions },
     video: { seconds: cp.cheer.seconds, maxSeconds: cp.cheer.maxSeconds },
     cp,
@@ -205,7 +254,10 @@ export function validate(config) {
   const posInt = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
   if (!(Number(config.raceMinutes) > 0)) errs.push('General: race length must be more than 0 minutes.');
   if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Checkpoint 4: every question needs text, and there must be at least one.');
-  if (cp.bingo.tiles.length !== 9 || cp.bingo.tiles.some((t) => !t.trim())) errs.push('Checkpoint 6: all nine bingo tiles need a prompt.');
+  groupRoster.forEach((g) => {
+    const card = config.teams[g.id]?.bingo ?? [];
+    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Checkpoint 6: all nine of ${g.name}’s bingo tiles need a prompt.`);
+  });
   if (!cp.guess.questions.length || cp.guess.questions.some((q) => !q.trim())) errs.push('Checkpoint 7: every question needs text, and there must be at least one.');
   if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Checkpoint 8: the maximum video length must be at least the target length.');
   if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Checkpoint 5: each task needs a label and a points value.');

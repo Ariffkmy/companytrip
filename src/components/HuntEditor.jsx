@@ -194,7 +194,11 @@ export default function HuntEditor() {
   if (!draft) return <p className="note">Loading the hunt…</p>;
 
   if (previewing) {
-    return <TreasureHunt preview config={draft} onClose={() => { setPreviewing(false); window.scrollTo({ top: 0 }); }} />;
+    return (
+      <div className="max-w-[640px] mx-auto">
+        <TreasureHunt preview config={draft} onClose={() => { setPreviewing(false); window.scrollTo({ top: 0 }); }} />
+      </div>
+    );
   }
 
   const posePhotoCount = groupRoster.filter((g) => draft.teams[g.id]?.pose?.photo).length;
@@ -258,39 +262,69 @@ export default function HuntEditor() {
           <Num label="Quiz pts / answer" value={val(['points', 'quizPerAnswer'])} onChange={set(['points', 'quizPerAnswer'])} />
         </div>
         <Area label="Finish point" hint="Shown on the last unlock screen and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
-        <Text label="Help note" hint="Small line under checkpoint 1. Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
+        <Text label="Help note" hint="Small line under the first game (photo bingo). Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
       </Section>
 
-      <Section title="1 · Copy the pose" sub={`${posePhotoCount} of ${groupRoster.length} teams have a pose photo`}>
+      <Section title="1 · Photo bingo" sub="First game · nine prompts per team">
+        <p className="note">Its own game, played first. Locking the card opens the stamp rally.</p>
+        {commonFields('bingo', { body: false })}
+        <div className="grid grid-cols-2 gap-3">
+          <Num label="Points per line" value={val([...cp('bingo'), 'linePts'])} onChange={set([...cp('bingo'), 'linePts'])} />
+          <Num label="Points for all nine" value={val([...cp('bingo'), 'fullPts'])} onChange={set([...cp('bingo'), 'fullPts'])} />
+        </div>
+        <Sub>Each team’s card</Sub>
+        <p className="note -mt-2">
+          Every team gets its own nine prompts (left to right, top to bottom). Who snaps each tile is drawn at random when the team
+          first opens its card — one member per tile, spread evenly. Only that member can upload it; the Team Lead can upload any
+          tile, but only to cover for a member with a technical issue.
+        </p>
+        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
+          {groupRoster.map((g) => (
+            <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <p className="font-display text-base tracking-wide">{g.name}</p>
+              <StringList label="Prompts" items={val(['teams', g.id, 'bingo']).map((t) => t.prompt)}
+                onChange={(items) => set(['teams', g.id, 'bingo'])(items.map((prompt) => ({ prompt })))} fixedLength />
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="2 · Copy the pose" sub={`${posePhotoCount} of ${groupRoster.length} teams have a pose photo`}>
+        {unlockFields('cp1', 2)}
+        <Sub>Checkpoint</Sub>
         {commonFields('cp1', { photo: false })}
         <Sub>Each team’s pose</Sub>
         <p className="note -mt-2">Every team gets a different pose. The photo is what they copy — add one for every team.</p>
-        {groupRoster.map((g) => (
-          <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
-            <p className="font-display text-base tracking-wide">{g.name}</p>
-            <Photo label="Pose photo" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
-          </div>
-        ))}
+        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
+          {groupRoster.map((g) => (
+            <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <p className="font-display text-base tracking-wide">{g.name}</p>
+              <Photo label="Pose photo" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
+            </div>
+          ))}
+        </div>
       </Section>
 
-      <Section title="2 · Find the place + riddle" sub={`${val([...cp('cp2a'), 'title'])} · ${val([...cp('cp2b'), 'title'])}`}>
-        {unlockFields('cp2', 2)}
+      <Section title="3 · Find the place + riddle" sub={`${val([...cp('cp2a'), 'title'])} · ${val([...cp('cp2b'), 'title'])}`}>
+        {unlockFields('cp2', 3)}
         <Sub>Part A — find the place</Sub>
         {commonFields('cp2a', { photo: false })}
         <p className="note">Each team gets its own place to find — only that team sees its photo.</p>
-        {groupRoster.map((g) => (
-          <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
-            <p className="font-display text-base tracking-wide">{g.name}</p>
-            <Photo label="Place photo" value={val(['teams', g.id, 'spot', 'photo'])} onChange={set(['teams', g.id, 'spot', 'photo'])} />
-            <Text label="Caption under the photo" value={val(['teams', g.id, 'spot', 'hint'])} onChange={set(['teams', g.id, 'spot', 'hint'])} />
-          </div>
-        ))}
+        <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
+          {groupRoster.map((g) => (
+            <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <p className="font-display text-base tracking-wide">{g.name}</p>
+              <Photo label="Place photo" value={val(['teams', g.id, 'spot', 'photo'])} onChange={set(['teams', g.id, 'spot', 'photo'])} />
+              <Text label="Caption under the photo" value={val(['teams', g.id, 'spot', 'hint'])} onChange={set(['teams', g.id, 'spot', 'hint'])} />
+            </div>
+          ))}
+        </div>
         <Sub>Part B — riddle</Sub>
         {commonFields('cp2b')}
       </Section>
 
-      <Section title="3 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
-        {unlockFields('cp3', 3)}
+      <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
+        {unlockFields('cp3', 4)}
         <Sub>Checkpoint</Sub>
         <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3">
           <Num label="Budget ¥" value={val([...cp('cp3'), 'budgetYen'])} onChange={set([...cp('cp3'), 'budgetYen'])} />
@@ -299,13 +333,13 @@ export default function HuntEditor() {
         {commonFields('cp3')}
       </Section>
 
-      <Section title="4 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>
-        {unlockFields('cp4', 4)}
+      <Section title="5 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>
+        {unlockFields('cp4', 5)}
         <Sub>Checkpoint</Sub>
         {commonFields('cp4')}
         <div>
           <p className="text-xs font-semibold text-gray-600 mb-1">Questions</p>
-          <ol className="space-y-3">
+          <ol className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-3">
             {val([...cp('cp4'), 'questions']).map((q, i) => (
               <li key={i} className="rounded-lg border border-gray-200 p-3 space-y-2">
                 <div className="flex gap-2 items-start">
@@ -330,8 +364,8 @@ export default function HuntEditor() {
         </div>
       </Section>
 
-      <Section title="5 · Ask a stranger" sub={val([...cp('ask'), 'title'])}>
-        {unlockFields('ask', 5)}
+      <Section title="6 · Ask a stranger" sub={val([...cp('ask'), 'title'])}>
+        {unlockFields('ask', 6)}
         <Sub>Checkpoint</Sub>
         {commonFields('ask')}
         {val([...cp('ask'), 'tasks']).map((t, i) => (
@@ -347,18 +381,6 @@ export default function HuntEditor() {
           </div>
         ))}
       </Section>
-
-      <Section title="6 · Photo bingo" sub="Nine prompts">
-        {unlockFields('bingo', 6)}
-        <Sub>Checkpoint</Sub>
-        {commonFields('bingo', { body: false })}
-        <div className="grid grid-cols-2 gap-3">
-          <Num label="Points per line" value={val([...cp('bingo'), 'linePts'])} onChange={set([...cp('bingo'), 'linePts'])} />
-          <Num label="Points for all nine" value={val([...cp('bingo'), 'fullPts'])} onChange={set([...cp('bingo'), 'fullPts'])} />
-        </div>
-        <StringList label="Tiles (left to right, top to bottom)" items={val([...cp('bingo'), 'tiles'])} onChange={set([...cp('bingo'), 'tiles'])} fixedLength />
-      </Section>
-
       <Section title="7 · Closest guess" sub={`${val([...cp('guess'), 'questions']).length} questions`}>
         {unlockFields('guess', 7)}
         <Sub>Checkpoint</Sub>

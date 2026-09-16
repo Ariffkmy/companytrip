@@ -339,6 +339,16 @@ export default function App() {
   }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
 
+  /* Admin is a laptop job: on large screens it gets the full width.
+     Phones and every other tab keep the 640px column. */
+  const wide = tab === 'admin' && !treasureOpen ? 'lg:max-w-[1280px] lg:px-8' : '';
+
+  const onAdmin = tab === 'admin' && !treasureOpen;
+  useEffect(() => {
+    document.body.classList.toggle('no-bg-art', onAdmin);
+    return () => document.body.classList.remove('no-bg-art');
+  }, [onAdmin]);
+
   const go = useCallback((id) => {
     setTab(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -346,7 +356,7 @@ export default function App() {
 
   const Header = () => (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200">
-      <div className="max-w-[640px] mx-auto px-4 h-13 py-2 flex items-center gap-2.5">
+      <div className={`max-w-[640px] ${wide} mx-auto px-4 h-13 py-2 flex items-center gap-2.5`}>
         <button
           type="button"
           onClick={() => go('home')}
@@ -396,7 +406,12 @@ export default function App() {
       <>
         <Header />
         <div className="max-w-[640px] mx-auto px-4 pb-8">
-          <TreasureHunt onClose={closeTreasureHunt} teamId={auth.member.team} config={huntConfig} />
+          <TreasureHunt
+            onClose={closeTreasureHunt}
+            teamId={auth.member.team}
+            me={{ email: auth.user?.email?.toLowerCase() ?? '', team: auth.member.team, role: auth.member.role, isAdmin: auth.isAdmin }}
+            config={huntConfig}
+          />
         </div>
       </>
     );
@@ -409,7 +424,7 @@ export default function App() {
       {/* Tab navigation — desktop/tablet: strip under the header, edge-faded
           so it is obvious it scrolls. Phones get the bottom bar instead. */}
       <nav aria-label="Sections" className="hidden md:block sticky top-13 z-30 bg-white/90 backdrop-blur-md border-b border-gray-200">
-        <div className="max-w-[640px] mx-auto nav-fade">
+        <div className={`max-w-[640px] ${wide} mx-auto nav-fade`}>
           <div className="flex gap-1 overflow-x-auto px-4 scrollbar-none">
             {tabs.map((t) => (
               <button
@@ -473,7 +488,7 @@ export default function App() {
       </nav>
 
       {/* Content — extra bottom room on phones so the last card clears the tab bar */}
-      <div className="max-w-[640px] mx-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-14">
+      <div className={`max-w-[640px] ${wide} mx-auto px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-14`}>
         {tab === 'home' && (
           <Home
             onGo={go}
