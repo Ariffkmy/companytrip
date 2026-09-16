@@ -57,6 +57,28 @@ export default defineConfig({
             },
           },
           {
+            // Album photos (private bucket, signed URLs). Every list load
+            // mints a new ?token=, so key the cache on the path alone —
+            // files are uuid-named and never overwritten. The token only
+            // matters on the first fetch.
+            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/sign\/album\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'album-photos',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+              plugins: [
+                {
+                  cacheKeyWillBeUsed: async ({ request }) => {
+                    const url = new URL(request.url);
+                    url.search = '';
+                    return url.href;
+                  },
+                },
+              ],
+            },
+          },
+          {
             // Google Fonts stylesheet — small, changes rarely.
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
             handler: 'StaleWhileRevalidate',

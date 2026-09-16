@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PAGE_SIZE, deletePhoto, formatUploaded, listPhotos, uploadPhoto } from '../lib/album';
+import { PAGE_SIZE, cachedPhotos, deletePhoto, formatUploaded, listPhotos, updateCachedPhotos, uploadPhoto } from '../lib/album';
 import schedule from '../data/schedule';
 
 /* D0–D5 only: the days people are actually out taking photos. */
@@ -68,7 +68,7 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
 
       <div className="relative flex-1 min-h-0 flex items-center justify-center px-2">
         {photo.src
-          ? <img src={photo.src} alt={`Photo by ${photo.uploader_name}`} className="max-w-full max-h-full object-contain" />
+          ? <img src={photo.src} crossOrigin="anonymous" alt={`Photo by ${photo.uploader_name}`} className="max-w-full max-h-full object-contain" />
           : <p className="text-onscrim text-sm opacity-70">This photo couldn’t load.</p>}
         <button type="button" className={`${navBtn} left-2`} onClick={() => onIndex(index - 1)} disabled={index === 0} aria-label="Previous photo">‹</button>
         <button type="button" className={`${navBtn} right-2`} onClick={() => onIndex(index + 1)} disabled={index === photos.length - 1} aria-label="Next photo">›</button>
@@ -94,7 +94,8 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
 
 /* ── Album page ───────────────────────────────────── */
 export default function Album({ userId, isAdmin }) {
-  const [photos, setPhotos] = useState(null);
+  /* Last copy on this phone first; load() swaps in the fresh list. */
+  const [photos, setPhotos] = useState(cachedPhotos);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
@@ -111,9 +112,11 @@ export default function Album({ userId, isAdmin }) {
       setError('');
       setLoadFailed(false);
     } catch (e) {
-      setPhotos((p) => p ?? []);
+      /* With a device copy on screen, stay quiet — it is still useful offline. */
+      const cached = cachedPhotos();
+      setPhotos((p) => p ?? cached ?? []);
       setLoadFailed(true);
-      setError(friendly(e));
+      if (!cached?.length) setError(friendly(e));
     }
   }, []);
 
@@ -145,6 +148,7 @@ export default function Album({ userId, isAdmin }) {
       try {
         const row = await uploadPhoto(files[i], userId);
         setPhotos((p) => [row, ...(p ?? [])]);
+        updateCachedPhotos((rows) => [row, ...rows]);
       } catch (e) {
         failed++;
         lastErr = e;
@@ -161,6 +165,7 @@ export default function Album({ userId, isAdmin }) {
     try {
       await deletePhoto(photo);
       const next = photos.filter((x) => x.id !== photo.id);
+      updateCachedPhotos((rows) => rows.filter((x) => x.id !== photo.id));
       setPhotos(next);
       setOpen(next.length ? Math.min(open, next.length - 1) : null);
     } catch (e) {
@@ -248,7 +253,7 @@ export default function Album({ userId, isAdmin }) {
                   <button type="button" onClick={() => setOpen(photos.indexOf(p))}
                     className="block w-full text-left cursor-pointer rounded-lg overflow-hidden bg-white border border-gray-200 focus-visible:outline-2 focus-visible:outline-red">
                     <span className="block aspect-square bg-gray-100">
-                      {p.thumb && <img src={p.thumb} alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                      {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
                     </span>
                     <span className="block px-2.5 py-2">
                       <span className="block text-[13px] font-medium leading-snug truncate">{p.uploader_name}</span>

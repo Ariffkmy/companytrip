@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatUploaded, listPhotos } from '../lib/album';
+import { cachedPhotos, formatUploaded, listPhotos } from '../lib/album';
 
 const COUNT = 12;
 const INTERVAL = 5000;
 const IDLE_AFTER_TOUCH = 8000;
 
+const latest = (rows) => rows.filter((r) => r.src).slice(0, COUNT);
+
 /* Latest album photos as a swipeable slideshow. Native scroll-snap does
    the swiping; the timer only nudges it forward, and stops for anyone
    who asked the OS for less motion. */
 export default function PhotoCarousel({ onOpenAlbum }) {
-  const [photos, setPhotos] = useState(null);
+  const [photos, setPhotos] = useState(() => {
+    const rows = cachedPhotos();
+    return rows ? latest(rows) : null;
+  });
   const [failed, setFailed] = useState(false);
   const [index, setIndex] = useState(0);
   const track = useRef(null);
@@ -18,9 +23,10 @@ export default function PhotoCarousel({ onOpenAlbum }) {
 
   useEffect(() => {
     let live = true;
-    listPhotos({ limit: COUNT })
-      .then((rows) => { if (live) setPhotos(rows.filter((r) => r.src)); })
-      .catch(() => { if (live) { setPhotos([]); setFailed(true); } });
+    /* A full page, not COUNT, so this refresh also updates the device copy. */
+    listPhotos()
+      .then((rows) => { if (live) setPhotos(latest(rows)); })
+      .catch(() => { if (live) { setPhotos((p) => p ?? []); setFailed(true); } });
     return () => { live = false; };
   }, []);
 
@@ -96,7 +102,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
             <li key={p.id} className="relative w-full shrink-0 snap-center aspect-[4/3]"
               aria-roledescription="slide" aria-label={`${i + 1} of ${photos.length}`}>
               <button type="button" onClick={onOpenAlbum} className="block w-full h-full cursor-pointer">
-                <img src={p.src} alt={`Photo by ${p.uploader_name}`} loading={i < 2 ? 'eager' : 'lazy'}
+                <img src={p.src} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading={i < 2 ? 'eager' : 'lazy'}
                   className="w-full h-full object-cover" />
                 <span className="absolute inset-x-0 bottom-0 px-3.5 pt-10 pb-3 text-left bg-gradient-to-t from-black/75 to-transparent">
                   <span className="block text-sm font-medium text-onscrim leading-snug truncate">{p.uploader_name}</span>

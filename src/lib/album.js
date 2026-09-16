@@ -15,6 +15,24 @@ import { supabase } from './supabase';
 const BUCKET = 'album';
 const URL_TTL = 60 * 60; // 1h — long enough to browse, short enough to not leak
 export const PAGE_SIZE = 48;
+const CACHE_KEY = 'olc-album';
+
+/* The newest page, as last seen on this phone. The album and the Home
+   carousel draw from it straight away and refresh behind it. Its signed
+   URLs may have expired, but the service worker caches album files by
+   path, so any photo already seen still loads — with or without signal. */
+export function cachedPhotos() {
+  try {
+    const rows = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+    return Array.isArray(rows) ? rows : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function remember(rows) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(rows.slice(0, PAGE_SIZE))); } catch (e) { /* quota — skip */ }
+}
 
 /* Resize to a JPEG blob. Phone photos are 3–10 MB; nobody on roaming
    data should pay for that to see a thumbnail. */
@@ -59,7 +77,16 @@ export async function listPhotos({ before = null, limit = PAGE_SIZE } = {}) {
   if (before) q = q.lt('created_at', before);
   const { data, error } = await q;
   if (error) throw error;
-  return withUrls(data);
+  const rows = await withUrls(data);
+  /* Only a full first page is a trustworthy "newest" snapshot. */
+  if (!before && limit >= PAGE_SIZE) remember(rows);
+  return rows;
+}
+
+/** Keep the device copy in step with an upload or delete. */
+export function updateCachedPhotos(fn) {
+  const rows = cachedPhotos();
+  if (rows) remember(fn(rows));
 }
 
 /** Upload one photo (full + thumbnail) and record it. Returns the row. */
