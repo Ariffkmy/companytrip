@@ -228,6 +228,8 @@ export default function HuntEditor() {
         <Text label="Title" value={val([...cp(key), 'title'])} onChange={set([...cp(key), 'title'])} />
         <Text label="Japanese subtitle" value={val([...cp(key), 'kana'])} onChange={set([...cp(key), 'kana'])} />
       </div>
+      <Text label="Where on the route map" hint="Shown as a 📍 tag that opens the map, e.g. “Checkpoint 2”. Leave blank to hide."
+        value={val([...cp(key), 'stop'])} onChange={set([...cp(key), 'stop'])} />
       {body && <Area label="Instructions" hint={TEXT_HINT} value={val([...cp(key), 'body'])} onChange={set([...cp(key), 'body'])} rows={4} />}
       {photo && <Photo label="Photo under the instructions (optional)" value={val([...cp(key), 'photo'])} onChange={set([...cp(key), 'photo'])} />}
     </>
@@ -237,7 +239,7 @@ export default function HuntEditor() {
     <>
       <Sub>Unlock screen before checkpoint {n}</Sub>
       <Text label="Heading" value={val(['unlocks', key, 'h'])} onChange={set(['unlocks', key, 'h'])} />
-      <Area label="Text" hint="Can use {budget}, {finish}, {quizCount}, {guessCount}." value={val(['unlocks', key, 'p'])} onChange={set(['unlocks', key, 'p'])} />
+      <Area label="Text" hint="Can use {budget}, {finish}, {quizCount}, {streak}." value={val(['unlocks', key, 'p'])} onChange={set(['unlocks', key, 'p'])} />
     </>
   );
 
@@ -401,17 +403,46 @@ export default function HuntEditor() {
           </div>
         ))}
       </Section>
-      <Section title="7 · Closest guess" sub={`${val([...cp('guess'), 'questions']).length} questions`}>
+      <Section title="7 · General knowledge" sub={`${val([...cp('guess'), 'streak'])} in a row · ${val([...cp('guess'), 'bank']).length} questions`}>
         {unlockFields('guess', 7)}
         <Sub>Checkpoint</Sub>
-        {commonFields('guess', { body: false })}
-        <div className="grid grid-cols-3 gap-3">
-          <Num label="Exact" value={val([...cp('guess'), 'exactPts'])} onChange={set([...cp('guess'), 'exactPts'])} />
-          <Num label="Within 10%" value={val([...cp('guess'), 'nearPts'])} onChange={set([...cp('guess'), 'nearPts'])} />
-          <Num label="Within 25%" value={val([...cp('guess'), 'closePts'])} onChange={set([...cp('guess'), 'closePts'])} />
+        {commonFields('guess')}
+        <div className="grid grid-cols-[minmax(0,10rem)] gap-3">
+          <Num label="Right in a row to pass" value={val([...cp('guess'), 'streak'])} onChange={set([...cp('guess'), 'streak'])} min={1} />
         </div>
-        <StringList label="Questions (numeric answers)" items={val([...cp('guess'), 'questions'])} onChange={set([...cp('guess'), 'questions'])} addLabel="Add question" />
-        <p className="note">The true answers are typed in by the committee in the Organiser view on the day.</p>
+        <p className="note -mt-2">Questions are drawn at random with the four answers shuffled. A wrong answer resets the streak to zero.</p>
+        <details className="rounded-lg border border-gray-200">
+          <summary className="px-3 py-2.5 cursor-pointer text-sm font-medium">
+            Question bank ({val([...cp('guess'), 'bank']).length})
+          </summary>
+          <ol className="px-3 pb-3 space-y-3">
+            {val([...cp('guess'), 'bank']).map((t, i, all) => {
+              const path = [...cp('guess'), 'bank', i];
+              return (
+                <li key={i} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <span className="font-mono text-[11px] text-gray-400 w-6 shrink-0 text-right">{i + 1}</span>
+                    <input aria-label={`Question ${i + 1}`} value={t.q} placeholder="Question"
+                      onChange={(e) => set([...path, 'q'])(e.target.value)} className={`${inputCls} h-10`} />
+                    <button type="button" aria-label={`Remove question ${i + 1}`} disabled={all.length <= 4}
+                      onClick={() => set([...cp('guess'), 'bank'])(all.filter((_, j) => j !== i))}
+                      className="shrink-0 h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">×</button>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-2 pl-8 pr-12">
+                    <input aria-label={`Right answer for question ${i + 1}`} value={t.a} placeholder="✓ Right answer"
+                      onChange={(e) => set([...path, 'a'])(e.target.value)} className={`${inputCls} h-10 text-sm border-sea`} />
+                    {[0, 1, 2].map((d) => (
+                      <input key={d} aria-label={`Wrong answer ${d + 1} for question ${i + 1}`} value={t.decoys?.[d] ?? ''} placeholder={`✕ Wrong answer ${d + 1}`}
+                        onChange={(e) => set([...path, 'decoys', d])(e.target.value)} className={`${inputCls} h-10 text-sm`} />
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          <button type="button" onClick={() => set([...cp('guess'), 'bank'])([...val([...cp('guess'), 'bank']), { q: '', a: '', decoys: ['', '', ''] }])}
+            className="mx-3 mb-3 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add question</button>
+        </details>
       </Section>
 
       <Section title="8 · Team cheer" sub={val([...cp('cheer'), 'title'])}>

@@ -11,11 +11,12 @@
    value on a trip whose config was saved before the field existed.
 
    Text fields: blank line = new paragraph, **double stars** = bold.
-   Unlock texts may use {budget}, {finish}, {quizCount}, {guessCount}.
+   Unlock texts may use {budget}, {finish}, {quizCount}, {streak}.
 */
 
 import { supabase } from './supabase';
 import groupRoster from '../data/groupRoster';
+import TRIVIA_BANK from '../data/triviaBank';
 
 export const HUNT_ID = 'atami';
 export const MEDIA_BUCKET = 'hunt-media';
@@ -120,15 +121,15 @@ export const DEFAULT_HUNT_CONFIG = {
 
   checkpoints: {
     cp1: {
-      title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null,
+      title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null, stop: 'Checkpoint 2',
       body: 'Everyone in the frame. Ask a stranger to hold the phone if you have to.',
     },
     cp2a: {
-      title: 'Find the place', kana: '現地で自撮り', photo: null,
+      title: 'Find the place', kana: '現地で自撮り', photo: null, stop: 'Checkpoint 3',
       body: 'Work out where this is, go there, and take a team selfie on the spot. The riddle unlocks when the selfie lands.',
     },
     cp2b: {
-      title: 'Three switches', kana: 'スイッチの謎', photo: null,
+      title: 'Three switches', kana: 'スイッチの謎', photo: null, stop: 'Checkpoint 3',
       /* Optional intro above the riddles; every riddle must be answered. */
       body: '',
       riddles: [
@@ -136,24 +137,24 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     cp3: {
-      title: 'Buy it, try it', kana: '買って食べる', photo: null,
+      title: 'Buy it, try it', kana: '買って食べる', photo: null, stop: 'Checkpoint 3',
       budgetYen: 500,
       brief: 'Something Japanese that nobody on your team has tried before.',
       body: 'Every member has to taste it. Photo has to show all of you eating or drinking, mid-bite.',
     },
     cp4: {
-      title: 'Look around you', kana: '周りを見ろ', photo: null,
-      body: 'Stop where the committee sent you. Every answer is somewhere in sight. Phones down — this one isn\'t on the internet.',
+      title: 'Look around you', kana: '周りを見ろ', photo: null, stop: 'Walk from Checkpoint 3 to 4',
+      body: 'This one is played **on the walk from Checkpoint 3 to Checkpoint 4**. Every answer is somewhere along that stretch — shop signs, things in windows, what is on the street and above it.\n\nKeep your eyes up and notice everything as you go: once you reach Checkpoint 4 you can\'t walk back to check. Split the questions between you before you set off. Phones down — none of this is on the internet.',
       questions: [
         { q: 'Something that is red. Name the object.', accept: [] },
-        { q: 'Read out a shop or cafe sign you can see from here.', accept: [] },
-        { q: 'How many people can you count from where you are standing?', accept: [] },
+        { q: 'Name a shop or cafe sign you passed on the way.', accept: [] },
+        { q: 'How many pedestrian crossings did you cross between Checkpoint 3 and 4?', accept: [] },
         { q: 'Something white and floating.', accept: ['cloud', 'clouds', 'seagull', 'seagulls'] },
-        { q: 'The furthest thing you can see. Name it.', accept: [] },
+        { q: 'The last shop you passed before reaching Checkpoint 4. Name it.', accept: [] },
       ],
     },
     ask: {
-      title: 'Ask a stranger', kana: '声かけ', photo: null,
+      title: 'Ask a stranger', kana: '声かけ', photo: null, stop: 'Checkpoint 4',
       body: 'Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.\n\nAsk before you photograph anyone. If they say no, thank them and find someone else.',
       tasks: [
         { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
@@ -162,34 +163,34 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     bingo: {
-      title: 'Photo bingo', kana: 'ビンゴ', photo: null,
+      title: 'Photo bingo', kana: 'ビンゴ', photo: null, stop: 'Checkpoint 1',
       linePts: 3,
       fullPts: 5,
     },
+    /* Stamp 7. Keyed `guess` because it replaced the closest-guess game;
+       the key is what saved team progress is filed under. */
     guess: {
-      title: 'Closest guess', kana: '目分量', photo: null,
-      exactPts: 5, nearPts: 3, closePts: 1,
-      questions: [
-        'How many steps are in the staircase at this checkpoint?',
-        'The committee is holding one item. What does it cost, in yen?',
-        'How many vending machines did you pass since the last stamp?',
-      ],
+      title: 'Test your general knowledge', kana: '一般常識', photo: null, stop: '',
+      body: 'No phones, no googling — talk it through and answer as a team.',
+      streak: 10,
+      bank: TRIVIA_BANK,
     },
     cheer: {
-      title: 'The team cheer', kana: 'チームコール', photo: null,
+      title: 'The team cheer', kana: 'チームコール', photo: null, stop: '',
       seconds: 15, maxSeconds: 30,
       body: 'Your team cheer — chant, dance, war cry, whatever you invented on the way here.\n\nEveryone on camera. Say "Atami" once. Loud enough to embarrass yourselves.',
     },
   },
 
-  /* The "Stamp collected" screen shown before each checkpoint opens. */
+  /* The "Stamp collected" screen shown before each checkpoint opens.
+     stop on each checkpoint above is its place on the route map. */
   unlocks: {
     cp1: { h: 'Copy the pose', p: 'Bingo card is in. Now the stamp rally: your first stamp is a team photo copying the pose in the next picture — everyone in the frame.' },
     cp2: { h: 'Find the spot', p: 'Somewhere along the way is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team\'s, so following another team won\'t help.' },
     cp3: { h: 'Buy it, try it', p: 'Find the shops. ¥{budget} for the team, one thing none of you have tried, everyone tastes it.' },
-    cp4: { h: 'Look around you', p: '{quizCount} questions, every answer within sight of where you\'re standing. Nothing to google.' },
-    ask: { h: 'Talk to a stranger', p: 'Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo. Start counting vending machines from here; you will be asked.' },
-    guess: { h: 'Three numbers', p: 'No looking anything up, no counting twice. Closest guess wins — and being roughly right still counts.' },
+    cp4: { h: 'Look around you', p: 'Read the {quizCount} questions before you leave Checkpoint 3 — every answer is somewhere on the walk to Checkpoint 4. Watch your surroundings the whole way. Nothing to google.' },
+    ask: { h: 'Talk to a stranger', p: 'Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo.' },
+    guess: { h: 'Brain check', p: 'Multiple choice, one question at a time. Get {streak} right in a row to collect the stamp — one wrong answer and your streak goes back to zero.' },
     cheer: { h: 'Last one', p: 'Film your team cheer, then walk it in. {finish}' },
   },
 };
@@ -214,6 +215,16 @@ export function withDefaults(stored) {
     merged.checkpoints.cp2b.riddles = [oldRiddle.body];
     merged.checkpoints.cp2b.body = '';
   }
+  /* Saved while stamp 7 was still the closest-guess game: its title,
+     text and unlock screen describe a game that no longer exists. */
+  const oldGuess = stored?.checkpoints?.guess;
+  if (oldGuess && !Array.isArray(oldGuess.bank)) {
+    merged.checkpoints.guess = {
+      ...structuredClone(DEFAULT_HUNT_CONFIG.checkpoints.guess),
+      stop: oldGuess.stop ?? '', photo: oldGuess.photo ?? null,
+    };
+    merged.unlocks.guess = structuredClone(DEFAULT_HUNT_CONFIG.unlocks.guess);
+  }
   return merged;
 }
 
@@ -223,7 +234,7 @@ export function fillTokens(text, config) {
     budget: config.checkpoints.cp3.budgetYen,
     finish: config.finishPoint,
     quizCount: config.checkpoints.cp4.questions.length,
-    guessCount: config.checkpoints.guess.questions.length,
+    streak: config.checkpoints.guess.streak,
   };
   return String(text ?? '').replace(/\{(\w+)\}/g, (m, k) => (k in values ? String(values[k]) : m));
 }
@@ -249,7 +260,7 @@ export function toRuntime(config) {
     quiz: { questions: cp.cp4.questions },
     ask: { tasks: cp.ask.tasks },
     bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, size: 9 },
-    guess: { exactPts: cp.guess.exactPts, nearPts: cp.guess.nearPts, closePts: cp.guess.closePts, questions: cp.guess.questions },
+    trivia: { streak: Math.max(1, Number(cp.guess.streak) || 10), bank: cp.guess.bank },
     video: { seconds: cp.cheer.seconds, maxSeconds: cp.cheer.maxSeconds },
     cp,
     unlocks: Object.fromEntries(
@@ -264,15 +275,22 @@ export function validate(config) {
   const cp = config.checkpoints;
   const posInt = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
   if (!(Number(config.raceMinutes) > 0)) errs.push('General: race length must be more than 0 minutes.');
-  if (!cp.cp2b.riddles.length || cp.cp2b.riddles.some((r) => !String(r ?? '').trim())) errs.push('Checkpoint 3: every riddle needs text, and there must be at least one.');
-  if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Checkpoint 5: every question needs text, and there must be at least one.');
+  if (!cp.cp2b.riddles.length || cp.cp2b.riddles.some((r) => !String(r ?? '').trim())) errs.push('Stamp 3: every riddle needs text, and there must be at least one.');
+  if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Stamp 5: every question needs text, and there must be at least one.');
   groupRoster.forEach((g) => {
     const card = config.teams[g.id]?.bingo ?? [];
-    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Checkpoint 1: all nine of ${g.name}’s bingo tiles need a prompt.`);
+    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Stamp 1: all nine of ${g.name}’s bingo tiles need a prompt.`);
   });
-  if (!cp.guess.questions.length || cp.guess.questions.some((q) => !q.trim())) errs.push('Checkpoint 7: every question needs text, and there must be at least one.');
-  if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Checkpoint 8: the maximum video length must be at least the target length.');
-  if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Checkpoint 6: each task needs a label and a points value.');
+  const bank = cp.guess.bank ?? [];
+  if (!(Number(cp.guess.streak) >= 1)) errs.push('Stamp 7: the streak needed must be at least 1.');
+  if (bank.length < 4) errs.push('Stamp 7: add at least 4 general knowledge questions.');
+  bank.forEach((t, i) => {
+    const opts = [t.a, ...(t.decoys ?? [])].map((o) => String(o ?? '').trim().toLowerCase());
+    if (!String(t.q ?? '').trim() || opts.length !== 4 || opts.some((o) => !o)) errs.push(`Stamp 7: question ${i + 1} needs its text, the right answer and three wrong answers.`);
+    else if (new Set(opts).size !== 4) errs.push(`Stamp 7: question ${i + 1} has a wrong answer that matches another answer.`);
+  });
+  if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Stamp 8: the maximum video length must be at least the target length.');
+  if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Stamp 6: each task needs a label and a points value.');
   return errs;
 }
 

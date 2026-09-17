@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
 import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
+import confetti from '../lib/confetti';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
@@ -174,23 +175,6 @@ function CheckpointPhoto({ src }) {
   );
 }
 
-/* Stamp slot each submission fills. The cheer keeps its own key rather
-   than a number so the display order stays readable when it moved last. */
-let ANSWERS = null;
-
-function loadAnswers() {
-  if (!ANSWERS) {
-    try { ANSWERS = JSON.parse(localStorage.getItem('treasure:answers')) || {}; }
-    catch { ANSWERS = {}; }
-  }
-  return ANSWERS;
-}
-
-function saveAnswers(next) {
-  ANSWERS = next;
-  try { localStorage.setItem('treasure:answers', JSON.stringify(next)); } catch { /* ignore */ }
-}
-
 const SLOTS = Array.from({ length: 8 }, (_, i) => i);
 
 /* Photo bingo is its own game and comes first; the stamp rally follows. */
@@ -255,24 +239,19 @@ function bingoPoints(tiles, CONFIG) {
   return p;
 }
 
-/* Closeness scoring — a wrong answer still pays if it is in the region.
-   Unanswered by the committee means unmarked, not zero. */
-function guessScore(guess, truth, CONFIG) {
-  const g = Number(guess);
-  const t = Number(truth);
-  if (guess === '' || guess == null || truth === '' || truth == null) return 0;
-  if (!isFinite(g) || !isFinite(t) || t <= 0) return 0;
-  if (g === t) return CONFIG.guess.exactPts;
-  const off = Math.abs(g - t) / t;
-  if (off <= 0.10) return CONFIG.guess.nearPts;
-  if (off <= 0.25) return CONFIG.guess.closePts;
-  return 0;
-}
-
-function guessPoints(sub, CONFIG) {
-  if (!sub) return 0;
-  const truths = loadAnswers();
-  return CONFIG.guess.questions.reduce((n, _, i) => n + guessScore((sub.answers || [])[i], truths[i], CONFIG), 0);
+/* A random question the team hasn't seen this round, with its four
+   answers shuffled. Once the whole bank has been seen, it starts over. */
+function drawTrivia(bank, seen = []) {
+  const unseen = bank.map((_, i) => i).filter((i) => !seen.includes(i));
+  const pool = unseen.length ? unseen : bank.map((_, i) => i);
+  const i = pool[Math.floor(Math.random() * pool.length)];
+  const t = bank[i];
+  const options = [t.a, ...t.decoys];
+  for (let j = options.length - 1; j > 0; j--) {
+    const k = Math.floor(Math.random() * (j + 1));
+    [options[j], options[k]] = [options[k], options[j]];
+  }
+  return { current: { i, q: t.q, a: t.a, options, picked: null }, seen: unseen.length ? [...seen, i] : [i] };
 }
 
 function scoreOf(run, CONFIG) {
@@ -283,7 +262,6 @@ function scoreOf(run, CONFIG) {
     if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
     else if (k === 'ask') p += askPoints(sub, CONFIG);
     else if (k === 'bingo') p += sub.points || 0;
-    else if (k === 'guess') p += guessPoints(sub, CONFIG);
   });
   Object.values(run.bonus || {}).forEach((v) => (p += v));
   return p;
@@ -352,6 +330,17 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
   const save = useCallback((run) => {
     store.save(run.teamId, run);
   }, []);
+
+  /* Deal the first general knowledge question when the team reaches it.
+     The question and any answer picked are saved with the run, so a
+     reload can't be used to dodge a question. */
+  const onTrivia = FLOW[S?.stage]?.key === 'guess';
+  useEffect(() => {
+    if (!onTrivia || S.trivia?.current || !CONFIG.trivia.bank.length) return;
+    const next = { ...S, trivia: { streak: 0, best: 0, answered: 0, ...drawTrivia(CONFIG.trivia.bank, S.trivia?.seen) } };
+    store.save(next.teamId, next);
+    setS(next);
+  }, [onTrivia, S, CONFIG, store]);
 
   const currentTeam = S ? CONFIG.teams.find((t) => t.id === S.teamId) : null;
   const bingoCard = CONFIG.teams.find((t) => t.id === activeTeamId)?.bingo ?? [];
@@ -572,7 +561,19 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
-  const renderCpHead = (n, title, kana) => (
+  /* "Stamp", not "Checkpoint": checkpoints are the numbered pins on the
+     route map, and a stop can host more than one game. */
+  const renderStop = (stop, style) => (String(stop ?? '').trim() ? (
+    <button type="button" onClick={() => setMapOpen(true)} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6,
+      padding: '4px 10px', borderRadius: 999, border: '2px solid currentColor',
+      background: 'transparent', color: 'inherit', font: '700 12px/1.2 var(--body)', cursor: 'pointer', ...style,
+    }}>
+      📍 {stop} <span style={{ opacity: 0.7, fontWeight: 500 }}>· map</span>
+    </button>
+  ) : null);
+
+  const renderCpHead = (n, title, kana, stop) => (
     <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
       <div style={{
         flex: 'none', width: 42, height: 42, borderRadius: '50%',
@@ -581,9 +582,10 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
         fontWeight: 900, fontSize: 19,
       }}>{KANJI[n - 1]}</div>
       <div>
-        <div className="eyebrow" style={{ color: 'var(--red)' }}>Checkpoint {n} of {CONFIG.stamps}</div>
+        <div className="eyebrow" style={{ color: 'var(--red)' }}>Stamp {n} of {CONFIG.stamps}</div>
         <h2 className="display" style={{ fontSize: 25, margin: '2px 0 1px' }}>{title}</h2>
         <div className="kana">{kana}</div>
+        {renderStop(stop, { color: 'var(--sea)' })}
       </div>
     </div>
   );
@@ -633,7 +635,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     if (!t) return null;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana)}
+        {renderCpHead(CP_NUM.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana, CONFIG.cp.cp1.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
         </div>
@@ -683,7 +685,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const s = t.spot;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana)}
+        {renderCpHead(CP_NUM.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana, CONFIG.cp.cp2a.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp2a.body} />
         </div>
@@ -750,7 +752,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const many = riddles.length > 1;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana)}
+        {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana, CONFIG.cp.cp2b.stop)}
         {String(CONFIG.cp.cp2b.body || '').trim() && (
           <div className="task">
             <Rich text={CONFIG.cp.cp2b.body} />
@@ -808,7 +810,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
   const renderCp3 = () => (
     <div className="card flag">
-      {renderCpHead(CP_NUM.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana)}
+      {renderCpHead(CP_NUM.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana, CONFIG.cp.cp3.stop)}
       <div className="task">
         <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {CONFIG.buy.brief}</p>
         <Rich text={CONFIG.cp.cp3.body} />
@@ -869,7 +871,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const answers = draft.answers || [];
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana)}
+        {renderCpHead(CP_NUM.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana, CONFIG.cp.cp4.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp4.body} />
         </div>
@@ -893,7 +895,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             />
           </label>
         ))}
-        {renderShot(draft.photo, 'Add a photo of the spot', 'Proof you\'re actually standing there')}
+        {renderShot(draft.photo, 'Add a team photo at Checkpoint 4', 'Proof you walked the stretch and made it')}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
@@ -927,7 +929,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const photoTask = CONFIG.ask.tasks.find((t) => t.key === 'photo');
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.kana)}
+        {renderCpHead(CP_NUM.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.kana, CONFIG.cp.ask.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.ask.body} />
         </div>
@@ -1148,7 +1150,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana)}
+        {renderCpHead(CP_NUM.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
         <div className="task">
           <p style={{ margin: 0 }}>The first game. Nine prompts, one photo each, each snapped by the teammate named on it. Fill all nine to move on.</p>
         </div>
@@ -1201,57 +1203,128 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
-  /* ── CP7 — closest guess ──────────────────────────── */
+  /* ── Stamp 7 — general knowledge streak ─────────────
+     Multiple choice from the bank. A right answer adds to the streak, a
+     wrong one resets it; reaching the target collects the stamp. */
 
-  const renderGuess = () => {
-    const answers = draft.answers || [];
-    const filledAll = CONFIG.guess.questions.every((_, i) => String(answers[i] ?? '').trim() !== '');
+  const renderTrivia = () => {
+    const target = CONFIG.trivia.streak;
+    const run = S.trivia;
+    const cur = run?.current;
+    const commit = (trivia) => {
+      const next = { ...S, trivia };
+      store.save(next.teamId, next);
+      setS(next);
+    };
+
+    const pick = (opt) => {
+      if (!cur || cur.picked != null) return;
+      const right = opt === cur.a;
+      const streak = right ? run.streak + 1 : 0;
+      commit({ ...run, current: { ...cur, picked: opt }, streak, best: Math.max(run.best, streak), answered: run.answered + 1 });
+      if (right) confetti(streak >= target ? { count: 220, duration: 2600 } : undefined);
+    };
+
+    const next = () => commit({ ...run, ...drawTrivia(CONFIG.trivia.bank, run.seen) });
+
+    const collect = () => {
+      const newS = { ...S };
+      newS.subs = { ...(newS.subs || {}), guess: { streak: target, answered: run.answered, best: run.best, at: Date.now() } };
+      newS.stage = S.stage + 1;
+      store.save(newS.teamId, newS);
+      setS(newS);
+      showToast('Stamp collected.');
+    };
+
+    const answered = cur?.picked != null;
+    const right = answered && cur.picked === cur.a;
+    const won = answered && right && run.streak >= target;
+    const streak = run?.streak ?? 0;
+
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.guess, CONFIG.cp.guess.title, CONFIG.cp.guess.kana)}
+        {renderCpHead(CP_NUM.guess, CONFIG.cp.guess.title, CONFIG.cp.guess.kana, CONFIG.cp.guess.stop)}
         <div className="task">
           <p style={{ margin: 0 }}>
-            Nothing to look up — just call it. You don’t have to be exact; being close still counts.
+            <b>Get {target} questions right in a row</b> to collect this stamp. Get one wrong and your streak goes back to zero.
           </p>
+          <Rich text={CONFIG.cp.guess.body} />
         </div>
         <CheckpointPhoto src={CONFIG.cp.guess.photo} />
-        {CONFIG.guess.questions.map((q, i) => (
-          <label key={i} className="f" style={{ display: 'block', marginBottom: 12 }}>
-            <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>{i + 1}. {q}</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder="Your number"
-              value={answers[i] ?? ''}
-              onChange={(e) => {
-                const next = [...answers];
-                next[i] = e.target.value;
-                setDraft((d) => ({ ...d, answers: next }));
-              }}
-              style={{
-                width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-                border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-              }}
-            />
-          </label>
-        ))}
-        <button
-          className="btn block"
-          disabled={!filledAll}
-          onClick={() => {
-            const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), guess: { answers, at: Date.now() } };
-            newS.stage = S.stage + 1;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            setDraft({});
-            showToast('Numbers in. Stamp collected.');
-          }}
-          type="button"
-        >
-          Send the numbers
-        </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>The committee marks these at the finish, so the board can still move.</p>
+
+        {/* Streak widget */}
+        <div aria-live="polite" style={{
+          border: 'var(--line)', borderRadius: 10, padding: '12px 14px', marginBottom: 14,
+          background: streak ? 'var(--th-parchment)' : 'var(--card)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 22, lineHeight: 1, filter: streak ? 'none' : 'grayscale(1)', opacity: streak ? 1 : 0.5 }} aria-hidden="true">🔥</span>
+            <b style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 30, lineHeight: 1 }}>{streak}</b>
+            <span style={{ fontSize: 14, color: 'var(--ink-soft)' }}>/ {target} in a row</span>
+            <span className="note" style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              Best {run?.best ?? 0} · {run?.answered ?? 0} answered
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${target}, 1fr)`, gap: 4, marginTop: 10 }} aria-hidden="true">
+            {Array.from({ length: target }, (_, i) => (
+              <span key={i} style={{
+                height: 8, borderRadius: 4,
+                background: i < streak ? 'var(--red)' : 'var(--th-slot)',
+                transition: 'background .25s',
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {!cur ? (
+          <p className="note">Dealing a question…</p>
+        ) : (
+          <>
+            <p style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.35, margin: '0 0 12px' }}>{cur.q}</p>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {cur.options.map((opt) => {
+                const isAnswer = opt === cur.a;
+                const isPicked = opt === cur.picked;
+                const bg = !answered ? 'var(--card)'
+                  : isAnswer ? 'var(--sea)'
+                  : isPicked ? 'var(--red)'
+                  : 'var(--card)';
+                const fg = answered && (isAnswer || isPicked) ? '#fff' : 'var(--ink)';
+                return (
+                  <button key={opt} type="button" onClick={() => pick(opt)} disabled={answered}
+                    aria-pressed={isPicked}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+                      minHeight: 50, padding: '10px 14px', borderRadius: 8, border: 'var(--line)',
+                      background: bg, color: fg, font: '600 15px/1.3 var(--body)',
+                      cursor: answered ? 'default' : 'pointer',
+                      opacity: answered && !isAnswer && !isPicked ? 0.55 : 1,
+                      boxShadow: answered ? 'none' : 'var(--hard-sm)',
+                    }}>
+                    <span style={{ flex: 1 }}>{opt}</span>
+                    {answered && isAnswer && <span aria-label="Correct answer">✓</span>}
+                    {answered && isPicked && !isAnswer && <span aria-label="Your answer, wrong">✕</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {answered && (
+              <div role="status" style={{ marginTop: 14 }}>
+                <p style={{ margin: '0 0 10px', fontWeight: 700, color: right ? 'var(--sea)' : 'var(--red)' }}>
+                  {won ? `${target} in a row — you did it!`
+                    : right ? `Correct! ${target - run.streak} more to go.`
+                    : `Not quite — it was ${cur.a}. Streak reset to 0.`}
+                </p>
+                {won ? (
+                  <button className="btn block" type="button" onClick={collect}>Collect the stamp</button>
+                ) : (
+                  <button className="btn block" type="button" onClick={next}>{right ? 'Next question' : 'Start again'}</button>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   };
@@ -1260,7 +1333,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const v = draft.video;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cheer, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana)}
+        {renderCpHead(CP_NUM.cheer, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana, CONFIG.cp.cheer.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cheer.body} lead={`${CONFIG.video.seconds} seconds. One take.`} />
         </div>
@@ -1339,6 +1412,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           {copy.h}
         </h2>
         <p style={{ color: 'var(--th-body-alt)' }}>{copy.p}</p>
+        {renderStop((CONFIG.cp[to + 'a'] ?? CONFIG.cp[to])?.stop, { color: 'var(--gold)', margin: '0 0 14px' })}
         <button
           className="btn block sea"
           onClick={() => {
@@ -1375,7 +1449,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     }
     const renderers = {
       cp1: renderCp1, cp2a: renderCp2a, cp2b: renderCp2b, cp3: renderCp3, cp4: renderCp4,
-      ask: renderAsk, bingo: renderBingo, guess: renderGuess, cheer: renderCheer,
+      ask: renderAsk, bingo: renderBingo, guess: renderTrivia, cheer: renderCheer,
     };
     const fn = renderers[st.key];
     return fn ? fn() : null;
@@ -1389,7 +1463,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
       ['4', 'Buy &amp; try', 'cp3'],
       ['5', 'Observation quiz', 'cp4'],
       ['6', 'Ask a stranger', 'ask'],
-      ['7', 'Closest guess', 'guess'],
+      ['7', 'General knowledge', 'guess'],
       ['8', 'Team cheer', 'cheer'],
     ];
     const doneStamps = new Set(
@@ -1548,31 +1622,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
               </table>
             </div>
 
-            {/* Closest-guess answer key */}
-            <div className="card">
-              <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Closest guess — true answers</div>
-              {CONFIG.guess.questions.map((q, i) => (
-                <label key={i} className="f" style={{ display: 'block', marginBottom: 10 }}>
-                  <span style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 5 }}>{i + 1}. {q}</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="Leave blank to leave unmarked"
-                    value={loadAnswers()[i] ?? ''}
-                    onChange={(e) => {
-                      saveAnswers({ ...loadAnswers(), [i]: e.target.value });
-                      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
-                    }}
-                    style={{
-                      width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '9px 12px',
-                      border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-                    }}
-                  />
-                </label>
-              ))}
-              <p className="note" style={{ margin: 0 }}>Every team's score updates the moment you type. Blank means nobody scores that one.</p>
-            </div>
-
             {/* Team panels */}
             {allRuns.map((run, i) => {
               const s = run.subs || {};
@@ -1620,8 +1669,9 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
                   )}
                   {s.guess && (
                     <p className="note">
-                      GUESSES — {(s.guess.answers || []).map((a, gi) => `${gi + 1}. ${esc(a)}`).join(' · ')}
-                      <span className="tag">+{guessPoints(s.guess, CONFIG)}</span>
+                      {s.guess.streak
+                        ? `GENERAL KNOWLEDGE — ${s.guess.streak} in a row after ${s.guess.answered} questions`
+                        : 'GENERAL KNOWLEDGE — done (old closest-guess answers)'}
                     </p>
                   )}
                   {s.cheer && <p className="note">VIDEO — {esc(s.cheer.name)} · {s.cheer.seconds}s (held on the team's phone)</p>}
