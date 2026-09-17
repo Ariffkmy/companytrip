@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import schedule from './data/schedule';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
@@ -8,6 +8,8 @@ import Login from './components/Login';
 import Admin from './components/Admin';
 import { useAuth } from './lib/useAuth';
 import { cachedHuntConfig, fetchHuntConfig } from './lib/huntConfig';
+
+const HuntMap = lazy(() => import('./components/HuntMap'));
 
 const THEME_KEY = 'olc-theme';
 
@@ -206,6 +208,8 @@ function ChecklistDayPanel({ day }) {
 
 /* ── DayPanel ──────────────────────────────────────── */
 function DayPanel({ day, index, active, onOpenTreasureHunt }) {
+  const [mapOpen, setMapOpen] = useState(false);
+  const closeMap = useCallback(() => setMapOpen(false), []);
   if (!active) return null;
 
   if (index === 0) {
@@ -224,6 +228,20 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
           <span className="text-2xl">🗺️</span>
           <span><em className="not-italic text-gold dark:text-paper">Atami</em> Treasure Hunt</span>
         </button>
+      )}
+      {index === 4 && (
+        <button
+          onClick={() => setMapOpen(true)}
+          type="button"
+          className="w-full -mt-1 h-11 rounded-xl border border-gray-200 bg-white text-sm font-medium text-ink cursor-pointer transition-colors hover:border-gray-300"
+        >
+          View the hunt route map
+        </button>
+      )}
+      {mapOpen && (
+        <Suspense fallback={null}>
+          <HuntMap onClose={closeMap} />
+        </Suspense>
       )}
 
       {/* Timeline */}

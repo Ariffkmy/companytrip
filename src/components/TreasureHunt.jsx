@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
 import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
 
@@ -6,7 +6,10 @@ import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot }
    Atami Treasure Hunt — Embedded Stamp Rally Game
    ═══════════════════════════════════════════════════ */
 
-const KANJI = ['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
+/* Leaflet is heavy; only fetch it when someone opens the map. */
+const HuntMap = lazy(() => import('./HuntMap'));
+
+const KANJI =['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
 
 /* 3x3 bingo card — rows, columns, diagonals */
 const BINGO_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
@@ -312,6 +315,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
   const [coverTile, setCoverTile] = useState(null);
   const [bingoMissing, setBingoMissing] = useState(null);
   const [bingoChecking, setBingoChecking] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const closeMap = useCallback(() => setMapOpen(false), []);
   /* Scores and times are for the committee only. */
   const canOrganise = preview || !!me?.isAdmin;
   const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
@@ -1659,7 +1664,14 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
   return (
     <div className="relative min-h-[300px]">
       {/* Close button */}
-      <div className="sticky top-0 z-70 flex justify-end py-1.5">
+      <div className="sticky top-0 z-70 flex justify-between gap-2 py-1.5">
+        <button
+          onClick={() => setMapOpen(true)}
+          type="button"
+          className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-card text-ink transition-all duration-100 hover:opacity-90"
+        >
+          🗺️ Route map
+        </button>
         <button
           onClick={onClose}
           type="button"
@@ -1681,6 +1693,12 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
       )}
       {view === 'done' && renderDoneScreen()}
       {view === 'organizer' && renderOrganizer()}
+
+      {mapOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-[90] grid place-items-center bg-paper note">Loading map…</div>}>
+          <HuntMap onClose={closeMap} />
+        </Suspense>
+      )}
 
       {/* Toast */}
       {toast && (

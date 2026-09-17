@@ -79,6 +79,18 @@ export default defineConfig({
             },
           },
           {
+            // Hunt map tiles. The route covers a few hundred tiles at
+            // most; keep whatever was viewed so it still draws on patchy
+            // roaming data in Atami.
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
             // Google Fonts stylesheet — small, changes rarely.
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
             handler: 'StaleWhileRevalidate',
