@@ -137,6 +137,37 @@ function StringList({ label, items, onChange, addLabel, fixedLength }) {
   );
 }
 
+/* Pulls "lat,lng" pairs out of pasted text — a Google Maps directions
+   URL is mostly that. Short maps.app.goo.gl links hide their
+   coordinates behind a redirect, so they have to be opened first. */
+function parseCoords(text) {
+  const out = [];
+  const re = /(-?\d{1,3}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/g;
+  let m;
+  while ((m = re.exec(String(text ?? ''))) !== null) {
+    const lat = Number(m[1]);
+    const lng = Number(m[2]);
+    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) out.push({ lat, lng });
+  }
+  return out;
+}
+
+/* Walking directions through the stops, from OpenStreetMap's public
+   router. Returns the drawn line plus its distance and duration. */
+async function fetchWalkingRoute(points) {
+  const path = points.map((p) => `${Number(p.lng)},${Number(p.lat)}`).join(';');
+  const res = await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${path}?overview=full&geometries=geojson`);
+  if (!res.ok) throw new Error('router refused');
+  const data = await res.json();
+  const r = data?.routes?.[0];
+  if (!r) throw new Error('no route');
+  return {
+    route: r.geometry.coordinates.map(([lng, lat]) => [Number(lat.toFixed(6)), Number(lng.toFixed(6))]),
+    km: Math.round((r.distance / 1000) * 10) / 10,
+    walkMin: Math.max(1, Math.round(r.duration / 60)),
+  };
+}
+
 function Section({ title, sub, children, defaultOpen = false }) {
   return (
     <details open={defaultOpen} className="group bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -157,6 +188,152 @@ function Sub({ children }) {
 }
 
 const TEXT_HINT = 'Blank line starts a new paragraph. **Double stars** make text bold.';
+
+/* ── Route map ────────────────────────────────────── */
+function Coord({ label, value, onChange, placeholder }) {
+  const id = useFieldId();
+  return (
+    <Field label={label} id={id}>
+      <input id={id} inputMode="decimal" value={value ?? ''} placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value.trim() === '' ? '' : Number(e.target.value))}
+        className={`${inputCls} h-10 font-mono text-sm`} />
+    </Field>
+  );
+}
+
+function MapSection({ val, set }) {
+  const [paste, setPaste] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [loop, setLoop] = useState(true);
+
+  const m = ['map'];
+  const stops = val([...m, 'checkpoints']) ?? [];
+  const start = val([...m, 'start']) ?? {};
+  const line = val([...m, 'route']) ?? [];
+  const setStops = set([...m, 'checkpoints']);
+
+  const move = (i, by) => {
+    const next = [...stops];
+    const j = i + by;
+    if (j < 0 || j >= next.length) return;
+    [next[i], next[j]] = [next[j], next[i]];
+    setStops(next);
+  };
+
+  const usePaste = () => {
+    const found = parseCoords(paste);
+    if (!found.length) {
+      setMsg('No coordinates found. Paste a Google Maps link that shows numbers like 35.1033,139.0784 — open a maps.app.goo.gl link in a browser first, then copy the address bar.');
+      return;
+    }
+    setStops(found.map((p) => ({ ...p, note: '' })));
+    setPaste('');
+    setMsg(`Set ${found.length} checkpoint${found.length === 1 ? '' : 's'} from the pasted coordinates. Redraw the walking line next.`);
+  };
+
+  const redraw = async () => {
+    const points = [start, ...stops, ...(loop ? [start] : [])]
+      .filter((p) => String(p?.lat ?? '') !== '' && String(p?.lng ?? '') !== '');
+    if (points.length < 2) { setMsg('Add a start and at least one checkpoint first.'); return; }
+    setBusy(true);
+    setMsg('');
+    try {
+      const drawn = await fetchWalkingRoute(points);
+      set([...m, 'route'])(drawn.route);
+      set([...m, 'km'])(drawn.km);
+      set([...m, 'walkMin'])(drawn.walkMin);
+      setMsg(`Walking line redrawn — ${drawn.km} km, about ${drawn.walkMin} min. Press Save to keep it.`);
+    } catch {
+      setMsg('Couldn’t reach the walking directions service. Check your connection and try again — the map still works with straight lines between stops.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section title="Route map" sub={`${stops.length} checkpoint${stops.length === 1 ? '' : 's'} · ${line.length > 1 ? 'line drawn' : 'straight lines'}`}>
+      <p className="note">
+        What participants see on the “Route map” screen. Checkpoints are numbered by the order below, so you can have as many as you like.
+      </p>
+
+      <Sub>Start &amp; finish</Sub>
+      <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1fr)_8rem_8rem] gap-3">
+        <Text label="Label" value={start.label} onChange={set([...m, 'start', 'label'])} placeholder="Start & finish" />
+        <Coord label="Latitude" value={start.lat} onChange={set([...m, 'start', 'lat'])} placeholder="35.1033591" />
+        <Coord label="Longitude" value={start.lng} onChange={set([...m, 'start', 'lng'])} placeholder="139.078452" />
+      </div>
+
+      <Sub>Checkpoints</Sub>
+      <ol className="space-y-2">
+        {stops.map((c, i) => (
+          <li key={i} className="rounded-lg border border-gray-200 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-ink dark:bg-flame text-white text-[11px] font-bold grid place-items-center">{i + 1}</span>
+              <input aria-label={`Note for checkpoint ${i + 1}`} value={c.note ?? ''} placeholder="What happens here (optional)"
+                onChange={(e) => set([...m, 'checkpoints', i, 'note'])(e.target.value)} className={`${inputCls} h-9 text-sm`} />
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move checkpoint ${i + 1} up`}
+                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">↑</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === stops.length - 1} aria-label={`Move checkpoint ${i + 1} down`}
+                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">↓</button>
+              <button type="button" onClick={() => setStops(stops.filter((_, j) => j !== i))} aria-label={`Remove checkpoint ${i + 1}`}
+                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer">×</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pl-8">
+              <Coord label="Latitude" value={c.lat} onChange={set([...m, 'checkpoints', i, 'lat'])} placeholder="35.1029235" />
+              <Coord label="Longitude" value={c.lng} onChange={set([...m, 'checkpoints', i, 'lng'])} placeholder="139.0776027" />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <button type="button" onClick={() => setStops([...stops, { lat: '', lng: '', note: '' }])}
+        className="text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add checkpoint</button>
+
+      <Sub>Paste from Google Maps</Sub>
+      <div className="flex flex-wrap gap-2 items-start">
+        <input value={paste} onChange={(e) => setPaste(e.target.value)} aria-label="Coordinates or Google Maps link"
+          placeholder="https://www.google.com/maps/dir/35.1033,139.0784/…" className={`${inputCls} h-10 flex-1 min-w-[16rem] text-sm`} />
+        <button type="button" onClick={usePaste} disabled={!paste.trim()}
+          className="h-10 px-4 rounded-lg border-2 border-ink bg-white text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          Replace checkpoints
+        </button>
+      </div>
+      <p className="note -mt-2">
+        Every coordinate pair in the link becomes a checkpoint, in order. A short maps.app.goo.gl link has to be opened in a browser first — then copy the long address it lands on.
+      </p>
+
+      <Sub>Walking line</Sub>
+      <div className="flex flex-wrap gap-3 items-center">
+        <button type="button" onClick={redraw} disabled={busy}
+          className="h-10 px-4 rounded-lg bg-ink dark:bg-flame text-white text-sm font-medium cursor-pointer disabled:opacity-60 disabled:cursor-wait">
+          {busy ? 'Drawing…' : 'Redraw along the streets'}
+        </button>
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+          <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} className="w-4 h-4 accent-[var(--color-red)]" />
+          Finish back at the start
+        </label>
+        {line.length > 1 && (
+          <button type="button" onClick={() => set([...m, 'route'])([])}
+            className="text-xs text-gray-500 underline underline-offset-2 cursor-pointer">Clear the line</button>
+        )}
+      </div>
+      <p className="note -mt-2">
+        {line.length > 1
+          ? `Line drawn with ${line.length} points. Redraw it whenever you move a checkpoint.`
+          : 'No line yet — the map joins the stops with straight lines until you draw one.'}
+      </p>
+      {msg && <p className="text-sm text-ink" aria-live="polite">{msg}</p>}
+
+      <Sub>Details shown on the map</Sub>
+      <div className="grid grid-cols-2 sm:grid-cols-[8rem_8rem_minmax(0,1fr)] gap-3">
+        <Num label="Distance (km)" value={val([...m, 'km'])} onChange={set([...m, 'km'])} />
+        <Num label="Walking (min)" value={val([...m, 'walkMin'])} onChange={set([...m, 'walkMin'])} />
+        <Text label="Google Maps link" hint="Opens in Google Maps from the map screen. Leave blank to hide the button."
+          value={val([...m, 'link'])} onChange={set([...m, 'link'])} />
+      </div>
+    </Section>
+  );
+}
 
 /* ── Editor ──────────────────────────────────────── */
 export default function HuntEditor() {
@@ -266,6 +443,8 @@ export default function HuntEditor() {
         <Area label="Finish point" hint="Shown on the last unlock screen and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
         <Text label="Help note" hint="Small line under the first game (photo bingo). Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
       </Section>
+
+      <MapSection val={val} set={set} />
 
       <Section title="1 · Photo bingo" sub="First game · nine prompts per team">
         <p className="note">Its own game, played first. Locking the card opens the stamp rally.</p>

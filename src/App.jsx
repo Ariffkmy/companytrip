@@ -7,7 +7,7 @@ import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
 import { useAuth } from './lib/useAuth';
-import { cachedHuntConfig, fetchHuntConfig } from './lib/huntConfig';
+import { cachedHuntConfig, fetchHuntConfig, withDefaults } from './lib/huntConfig';
 
 const HuntMap = lazy(() => import('./components/HuntMap'));
 
@@ -207,7 +207,7 @@ function ChecklistDayPanel({ day }) {
 }
 
 /* ── DayPanel ──────────────────────────────────────── */
-function DayPanel({ day, index, active, onOpenTreasureHunt }) {
+function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
   const [mapOpen, setMapOpen] = useState(false);
   const closeMap = useCallback(() => setMapOpen(false), []);
   if (!active) return null;
@@ -240,7 +240,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
       )}
       {mapOpen && (
         <Suspense fallback={null}>
-          <HuntMap onClose={closeMap} />
+          <HuntMap map={huntMap} onClose={closeMap} />
         </Suspense>
       )}
 
@@ -300,7 +300,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
 }
 
 /* ── Itinerary ─────────────────────────────────────── */
-function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay }) {
+function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay, huntMap }) {
   return (
     <section>
       <PageHead
@@ -331,7 +331,7 @@ function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay }) {
       </div>
 
       {schedule.map((day, i) => (
-        <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} />
+        <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} huntMap={huntMap} />
       ))}
     </section>
   );
@@ -356,6 +356,10 @@ export default function App() {
     setTreasureOpen(true);
   }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
+
+  /* The route map is reachable from the itinerary without opening the
+     hunt, so pick up any admin edits on the way in. */
+  useEffect(() => { fetchHuntConfig().then(({ config }) => setHuntConfig(config)); }, []);
 
   /* Admin is a laptop job: on large screens it gets the full width.
      Phones and every other tab keep the 640px column. */
@@ -521,6 +525,7 @@ export default function App() {
             onOpenTreasureHunt={openTreasureHunt}
             activeDay={itinDay}
             setActiveDay={setItinDay}
+            huntMap={(huntConfig ?? withDefaults(null)).map}
           />
         )}
         {tab === 'album' && <Album userId={auth.user?.id} isAdmin={auth.isAdmin} />}

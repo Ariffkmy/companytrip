@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { CHECKPOINTS, HUNT_MAP_LINK, ROUTE, ROUTE_STATS, START } from '../data/huntRoute';
 
 /* OpenStreetMap's own tiles: no key, fine for a couple of dozen phones.
    Dark mode is a CSS filter on the tile pane (see index.css). The
@@ -10,15 +9,30 @@ import { CHECKPOINTS, HUNT_MAP_LINK, ROUTE, ROUTE_STATS, START } from '../data/h
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-/* Full-screen map of the hunt route. Opened over the game, so closing
-   it drops the team back exactly where they were. */
-export default function HuntMap({ onClose }) {
+const num = (v) => (String(v ?? '').trim() === '' ? NaN : Number(v));
+const point = (p) => {
+  const lat = num(p?.lat);
+  const lng = num(p?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : null;
+};
+
+/* Full-screen map of the hunt route, drawn from the admin's settings.
+   Opened over the game, so closing it drops the team back exactly where
+   they were. */
+export default function HuntMap({ map: cfg, onClose }) {
   const el = useRef(null);
   const map = useRef(null);
   const me = useRef(null);
   const watch = useRef(null);
   const closeRef = useRef(null);
   const [locating, setLocating] = useState('off'); // off | finding | on | denied | unavailable
+
+  const start = point(cfg?.start);
+  const stops = (cfg?.checkpoints ?? []).map(point).filter(Boolean);
+  /* No drawn line yet: join the stops so there is still something to follow. */
+  const line = (cfg?.route ?? []).map((p) => (Array.isArray(p) ? p : point(p))).filter(Boolean);
+  const route = line.length > 1 ? line : [start, ...stops].filter(Boolean);
+  const link = String(cfg?.link ?? '').trim();
 
   useEffect(() => {
     const m = L.map(el.current, { zoomControl: false, attributionControl: true });
@@ -29,24 +43,34 @@ export default function HuntMap({ onClose }) {
       attribution: ATTRIBUTION, maxZoom: 19, crossOrigin: 'anonymous',
     }).addTo(m);
 
-    L.polyline(ROUTE, { className: 'hunt-route-casing', weight: 9, interactive: false }).addTo(m);
-    const route = L.polyline(ROUTE, { className: 'hunt-route', weight: 5, interactive: false }).addTo(m);
-    L.polyline(ROUTE, { className: 'hunt-route-flow', weight: 5, interactive: false }).addTo(m);
+    if (route.length > 1) {
+      L.polyline(route, { className: 'hunt-route-casing', weight: 9, interactive: false }).addTo(m);
+      L.polyline(route, { className: 'hunt-route', weight: 5, interactive: false }).addTo(m);
+      L.polyline(route, { className: 'hunt-route-flow', weight: 5, interactive: false }).addTo(m);
+    }
 
-    L.circleMarker([START.lat, START.lng], { className: 'hunt-start', radius: 9, weight: 3 })
-      .addTo(m)
-      .bindTooltip(START.label, { permanent: true, direction: 'top', offset: [0, -10], className: 'hunt-tip' });
+    if (start) {
+      L.circleMarker(start, { className: 'hunt-start', radius: 9, weight: 3 })
+        .addTo(m)
+        .bindTooltip(cfg?.start?.label || 'Start & finish', { permanent: true, direction: 'top', offset: [0, -10], className: 'hunt-tip' });
+    }
 
-    /* Checkpoint 1 sits a few metres from the start, so it is drawn on
-       top and to the side rather than hidden under the start ring. */
-    CHECKPOINTS.forEach((c) => {
-      L.marker([c.lat, c.lng], {
-        icon: L.divIcon({ className: 'hunt-cp', html: `<span>${c.n}</span>`, iconSize: [26, 26], iconAnchor: c.n === 1 ? [-4, 13] : [13, 13] }),
-        title: `Checkpoint ${c.n}`, alt: `Checkpoint ${c.n}`, keyboard: false, zIndexOffset: 1000,
+    /* A stop within a few metres of the start is drawn to the side so it
+       isn't hidden under the start ring. */
+    const near = (a, b) => a && b && Math.abs(a[0] - b[0]) < 0.0002 && Math.abs(a[1] - b[1]) < 0.0002;
+    stops.forEach((at, i) => {
+      const note = String(cfg.checkpoints[i]?.note ?? '').trim();
+      const label = `Checkpoint ${i + 1}`;
+      const marker = L.marker(at, {
+        icon: L.divIcon({ className: 'hunt-cp', html: `<span>${i + 1}</span>`, iconSize: [26, 26], iconAnchor: near(at, start) ? [-4, 13] : [13, 13] }),
+        title: note ? `${label} · ${note}` : label, alt: label, keyboard: false, zIndexOffset: 1000,
       }).addTo(m);
+      if (note) marker.bindPopup(`<b>${label}</b><br>${note}`);
     });
 
-    m.fitBounds(route.getBounds(), { padding: [32, 32] });
+    const bounds = L.latLngBounds([...route, ...stops, start].filter(Boolean));
+    if (bounds.isValid()) m.fitBounds(bounds, { padding: [32, 32] });
+    else m.setView([35.1033, 139.0784], 15);
 
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -60,9 +84,13 @@ export default function HuntMap({ onClose }) {
       if (watch.current != null) navigator.geolocation?.clearWatch(watch.current);
       m.remove();
     };
-  }, [onClose]);
+    /* Built once per open; the config can't change while it is up. */
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fitRoute = () => map.current?.fitBounds(L.latLngBounds(ROUTE), { padding: [32, 32] });
+  const fitRoute = () => {
+    const bounds = L.latLngBounds([...route, ...stops, start].filter(Boolean));
+    if (bounds.isValid()) map.current?.fitBounds(bounds, { padding: [32, 32] });
+  };
 
   /* Only asks for location when tapped — no permission prompt on open. */
   const locate = () => {
@@ -101,6 +129,14 @@ export default function HuntMap({ onClose }) {
     unavailable: 'Couldn’t find your location. Try again outside, away from tall buildings.',
   }[locating];
 
+  const km = num(cfg?.km);
+  const walkMin = num(cfg?.walkMin);
+  const stats = [
+    Number.isFinite(km) && km > 0 ? `${km} km` : null,
+    Number.isFinite(walkMin) && walkMin > 0 ? `about ${walkMin} min on foot` : null,
+    stops.length ? `${stops.length} checkpoint${stops.length === 1 ? '' : 's'}` : null,
+  ].filter(Boolean).join(' · ');
+
   const pill = 'h-10 px-3.5 rounded-full bg-white border border-gray-200 shadow-sm text-sm font-medium text-ink cursor-pointer whitespace-nowrap active:translate-y-px focus-visible:outline-2 focus-visible:outline-red';
 
   return (
@@ -109,7 +145,7 @@ export default function HuntMap({ onClose }) {
         <div className="max-w-[640px] mx-auto px-4 h-14 flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <h2 id="hunt-map-h" className="font-display text-lg tracking-wide leading-none">Hunt map</h2>
-            <p className="font-mono text-[11px] text-gray-500 mt-1">{ROUTE_STATS.km} km loop · about {ROUTE_STATS.walkMin} min on foot</p>
+            {stats && <p className="font-mono text-[11px] text-gray-500 mt-1 truncate">{stats}</p>}
           </div>
           <button ref={closeRef} type="button" onClick={onClose}
             className="h-9 px-3 rounded-lg bg-ink dark:bg-flame text-white text-sm font-medium cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red">
@@ -126,9 +162,11 @@ export default function HuntMap({ onClose }) {
             {locating === 'finding' ? 'Finding you…' : locating === 'on' ? '◉ Me' : '◎ Show me'}
           </button>
           <button type="button" onClick={fitRoute} className={pill}>Whole route</button>
-          <a href={HUNT_MAP_LINK} target="_blank" rel="noopener noreferrer" className={`${pill} grid place-items-center no-underline`}>
-            Google Maps ↗
-          </a>
+          {link && (
+            <a href={link} target="_blank" rel="noopener noreferrer" className={`${pill} grid place-items-center no-underline`}>
+              Google Maps ↗
+            </a>
+          )}
         </div>
 
         {locateNote && (
@@ -140,9 +178,14 @@ export default function HuntMap({ onClose }) {
 
       <div className="shrink-0 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
         <ul className="max-w-[640px] mx-auto px-4 py-2.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-          <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-5 h-1.5 rounded-full bg-red" />Walking route</li>
-          <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full border-[3px] border-red bg-white" />Start &amp; finish</li>
-          <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-4 h-4 rounded-full bg-ink dark:bg-flame text-white text-[9px] font-bold grid place-items-center">1</span>Checkpoint, in walking order</li>
+          {route.length > 1 && <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-5 h-1.5 rounded-full bg-red" />Walking route</li>}
+          {start && <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full border-[3px] border-red bg-white" />{cfg?.start?.label || 'Start & finish'}</li>}
+          {stops.length > 0 && (
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="w-4 h-4 rounded-full bg-ink dark:bg-flame text-white text-[9px] font-bold grid place-items-center">1</span>
+              Checkpoint, in walking order
+            </li>
+          )}
           <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full border-[3px] border-white bg-sea shadow" />You</li>
         </ul>
       </div>

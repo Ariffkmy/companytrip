@@ -1746,7 +1746,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
       {mapOpen && (
         <Suspense fallback={<div className="fixed inset-0 z-[90] grid place-items-center bg-paper note">Loading map…</div>}>
-          <HuntMap onClose={closeMap} />
+          <HuntMap map={CONFIG.map} onClose={closeMap} />
         </Suspense>
       )}
 

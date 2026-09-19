@@ -17,6 +17,7 @@
 import { supabase } from './supabase';
 import groupRoster from '../data/groupRoster';
 import TRIVIA_BANK from '../data/triviaBank';
+import { CHECKPOINTS, HUNT_MAP_LINK, ROUTE, ROUTE_STATS, START } from '../data/huntRoute';
 
 export const HUNT_ID = 'atami';
 export const MEDIA_BUCKET = 'hunt-media';
@@ -117,6 +118,19 @@ export const DEFAULT_HUNT_CONFIG = {
         'The colour yellow',
       ]),
     },
+  },
+
+  /* Route map. Checkpoints are numbered by their order here, so a trip
+     can have as many as it likes. `route` is the walking line; the
+     editor can redraw it through the stops, or it falls back to
+     straight lines between them. */
+  map: {
+    link: HUNT_MAP_LINK,
+    km: ROUTE_STATS.km,
+    walkMin: ROUTE_STATS.walkMin,
+    start: { lat: START.lat, lng: START.lng, label: START.label },
+    checkpoints: CHECKPOINTS.map((c) => ({ lat: c.lat, lng: c.lng, note: '' })),
+    route: ROUTE,
   },
 
   checkpoints: {
@@ -260,6 +274,7 @@ export function toRuntime(config) {
     quiz: { questions: cp.cp4.questions },
     ask: { tasks: cp.ask.tasks },
     bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, size: 9 },
+    map: config.map,
     trivia: { streak: Math.max(1, Number(cp.guess.streak) || 10), bank: cp.guess.bank },
     video: { seconds: cp.cheer.seconds, maxSeconds: cp.cheer.maxSeconds },
     cp,
@@ -288,6 +303,12 @@ export function validate(config) {
     const opts = [t.a, ...(t.decoys ?? [])].map((o) => String(o ?? '').trim().toLowerCase());
     if (!String(t.q ?? '').trim() || opts.length !== 4 || opts.some((o) => !o)) errs.push(`Stamp 7: question ${i + 1} needs its text, the right answer and three wrong answers.`);
     else if (new Set(opts).size !== 4) errs.push(`Stamp 7: question ${i + 1} has a wrong answer that matches another answer.`);
+  });
+  const coord = (p) => Math.abs(Number(p?.lat)) <= 90 && Math.abs(Number(p?.lng)) <= 180
+    && String(p?.lat ?? '').trim() !== '' && String(p?.lng ?? '').trim() !== '';
+  if (!coord(config.map.start)) errs.push('Route map: the start needs a latitude and longitude.');
+  (config.map.checkpoints ?? []).forEach((c, i) => {
+    if (!coord(c)) errs.push(`Route map: checkpoint ${i + 1} needs a latitude between -90 and 90 and a longitude between -180 and 180.`);
   });
   if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Stamp 8: the maximum video length must be at least the target length.');
   if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Stamp 6: each task needs a label and a points value.');
