@@ -511,7 +511,6 @@ export default function App() {
           <Home
             onGo={go}
             onOpenTreasureHunt={openTreasureHunt}
-            userId={auth.user?.id}
             userEmail={auth.user?.email}
             isAdmin={auth.isAdmin}
             onSignOut={auth.signOut}

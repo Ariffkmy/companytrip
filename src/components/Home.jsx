@@ -78,23 +78,23 @@ function Field({ label, value, wide }) {
   );
 }
 
-function Insurance({ userId }) {
+function Insurance({ userEmail }) {
   /* Show the phone's copy first: on a train platform in Atami there may
      never be a fresh one. */
-  const [policy, setPolicy] = useState(() => cachedPolicy(userId));
+  const [policy, setPolicy] = useState(() => cachedPolicy(userEmail));
   const [state, setState] = useState('loading'); // loading · ready · offline
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!userId) return undefined;
+    if (!userEmail) return undefined;
     let live = true;
-    setPolicy(cachedPolicy(userId));
-    fetchMyPolicy(userId)
+    setPolicy(cachedPolicy(userEmail));
+    fetchMyPolicy(userEmail)
       .then((row) => { if (live) { setPolicy(row); setState('ready'); } })
       .catch(() => { if (live) setState('offline'); });
     return () => { live = false; };
-  }, [userId]);
+  }, [userEmail]);
 
   const download = async () => {
     setDownloading(true);
@@ -211,14 +211,14 @@ function Jump({ onGo, onOpenTreasureHunt }) {
   );
 }
 
-export default function Home({ onGo, onOpenTreasureHunt, userId, userEmail, isAdmin, onSignOut }) {
+export default function Home({ onGo, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <Groups />
       <WeatherWidget />
       <ForexWidget />
-      <Insurance userId={userId} />
+      <Insurance userEmail={userEmail} />
       <Jump onGo={onGo} onOpenTreasureHunt={onOpenTreasureHunt} />
 
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">
