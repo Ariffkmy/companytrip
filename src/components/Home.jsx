@@ -3,11 +3,12 @@
  * dividers · widgets stacked weather → money → photos
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import WeatherWidget from './Weather';
 import ForexWidget from './ForexWidget';
 import PhotoCarousel from './PhotoCarousel';
 import groupRoster from '../data/groupRoster';
+import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
 
 /* Lead and JP Speaker are the two you need to find fast, so they are
    the only rows that carry a badge. */
@@ -64,6 +65,117 @@ function Groups() {
   );
 }
 
+/* ── Insurance ──────────────────────────────────────
+   Your own policy, nobody else's. The numbers are printed large and
+   selectable because the moment you need them is on the phone to a
+   hotline, reading them out — the PDF is the slow path. */
+function Field({ label, value, wide }) {
+  return (
+    <div className={wide ? 'col-span-2' : ''}>
+      <dt className="font-mono text-[10px] tracking-[.14em] uppercase text-gray-400">{label}</dt>
+      <dd className="text-sm text-ink leading-snug mt-0.5 select-all break-words">{value || '—'}</dd>
+    </div>
+  );
+}
+
+function Insurance({ userId }) {
+  /* Show the phone's copy first: on a train platform in Atami there may
+     never be a fresh one. */
+  const [policy, setPolicy] = useState(() => cachedPolicy(userId));
+  const [state, setState] = useState('loading'); // loading · ready · offline
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!userId) return undefined;
+    let live = true;
+    setPolicy(cachedPolicy(userId));
+    fetchMyPolicy(userId)
+      .then((row) => { if (live) { setPolicy(row); setState('ready'); } })
+      .catch(() => { if (live) setState('offline'); });
+    return () => { live = false; };
+  }, [userId]);
+
+  const download = async () => {
+    setDownloading(true);
+    setError('');
+    try {
+      const url = await certificateUrl(policy);
+      /* An anchor rather than location.assign: the signed link carries a
+         Content-Disposition, so this saves the file instead of replacing
+         the app — which on a PWA would mean losing the session view. */
+      const a = document.createElement('a');
+      a.href = url;
+      a.rel = 'noopener';
+      a.click();
+    } catch (e) {
+      setError('Couldn’t fetch the certificate. Try again with signal.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  /* Nothing loaded yet is the normal state until the committee imports
+     the policies, so it reads as a status, not a failure. */
+  if (!policy) {
+    if (state === 'loading') return null;
+    return (
+      <section className="mt-9" aria-labelledby="ins-h">
+        <h2 id="ins-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+          Travel insurance
+        </h2>
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <p className="text-sm text-gray-500 leading-relaxed">
+            {state === 'offline'
+              ? 'No saved copy on this phone yet — open this page once with signal.'
+              : 'Your policy hasn’t been loaded yet. The committee will add it before departure.'}
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-9" aria-labelledby="ins-h">
+      <h2 id="ins-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+        Travel insurance
+      </h2>
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <p className="font-display text-base tracking-wide leading-snug">{policy.product || 'Travel cover'}</p>
+          {policy.destination && (
+            <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-sea">
+              {policy.destination}
+            </span>
+          )}
+        </div>
+
+        <dl className="grid grid-cols-2 gap-x-3 gap-y-3 mt-3.5">
+          <Field label="Master policy no." value={policy.master_policy_no} />
+          <Field label="Reference no." value={policy.reference_no} />
+          <Field label="Flight booking" value={policy.booking_no} />
+          <Field label="Cover" value={`${formatDate(policy.effective_date)} – ${formatDate(policy.expiry_date)}`} />
+          <Field label="Plan type" value={policy.plan_type} wide />
+        </dl>
+
+        <button
+          type="button"
+          onClick={download}
+          disabled={!policy.pdf_path || downloading}
+          className="w-full mt-4 h-11 rounded-lg border border-gray-200 bg-white text-sm font-medium text-ink cursor-pointer transition-colors hover:border-gray-300 disabled:cursor-default disabled:text-gray-400 disabled:hover:border-gray-200"
+        >
+          {downloading ? 'Preparing…' : policy.pdf_path ? 'Download certificate (PDF)' : 'Certificate not uploaded yet'}
+        </button>
+
+        {error && <p className="text-xs text-red mt-2">{error}</p>}
+        <p className="note mt-2 leading-relaxed">
+          Saved on this phone so the numbers are readable offline. The PDF itself needs signal.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* ── Jump ───────────────────────────────────────────
    Two-up, deliberately uneven in weight: Safety is the one you
    need under pressure, so it reads loudest. */
@@ -99,13 +211,14 @@ function Jump({ onGo, onOpenTreasureHunt }) {
   );
 }
 
-export default function Home({ onGo, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
+export default function Home({ onGo, onOpenTreasureHunt, userId, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <Groups />
       <WeatherWidget />
       <ForexWidget />
+      <Insurance userId={userId} />
       <Jump onGo={onGo} onOpenTreasureHunt={onOpenTreasureHunt} />
 
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">
