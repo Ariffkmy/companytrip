@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import groupRoster from '../data/groupRoster';
 import HuntEditor from './HuntEditor';
 import { sendInvites, inviteProblem } from '../lib/invites';
+import { listPolicies, removeCertificate, uploadCertificate } from '../lib/insurance';
 
 const ROLES = ['Member', 'Team Lead', 'JP Speaker'];
 
@@ -371,8 +372,171 @@ function TripList({ currentEmail, onSelfChanged }) {
   );
 }
 
+/* ── Insurance ───────────────────────────────────────
+   One row per person on the trip list, whether or not they have joined
+   yet: policies are keyed by email, so a certificate can be uploaded
+   for someone who has not accepted their invite. */
+function InsuranceRow({ person, policy, busy, note, onUpload, onRemove }) {
+  const who = person.full_name || person.email;
+  const id = `ins-${person.email.replace(/[^a-z0-9]/gi, '-')}`;
+  const hasFile = !!policy?.pdf_path;
+  const details = policy?.reference_no || policy?.master_policy_no;
+
+  return (
+    <tr className="border-t border-gray-200 align-middle">
+      <td className="pl-3 pr-2 py-2.5 max-w-[220px]">
+        <span className="block text-sm font-medium truncate">{who}</span>
+        <span className="block note truncate">{person.email}</span>
+      </td>
+      <td className="px-2 py-2.5">
+        {details ? (
+          <>
+            <span className="block text-sm truncate">{policy.product || 'Policy loaded'}</span>
+            <span className="block note truncate">{details}</span>
+          </>
+        ) : (
+          <span className="text-sm text-gray-400">Details not loaded</span>
+        )}
+      </td>
+      <td className="px-2 py-2.5">
+        <span className={`text-xs font-medium ${hasFile ? 'text-green' : 'text-gray-400'}`}>
+          {hasFile ? '✓ Uploaded' : 'No PDF'}
+        </span>
+        {note && (
+          <span className={`block text-xs ${note.ok ? 'text-gray-600' : 'text-red'}`}>{note.text}</span>
+        )}
+      </td>
+      <td className="pl-2 pr-3 py-2.5 text-right whitespace-nowrap">
+        <label
+          htmlFor={id}
+          className={`inline-block h-9 px-3 leading-9 rounded-lg border border-gray-200 bg-white text-xs font-medium ${
+            busy ? 'opacity-60 cursor-wait' : 'cursor-pointer hover:border-gray-300'
+          }`}
+        >
+          {busy ? 'Uploading…' : hasFile ? 'Replace' : 'Upload PDF'}
+        </label>
+        <input
+          id={id}
+          type="file"
+          accept="application/pdf"
+          disabled={busy}
+          className="hidden"
+          onChange={(e) => { const f = e.target.files[0]; e.target.value = ''; if (f) onUpload(f); }}
+        />
+        {hasFile && !busy && (
+          <button type="button" onClick={onRemove}
+            className="ml-2 text-xs text-gray-400 underline underline-offset-2 hover:text-red cursor-pointer">
+            Remove
+          </button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function InsuranceAdmin() {
+  const [people, setPeople] = useState(null);
+  const [policies, setPolicies] = useState({});
+  const [busy, setBusy] = useState(new Set());
+  const [notes, setNotes] = useState({});
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setError('');
+    const [{ data, error: err }, rows] = await Promise.all([
+      supabase.from('allowed_emails').select('email, full_name').order('full_name', { nullsFirst: false }),
+      listPolicies().catch(() => null),
+    ]);
+    if (err) { setError(friendly(err)); return; }
+    setPeople(data ?? []);
+    if (rows === null) setError('Couldn’t read the policies. Has the insurance migration been run?');
+    else setPolicies(rows);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const mark = (email, on) => setBusy((prev) => {
+    const next = new Set(prev);
+    if (on) next.add(email); else next.delete(email);
+    return next;
+  });
+
+  const run = async (email, work, okText) => {
+    mark(email, true);
+    setNotes((prev) => ({ ...prev, [email]: undefined }));
+    try {
+      const row = await work();
+      setPolicies((prev) => ({ ...prev, [email]: row }));
+      setNotes((prev) => ({ ...prev, [email]: { ok: true, text: okText } }));
+    } catch (e) {
+      const msg = e?.message ?? '';
+      setNotes((prev) => ({ ...prev, [email]: { ok: false, text:
+        /not a pdf/i.test(msg) ? 'That file isn’t a PDF.'
+        : /row-level security|permission|403/i.test(msg) ? 'Your account isn’t an admin any more.'
+        : /foreign key/i.test(msg) ? 'Not on the trip list any more.'
+        : /payload too large|exceeded/i.test(msg) ? 'Too big — the limit is 10 MB.'
+        : /fetch|network/i.test(msg) ? 'No connection.'
+        : 'Couldn’t save that. Try again.' } }));
+    } finally {
+      mark(email, false);
+    }
+  };
+
+  const done = (people ?? []).filter((p) => policies[p.email]?.pdf_path).length;
+
+  return (
+    <div className="min-w-0">
+      {error && <p role="alert" className="text-sm text-red mb-3">{error}</p>}
+      {people === null && !error && <p className="note">Loading the list…</p>}
+
+      {people && people.length > 0 && (
+        <>
+          <p className="text-sm text-gray-600 mb-3">
+            {done} of {people.length} have a certificate.
+            {done < people.length && ' A PDF can go up before someone accepts their invite — it appears on their home screen when they first sign in.'}
+          </p>
+          <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left">
+              <thead>
+                <tr className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
+                  <th scope="col" className="pl-3 pr-2 py-2.5 font-normal">Member</th>
+                  <th scope="col" className="px-2 py-2.5 font-normal">Policy</th>
+                  <th scope="col" className="px-2 py-2.5 font-normal">Certificate</th>
+                  <th scope="col" className="pl-2 pr-3 py-2.5 font-normal"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((p) => (
+                  <InsuranceRow
+                    key={p.email}
+                    person={p}
+                    policy={policies[p.email]}
+                    busy={busy.has(p.email)}
+                    note={notes[p.email]}
+                    onUpload={(file) => run(p.email, () => uploadCertificate(p.email, file), 'Uploaded')}
+                    onRemove={() => run(p.email, () => removeCertificate(policies[p.email]), 'Removed')}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="note mt-6 leading-relaxed">
+            Policy numbers and dates are loaded straight into public.insurance_policies; this page only handles the
+            PDFs. Replacing a certificate deletes the old file once the new one is safely in place.
+          </p>
+        </>
+      )}
+
+      {people && people.length === 0 && (
+        <p className="text-sm text-gray-500">Nobody on the trip list yet — add people under Trip list first.</p>
+      )}
+    </div>
+  );
+}
+
 const SECTIONS = [
   { id: 'people', label: 'Trip list' },
+  { id: 'insurance', label: 'Insurance', lede: 'One travel insurance certificate per person. Upload the PDF and it shows on their home screen — they can only ever see their own.' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
 ];
 
@@ -392,12 +556,12 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       <div className="pt-9 pb-5">
         <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Committee</p>
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Admin <span className="text-red">{current.id === 'hunt' ? 'hunt' : 'list'}</span>
+          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover' }[current.id] ?? 'list'}</span>
         </h1>
         {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
 
-      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-2 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-md">
+      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-md">
         {SECTIONS.map((x) => (
           <button key={x.id} type="button" role="tab" aria-selected={section === x.id} onClick={() => choose(x.id)}
             className={`h-9 rounded-md text-sm font-medium cursor-pointer transition-colors ${
@@ -408,9 +572,11 @@ export default function Admin({ currentEmail, onSelfChanged }) {
         ))}
       </div>
 
-      {section === 'hunt'
-        ? <HuntEditor />
-        : <TripList currentEmail={currentEmail} onSelfChanged={onSelfChanged} />}
+      {section === 'hunt' && <HuntEditor />}
+      {section === 'insurance' && <InsuranceAdmin />}
+      {section !== 'hunt' && section !== 'insurance' && (
+        <TripList currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
+      )}
     </section>
   );
 }

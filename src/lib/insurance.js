@@ -74,6 +74,81 @@ export async function certificateUrl(policy) {
   return data.signedUrl;
 }
 
+/* ── Committee side ─────────────────────────────────
+   Admins only. RLS and the storage policies enforce that; these just
+   stop the Admin page having to know the shape of either. */
+
+const ADMIN_COLUMNS = `email, ${COLUMNS}, updated_at`;
+
+/** Every policy, for the admin list. Keyed by email. */
+export async function listPolicies() {
+  if (!supabase) return {};
+  const { data, error } = await supabase.from('insurance_policies').select(ADMIN_COLUMNS);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((row) => [row.email, row]));
+}
+
+/** Upload or replace one member's certificate. Returns the saved row. */
+export async function uploadCertificate(userEmail, file) {
+  const email = normalise(userEmail);
+  if (!supabase || !email) throw new Error('no member');
+  if (file.type !== 'application/pdf') throw new Error('not a pdf');
+
+  /* A readable folder so the bucket is navigable in the Supabase
+     dashboard, and a uuid filename so replacing a certificate never
+     collides with a signed URL still in flight for the old one. */
+  const folder = email.replace(/[^a-z0-9]+/gi, '-');
+  const path = `${folder}/${crypto.randomUUID()}.pdf`;
+
+  /* Whatever they had before, so a replacement doesn't leave someone's
+     old certificate sitting in the bucket for good. */
+  const { data: previous } = await supabase
+    .from('insurance_policies').select('pdf_path').eq('email', email).maybeSingle();
+
+  const store = supabase.storage.from(BUCKET);
+  const up = await store.upload(path, file, { contentType: 'application/pdf' });
+  if (up.error) throw up.error;
+
+  /* Upsert, not update: a certificate can arrive before the policy
+     details have been loaded, and an uploaded file with no row pointing
+     at it would be unreachable — nobody could ever read it. */
+  const { data, error } = await supabase
+    .from('insurance_policies')
+    .upsert({ email, pdf_path: path }, { onConflict: 'email' })
+    .select(ADMIN_COLUMNS)
+    .single();
+  if (error) {
+    await store.remove([path]); // don't strand the file
+    throw error;
+  }
+
+  /* Only once the row points at the new file: the old one stays
+     readable until the moment it is replaced, never a gap. A failed
+     delete leaves an orphan nobody can reach, which is the safe way
+     round to fail. */
+  if (previous?.pdf_path && previous.pdf_path !== path) {
+    await store.remove([previous.pdf_path]);
+  }
+  return data;
+}
+
+/** Drop a member's certificate, keeping their policy details. */
+export async function removeCertificate(policy) {
+  if (!supabase || !policy?.pdf_path) return policy;
+  const { data, error } = await supabase
+    .from('insurance_policies')
+    .update({ pdf_path: null })
+    .eq('email', policy.email)
+    .select(ADMIN_COLUMNS)
+    .single();
+  if (error) throw error;
+  /* The row is the source of truth for access, so clear it first and
+     delete the file after: a failed delete leaves an orphan, not a
+     readable certificate. */
+  await supabase.storage.from(BUCKET).remove([policy.pdf_path]);
+  return data;
+}
+
 /** 2026-10-22 → 22 Oct 2026 */
 export function formatDate(iso) {
   if (!iso) return '—';
