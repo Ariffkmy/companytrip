@@ -57,19 +57,17 @@ export async function fetchMyPolicy(userEmail) {
   return data;
 }
 
-/* A filename the member will recognise in their downloads folder,
-   rather than the uuid-shaped storage path. */
-function fileName(policy) {
-  const tag = policy.reference_no || policy.master_policy_no || 'policy';
-  return `Travel-Insurance-${tag.replace(/[^\w-]+/g, '-')}.pdf`;
-}
+/** A short-lived link that opens the certificate. Throws if refused.
 
-/** A short-lived link that downloads the certificate. Throws if refused. */
+    No download flag: the browser renders the PDF, and saving it is then
+    the reader's call rather than something that happens to them. On a
+    phone a forced download often lands in a folder they then have to go
+    hunting for. */
 export async function certificateUrl(policy) {
   if (!supabase || !policy?.pdf_path) throw new Error('no certificate');
   const { data, error } = await supabase.storage
     .from(BUCKET)
-    .createSignedUrl(policy.pdf_path, URL_TTL, { download: fileName(policy) });
+    .createSignedUrl(policy.pdf_path, URL_TTL);
   if (error) throw error;
   return data.signedUrl;
 }

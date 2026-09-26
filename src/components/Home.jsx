@@ -106,7 +106,7 @@ function Insurance({ userEmail }) {
      never be a fresh one. */
   const [policy, setPolicy] = useState(() => cachedPolicy(userEmail));
   const [state, setState] = useState('loading'); // loading · ready · offline
-  const [downloading, setDownloading] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -119,22 +119,21 @@ function Insurance({ userEmail }) {
     return () => { live = false; };
   }, [userEmail]);
 
-  const download = async () => {
-    setDownloading(true);
+  const view = async () => {
+    setOpening(true);
     setError('');
+    /* Opened before the await, because a tab opened after one is a
+       popup as far as the browser is concerned and gets blocked. */
+    const tab = window.open('', '_blank', 'noopener');
     try {
       const url = await certificateUrl(policy);
-      /* An anchor rather than location.assign: the signed link carries a
-         Content-Disposition, so this saves the file instead of replacing
-         the app — which on a PWA would mean losing the session view. */
-      const a = document.createElement('a');
-      a.href = url;
-      a.rel = 'noopener';
-      a.click();
+      if (tab) tab.location = url;
+      else window.location.assign(url); // popups blocked: go in place
     } catch (e) {
-      setError('Couldn’t fetch the certificate. Try again with signal.');
+      tab?.close();
+      setError('Couldn’t open the certificate. Try again with signal.');
     } finally {
-      setDownloading(false);
+      setOpening(false);
     }
   };
 
@@ -183,16 +182,16 @@ function Insurance({ userEmail }) {
 
         <button
           type="button"
-          onClick={download}
-          disabled={!policy.pdf_path || downloading}
+          onClick={view}
+          disabled={!policy.pdf_path || opening}
           className="w-full mt-4 h-11 rounded-lg border border-gray-200 bg-white text-sm font-medium text-ink cursor-pointer transition-colors hover:border-gray-300 disabled:cursor-default disabled:text-gray-400 disabled:hover:border-gray-200"
         >
-          {downloading ? 'Preparing…' : policy.pdf_path ? 'Download certificate (PDF)' : 'Certificate not uploaded yet'}
+          {opening ? 'Opening…' : policy.pdf_path ? 'View certificate (PDF)' : 'Certificate not uploaded yet'}
         </button>
 
         {error && <p className="text-xs text-red mt-2">{error}</p>}
         <p className="note mt-2 leading-relaxed">
-          Saved on this phone so the numbers are readable offline. The PDF itself needs signal.
+          Saved on this phone so the numbers are readable offline. Opening the PDF needs signal — save it from there if you want it with you.
         </p>
       </div>
     </section>
