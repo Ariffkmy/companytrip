@@ -11,9 +11,23 @@ import { supabase } from './supabase';
 
 const BATCH = 100;
 
-/* Invite links always point at the live app, even when an admin sends
-   them from a local dev server. */
-const SITE_URL = import.meta.env.VITE_SITE_URL || 'https://companytrip-seven.vercel.app';
+/* Invite links must never point at a dev server: the person clicking is
+   on their own phone, where localhost is their phone.
+
+   Sent from the deployed app the live origin is by definition right,
+   and it keeps working if the domain ever changes. Only a local dev
+   server has to be told where the real site is, and the constant below
+   is the last resort for that.
+
+   Whatever this resolves to must also be listed under Supabase →
+   Authentication → URL Configuration → Redirect URLs. An unlisted URL
+   is not an error: Supabase quietly falls back to the project's Site
+   URL, which is how an invite ends up pointing at localhost. */
+const LIVE_SITE = 'https://olc-companytrip.vercel.app';
+const onDevServer = /^(localhost|127\.|\[?::1)/i.test(globalThis.location?.hostname ?? '');
+const SITE_URL = import.meta.env.VITE_SITE_URL
+  || (onDevServer ? LIVE_SITE : globalThis.location?.origin)
+  || LIVE_SITE;
 
 /** Invite one or many emails. Resolves to [{ email, status, message? }]
     with status 'sent' | 'joined' | 'not_on_list' | 'error'. */
