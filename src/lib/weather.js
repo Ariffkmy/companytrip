@@ -5,13 +5,16 @@
    matters for a static build: a keyed provider would ship its secret
    inside the JS bundle.
 
-   Two modes, because the trip is further out than any real forecast
-   reaches:
-     • LIVE     — the actual forecast, once the dates are inside
-                  Open-Meteo's ~16 day window.
-     • TYPICAL  — the same five calendar days averaged over recent
-                  years, from the historical archive. What you pack by
-                  until the real forecast exists.
+   The widget shows a rolling five days starting today, so it is
+   always about now rather than about the trip window.
+
+   Two modes:
+     • LIVE     — the actual forecast. Today is always inside
+                  Open-Meteo's ~16 day horizon, so this is the normal
+                  path.
+     • TYPICAL  — the same calendar days averaged over recent years,
+                  from the historical archive. A fallback for when the
+                  forecast endpoint cannot be reached.
 
    Both endpoints accept comma-separated coordinates, so all three
    cities arrive in one request.
@@ -27,8 +30,37 @@ export const TRIP_DATES = [
   '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25', '2026-10-26',
 ];
 
+/* Which city you are in on each trip date. Used to label the forecast
+   once the window reaches the trip; outside it there is no answer, and
+   callers fall back to the first or last destination. */
+export const TRIP_CITY_BY_DATE = Object.fromEntries(
+  TRIP_DATES.map((date, i) => [date, [0, 0, 1, 2, 2][i]])
+);
+
+/* How many days the widget shows, starting today. */
+const WINDOW = 5;
+
 /* How many past years to average for the TYPICAL view. */
 const NORMAL_YEARS = 5;
+
+/* Dates are the forecast's own, so "today" means today in Japan — the
+   window must not slide a day when someone opens the app late at night
+   in Malaysia. en-CA formats as YYYY-MM-DD. */
+const tokyoToday = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date());
+
+function addDays(iso, n) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The days the widget covers: today first, then the next four. */
+export function forecastDates() {
+  const first = tokyoToday();
+  return Array.from({ length: WINDOW }, (_, i) => addDays(first, i));
+}
 
 const DAILY = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum';
 const HOURLY = 'temperature_2m,precipitation,weather_code,relative_humidity_2m,wind_speed_10m';
@@ -82,7 +114,14 @@ export function advise(min, max, rain) {
 function readCache() {
   try {
     const raw = JSON.parse(localStorage.getItem(CACHE_KEY));
-    if (raw && Date.now() - raw.at < CACHE_TTL) return raw.payload;
+    if (!raw || Date.now() - raw.at >= CACHE_TTL) return null;
+    /* A copy saved while the widget still covered the fixed trip window
+       has no dates on it, and one saved yesterday is a day behind. Both
+       would draw a strip that disagrees with its own labels, so treat
+       them as a miss and fetch. */
+    const dates = raw.payload?.dates;
+    if (!Array.isArray(dates) || dates[0] !== tokyoToday()) return null;
+    return raw.payload;
   } catch { /* ignore */ }
   return null;
 }
@@ -102,11 +141,11 @@ async function get(url) {
   return Array.isArray(json) ? json : [json];
 }
 
-/** The real forecast. Returns null when the trip is beyond its horizon. */
-async function fetchLive() {
+/** The real forecast for the rolling window. Null if it can't be had. */
+async function fetchLive(dates) {
   const url = 'https://api.open-meteo.com/v1/forecast'
     + `?latitude=${LAT}&longitude=${LON}&daily=${DAILY}&hourly=${HOURLY}`
-    + `&timezone=Asia%2FTokyo&start_date=${TRIP_DATES[0]}&end_date=${TRIP_DATES[4]}`;
+    + `&timezone=Asia%2FTokyo&start_date=${dates[0]}&end_date=${dates[dates.length - 1]}`;
 
   let results;
   try {
@@ -115,23 +154,29 @@ async function fetchLive() {
     return null; // out of range comes back as an error, not empty data
   }
 
-  const byCity = results.map((r) => readDays(r));
+  const byCity = results.map((r) => readDays(r, dates));
   // Every value being null means the window returned placeholder rows.
   const hasData = byCity.some((days) => days.some((d) => d && d.max !== null));
   return hasData ? byCity : null;
 }
 
-/** The same five days averaged across the last NORMAL_YEARS years. */
-async function fetchTypical() {
-  const thisYear = Number(TRIP_DATES[0].slice(0, 4));
+/** The same calendar days averaged across the last NORMAL_YEARS years. */
+async function fetchTypical(dates) {
+  const thisYear = Number(dates[0].slice(0, 4));
   const years = Array.from({ length: NORMAL_YEARS }, (_, i) => thisYear - 1 - i);
+  const from = dates[0].slice(5);
+  const to = dates[dates.length - 1].slice(5);
+  /* A window that straddles New Year would need two ranges per year for
+     no real gain — this is only ever a fallback, so skip it and let the
+     caller fall through to the cached copy. */
+  if (from > to) throw new Error('window crosses the year');
 
   const perYear = await Promise.all(
     years.map((y) =>
       get(
         'https://archive-api.open-meteo.com/v1/archive'
         + `?latitude=${LAT}&longitude=${LON}&daily=${DAILY}&hourly=${HOURLY}`
-        + `&timezone=Asia%2FTokyo&start_date=${y}-10-22&end_date=${y}-10-26`
+        + `&timezone=Asia%2FTokyo&start_date=${y}-${from}&end_date=${y}-${to}`
       ).catch(() => null)
     )
   );
@@ -141,8 +186,8 @@ async function fetchTypical() {
 
   // For each city, for each of the 5 days, average across the years.
   return CITIES.map((_, ci) =>
-    TRIP_DATES.map((date, di) => {
-      const rows = good.map((yr) => readDays(yr[ci])[di]).filter((d) => d && d.max !== null);
+    dates.map((date, di) => {
+      const rows = good.map((yr) => readDays(yr[ci], dates)[di]).filter((d) => d && d.max !== null);
       if (rows.length === 0) return null;
       const mean = (k) => rows.reduce((s, r) => s + r[k], 0) / rows.length;
       return {
@@ -233,9 +278,9 @@ function readHours(hourly, date) {
   return out.length ? out : null;
 }
 
-function readDays(result) {
+function readDays(result, dates) {
   const d = result?.daily;
-  if (!d) return TRIP_DATES.map(() => null);
+  if (!d) return dates.map(() => null);
   return d.time.map((date, i) => ({
     date,
     code: d.weather_code[i],
@@ -247,19 +292,21 @@ function readDays(result) {
 }
 
 /**
- * Weather for the whole trip.
- * → { mode: 'live' | 'typical', cities: [[day, …] …], cached?: true }
+ * Weather for the next five days, starting today.
+ * → { mode: 'live' | 'typical', dates: [iso …], cities: [[day, …] …], cached?: true }
  */
 export async function loadWeather() {
-  const live = await fetchLive();
+  const dates = forecastDates();
+
+  const live = await fetchLive(dates);
   if (live) {
-    const payload = { mode: 'live', cities: live };
+    const payload = { mode: 'live', dates, cities: live };
     writeCache(payload);
     return payload;
   }
 
   try {
-    const payload = { mode: 'typical', cities: await fetchTypical() };
+    const payload = { mode: 'typical', dates, cities: await fetchTypical(dates) };
     writeCache(payload);
     return payload;
   } catch (err) {

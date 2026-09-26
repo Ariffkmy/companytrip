@@ -1,16 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   CITIES, loadWeather, describeCode, advise,
-  hourLabel, toF, summarise,
+  hourLabel, toF, summarise, TRIP_CITY_BY_DATE, TRIP_DATES,
 } from '../lib/weather';
 
-const DAYS = [
-  { short: 'Thu', num: '22' },
-  { short: 'Fri', num: '23' },
-  { short: 'Sat', num: '24' },
-  { short: 'Sun', num: '25' },
-  { short: 'Mon', num: '26' },
-];
+/* Labels come from the dates the forecast actually returned, so the
+   strip follows today rather than a fixed set of trip days. */
+function dayLabel(iso, i) {
+  if (i === 0) return 'Today';
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short' });
+}
+
+/* Each day is labelled with the city you are in on it. Before the trip
+   that is unknowable, so show the first destination; after it, the
+   last. */
+function cityIndexFor(iso) {
+  const onTrip = TRIP_CITY_BY_DATE[iso];
+  if (onTrip !== undefined) return onTrip;
+  return iso < TRIP_DATES[0] ? 0 : CITIES.length - 1;
+}
 
 const METRICS = [
   { id: 'temp', label: 'Temperature' },
@@ -97,6 +105,9 @@ export default function WeatherWidget() {
   const [dayIndex, setDayIndex] = useState(0);
   const [metric, setMetric] = useState('temp');
   const [unitF, setUnitF] = useState(false);
+  /* Collapsed by default: five days at a glance is what you read most
+     mornings. The hourly chart is for the one morning you need it. */
+  const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -110,6 +121,7 @@ export default function WeatherWidget() {
 
   useEffect(() => { load(); }, [load]);
 
+  const dates = data?.dates ?? [];
   const cityIndex = CITIES.findIndex((c) => c.id === city);
   const days = data?.cities?.[cityIndex] ?? [];
   const day = days[dayIndex];
@@ -120,27 +132,8 @@ export default function WeatherWidget() {
   return (
     <section className="pt-9" aria-labelledby="wx-h">
       <h2 id="wx-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
-        Weather · 22–26 Oct
+        Weather · next {dates.length || 5} days
       </h2>
-
-      {/* City */}
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 mb-3">
-        {CITIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setCity(c.id)}
-            className={`flex-none px-3.5 py-2 rounded-lg text-left transition-all ${
-              c.id === city
-                ? 'bg-ink dark:bg-flame text-white'
-                : 'bg-white text-gray-500 border border-gray-200 active:border-gray-300'
-            }`}
-          >
-            <span className="block font-display text-sm tracking-wide">{c.name}</span>
-            <span className="block text-[10px] mt-0.5 opacity-70">{c.days}</span>
-          </button>
-        ))}
-      </div>
 
       {error ? (
         <div className="bg-white border border-gray-200 rounded-lg py-10 text-center">
@@ -156,6 +149,75 @@ export default function WeatherWidget() {
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          {/* ── Day strip — today plus the next four, each labelled with
+                 the city you are in on it. Always visible. ── */}
+          <div className="flex gap-1 p-2 overflow-x-auto scrollbar-none">
+            {dates.map((iso, i) => {
+              const ci = cityIndexFor(iso);
+              const dd = data?.cities?.[ci]?.[i];
+              const c = dd ? describeCode(dd.code) : null;
+              const selected = i === dayIndex;
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => { setDayIndex(i); setCity(CITIES[ci].id); }}
+                  className={`flex-1 min-w-[62px] rounded-lg py-2.5 text-center transition-colors border ${
+                    selected ? 'border-gray-300 bg-card-hover' : 'border-transparent active:bg-card-hover'
+                  }`}
+                >
+                  <p className="font-display text-sm tracking-wide">{dayLabel(iso, i)}</p>
+                  <p className="text-xl leading-tight my-0.5">{c ? c.icon : '·'}</p>
+                  {dd && (
+                    <p className="text-xs">
+                      <span className="font-semibold">{t(dd.max)}°</span>{' '}
+                      <span className="text-gray-400">{t(dd.min)}°</span>
+                    </p>
+                  )}
+                  <p className="text-[9px] text-gray-400 leading-tight mt-0.5 truncate">
+                    {CITIES[ci].name}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── The one line worth acting on, plus the way in ── */}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="w-full flex items-center gap-2 px-4 py-2.5 border-t border-gray-100 text-left cursor-pointer bg-transparent"
+          >
+            <span className="text-xs text-sea min-w-0 flex-1">{advise(day.min, day.max, day.rain)}</span>
+            <span className="note shrink-0">{open ? 'Less' : 'Detail'}</span>
+            <span aria-hidden="true" className={`shrink-0 text-gray-400 text-xs transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+          </button>
+        </div>
+      )}
+
+      {!error && day && open && (
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden mt-2">
+          {/* City */}
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none p-2">
+            {CITIES.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCity(c.id)}
+                className={`flex-none px-3.5 py-2 rounded-lg text-left transition-all ${
+                  c.id === city
+                    ? 'bg-ink dark:bg-flame text-white'
+                    : 'bg-white text-gray-500 border border-gray-200 active:border-gray-300'
+                }`}
+              >
+                <span className="block font-display text-sm tracking-wide">{c.name}</span>
+                <span className="block text-[10px] mt-0.5 opacity-70">{c.days}</span>
+              </button>
+            ))}
+          </div>
+
           {/* ── Summary ── */}
           <div className="flex items-start gap-3 p-4">
             <span className="text-5xl leading-none shrink-0">{cond.icon}</span>
@@ -176,7 +238,9 @@ export default function WeatherWidget() {
 
             <div className="min-w-0 flex-1 text-right">
               <p className="font-display text-base tracking-wide leading-tight">
-                {DAYS[dayIndex].short} {DAYS[dayIndex].num} Oct
+                {day.date
+                  ? new Date(`${day.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+                  : '—'}
               </p>
               <p className="text-xs text-gray-500 leading-snug">{cond.label}</p>
               <p className="text-[11px] text-gray-400 leading-snug mt-1">{CITIES[cityIndex].name}</p>
@@ -196,7 +260,6 @@ export default function WeatherWidget() {
             {stats.wind !== null && (
               <p className="text-xs text-gray-500">Wind: <span className="text-gray-600">{stats.wind} km/h</span></p>
             )}
-            <p className="text-xs text-sea pt-1">{advise(day.min, day.max, day.rain)}</p>
           </div>
 
           {/* ── Metric tabs ── */}
@@ -224,39 +287,11 @@ export default function WeatherWidget() {
               : <p className="text-xs text-gray-400 text-center py-10">No hourly data</p>}
           </div>
 
-          {/* ── Day strip ── */}
-          <div className="flex gap-1 px-2 pb-3 pt-1 overflow-x-auto scrollbar-none">
-            {DAYS.map((d, i) => {
-              const dd = days[i];
-              const c = dd ? describeCode(dd.code) : null;
-              return (
-                <button
-                  key={d.num}
-                  type="button"
-                  onClick={() => setDayIndex(i)}
-                  className={`flex-1 min-w-[62px] rounded-lg py-2.5 text-center transition-colors border ${
-                    i === dayIndex
-                      ? 'border-gray-300 bg-card-hover'
-                      : 'border-transparent active:bg-card-hover'
-                  }`}
-                >
-                  <p className="font-display text-sm tracking-wide">{d.short}</p>
-                  <p className="text-xl leading-tight my-0.5">{c ? c.icon : '·'}</p>
-                  {dd && (
-                    <p className="text-xs">
-                      <span className="font-semibold">{t(dd.max)}°</span>{' '}
-                      <span className="text-gray-400">{t(dd.min)}°</span>
-                    </p>
-                  )}
-                </button>
-              );
-            })}
-          </div>
         </div>
       )}
 
       {/* What am I looking at? */}
-      {data && data.mode === 'live' && (
+      {open && data && data.mode === 'live' && (
         <div className="rounded-lg p-3.5 mt-2.5 border border-gray-200 bg-white">
           <p className="text-sm font-medium mb-0.5">
             📡 Live forecast

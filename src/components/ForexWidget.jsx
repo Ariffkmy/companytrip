@@ -32,6 +32,9 @@ export default function ForexWidget() {
   const [myr, setMyr] = useState('100');
   const [jpy, setJpy] = useState('');
   const [edited, setEdited] = useState('myr'); // which box the user last typed in
+  /* Collapsed by default: the rate is the glance, the converter is for
+     when you are actually stood in a shop. */
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -67,46 +70,62 @@ export default function ForexWidget() {
             <div className="flex items-baseline gap-2 flex-wrap">
               <p className="text-sm text-gray-500">RM 1 =</p>
               <p className="display text-4xl leading-none tick">¥{fmt(rate)}</p>
-              <p className={`ml-auto font-mono text-xs tick ${up ? 'text-green' : 'text-red'}`}
-                title="Change over the last 30 days">
-                {up ? '▲' : '▼'} {fmt(Math.abs(data.change))}% · 30d
-              </p>
+              {open && (
+                <p className={`ml-auto font-mono text-xs tick ${up ? 'text-green' : 'text-red'}`}
+                  title="Change over the last 30 days">
+                  {up ? '▲' : '▼'} {fmt(Math.abs(data.change))}% · 30d
+                </p>
+              )}
             </div>
             <p className="text-xs text-gray-500 mt-1 tick">¥1,000 = RM {fmt(1000 / rate)}</p>
 
-            <div className="mt-3 -mx-1"><Sparkline series={data.series} /></div>
-
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <label className="relative block">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">RM</span>
-                <span className="sr-only">Ringgit</span>
-                <input type="number" inputMode="decimal" min="0" value={myrShown}
-                  onChange={(e) => { setMyr(e.target.value); setEdited('myr'); }} className={inputCls} />
-              </label>
-              <label className="relative block">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">¥</span>
-                <span className="sr-only">Yen</span>
-                <input type="number" inputMode="numeric" min="0" value={jpyShown}
-                  onChange={(e) => { setJpy(e.target.value); setEdited('jpy'); }} className={inputCls} />
-              </label>
-            </div>
-
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none mt-2">
-              {QUICK_YEN.map((y) => (
-                <button key={y} type="button" onClick={() => { setJpy(String(y)); setEdited('jpy'); }}
-                  className="flex-none h-8 px-2.5 rounded-full border border-gray-200 text-xs text-gray-600 tick cursor-pointer hover:border-gray-300">
-                  ¥{y.toLocaleString()} ≈ RM {fmt(y / rate, 0)}
-                </button>
-              ))}
-            </div>
-
-            <p className="note mt-3 leading-relaxed">
-              ECB reference rate for {new Date(data.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-              {data.cached ? ' · offline, last saved copy' : ''}. Money changers give a little less.
-            </p>
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              className="w-full flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 text-left cursor-pointer bg-transparent"
+            >
+              <span className="note min-w-0 flex-1">{open ? 'Rate only' : 'Converter & 30-day trend'}</span>
+              <span aria-hidden="true" className={`shrink-0 text-gray-400 text-xs transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+            </button>
           </>
         )}
       </div>
+
+      {data && open && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mt-2">
+          <div className="-mx-1"><Sparkline series={data.series} /></div>
+
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <label className="relative block">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">RM</span>
+              <span className="sr-only">Ringgit</span>
+              <input type="number" inputMode="decimal" min="0" value={myrShown}
+                onChange={(e) => { setMyr(e.target.value); setEdited('myr'); }} className={inputCls} />
+            </label>
+            <label className="relative block">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">¥</span>
+              <span className="sr-only">Yen</span>
+              <input type="number" inputMode="numeric" min="0" value={jpyShown}
+                onChange={(e) => { setJpy(e.target.value); setEdited('jpy'); }} className={inputCls} />
+            </label>
+          </div>
+
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-none mt-2">
+            {QUICK_YEN.map((y) => (
+              <button key={y} type="button" onClick={() => { setJpy(String(y)); setEdited('jpy'); }}
+                className="flex-none h-8 px-2.5 rounded-full border border-gray-200 text-xs text-gray-600 tick cursor-pointer hover:border-gray-300">
+                ¥{y.toLocaleString()} ≈ RM {fmt(y / rate, 0)}
+              </button>
+            ))}
+          </div>
+
+          <p className="note mt-3 leading-relaxed">
+            ECB reference rate for {new Date(data.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+            {data.cached ? ' · offline, last saved copy' : ''}. Money changers give a little less.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

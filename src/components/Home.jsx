@@ -17,6 +17,29 @@ const ROLE_STYLE = {
   'JP Speaker': 'text-gold',
 };
 
+/* ── Greeting ───────────────────────────────────────
+   First name only. The roster carries everyone's full name further
+   down, and a full Malaysian name wraps to three lines on a phone
+   before you have read anything useful. */
+function firstName(full, email) {
+  const given = String(full ?? '').trim().split(/\s+/)[0];
+  if (given) return given;
+  /* No profile name yet — the part before the @ is closer to a name
+     than the whole address is. */
+  const local = String(email ?? '').split('@')[0].trim();
+  return local || 'there';
+}
+
+function Greeting({ userName, userEmail }) {
+  return (
+    <section className="pt-7 pb-1">
+      <h1 className="display text-3xl sm:text-4xl leading-[1.05]">
+        Hi {firstName(userName, userEmail)}<span className="text-red">!</span>
+      </h1>
+    </section>
+  );
+}
+
 /* ── Groups ───────────────────────────────────────── */
 function Groups() {
   const [openGroups, setOpenGroups] = useState([0]);
@@ -211,15 +234,18 @@ function Jump({ onGo, onOpenTreasureHunt }) {
   );
 }
 
-export default function Home({ onGo, onOpenTreasureHunt, userEmail, isAdmin, onSignOut }) {
+export default function Home({ onGo, onOpenTreasureHunt, userName, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
+      <Greeting userName={userName} userEmail={userEmail} />
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
-      <Groups />
       <WeatherWidget />
       <ForexWidget />
       <Insurance userEmail={userEmail} />
       <Jump onGo={onGo} onOpenTreasureHunt={onOpenTreasureHunt} />
+      {/* Last: who is on which team is looked up once or twice a trip,
+          while the weather, the rate and your policy are daily reads. */}
+      <Groups />
 
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">
         <p className="note flex items-baseline gap-2 min-w-0">
