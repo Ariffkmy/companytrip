@@ -137,37 +137,6 @@ function StringList({ label, items, onChange, addLabel, fixedLength }) {
   );
 }
 
-/* Pulls "lat,lng" pairs out of pasted text — a Google Maps directions
-   URL is mostly that. Short maps.app.goo.gl links hide their
-   coordinates behind a redirect, so they have to be opened first. */
-function parseCoords(text) {
-  const out = [];
-  const re = /(-?\d{1,3}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/g;
-  let m;
-  while ((m = re.exec(String(text ?? ''))) !== null) {
-    const lat = Number(m[1]);
-    const lng = Number(m[2]);
-    if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) out.push({ lat, lng });
-  }
-  return out;
-}
-
-/* Walking directions through the stops, from OpenStreetMap's public
-   router. Returns the drawn line plus its distance and duration. */
-async function fetchWalkingRoute(points) {
-  const path = points.map((p) => `${Number(p.lng)},${Number(p.lat)}`).join(';');
-  const res = await fetch(`https://routing.openstreetmap.de/routed-foot/route/v1/foot/${path}?overview=full&geometries=geojson`);
-  if (!res.ok) throw new Error('router refused');
-  const data = await res.json();
-  const r = data?.routes?.[0];
-  if (!r) throw new Error('no route');
-  return {
-    route: r.geometry.coordinates.map(([lng, lat]) => [Number(lat.toFixed(6)), Number(lng.toFixed(6))]),
-    km: Math.round((r.distance / 1000) * 10) / 10,
-    walkMin: Math.max(1, Math.round(r.duration / 60)),
-  };
-}
-
 function Section({ title, sub, children, defaultOpen = false }) {
   return (
     <details open={defaultOpen} className="group bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -189,7 +158,7 @@ function Sub({ children }) {
 
 const TEXT_HINT = 'Blank line starts a new paragraph. **Double stars** make text bold.';
 
-/* ── Route map ────────────────────────────────────── */
+/* ── Area map ─────────────────────────────────────── */
 function Coord({ label, value, onChange, placeholder }) {
   const id = useFieldId();
   return (
@@ -202,59 +171,15 @@ function Coord({ label, value, onChange, placeholder }) {
 }
 
 function MapSection({ val, set }) {
-  const [paste, setPaste] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [loop, setLoop] = useState(true);
-
   const m = ['map'];
-  const stops = val([...m, 'checkpoints']) ?? [];
+  const areas = val([...m, 'areas']) ?? [];
   const start = val([...m, 'start']) ?? {};
-  const line = val([...m, 'route']) ?? [];
-  const setStops = set([...m, 'checkpoints']);
-
-  const move = (i, by) => {
-    const next = [...stops];
-    const j = i + by;
-    if (j < 0 || j >= next.length) return;
-    [next[i], next[j]] = [next[j], next[i]];
-    setStops(next);
-  };
-
-  const usePaste = () => {
-    const found = parseCoords(paste);
-    if (!found.length) {
-      setMsg('No coordinates found. Paste a Google Maps link that shows numbers like 35.1033,139.0784 — open a maps.app.goo.gl link in a browser first, then copy the address bar.');
-      return;
-    }
-    setStops(found.map((p) => ({ ...p, note: '' })));
-    setPaste('');
-    setMsg(`Set ${found.length} checkpoint${found.length === 1 ? '' : 's'} from the pasted coordinates. Redraw the walking line next.`);
-  };
-
-  const redraw = async () => {
-    const points = [start, ...stops, ...(loop ? [start] : [])]
-      .filter((p) => String(p?.lat ?? '') !== '' && String(p?.lng ?? '') !== '');
-    if (points.length < 2) { setMsg('Add a start and at least one checkpoint first.'); return; }
-    setBusy(true);
-    setMsg('');
-    try {
-      const drawn = await fetchWalkingRoute(points);
-      set([...m, 'route'])(drawn.route);
-      set([...m, 'km'])(drawn.km);
-      set([...m, 'walkMin'])(drawn.walkMin);
-      setMsg(`Walking line redrawn — ${drawn.km} km, about ${drawn.walkMin} min. Press Save to keep it.`);
-    } catch {
-      setMsg('Couldn’t reach the walking directions service. Check your connection and try again — the map still works with straight lines between stops.');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
-    <Section title="Route map" sub={`${stops.length} checkpoint${stops.length === 1 ? '' : 's'} · ${line.length > 1 ? 'line drawn' : 'straight lines'}`}>
+    <Section title="Area map" sub={`${areas.length} area${areas.length === 1 ? '' : 's'}`}>
       <p className="note">
-        What participants see on the “Route map” screen. Checkpoints are numbered by the order below, so you can have as many as you like.
+        What participants see on the “Hunt areas” screen. Teams roam these in any order, so there is no
+        walking line and no numbering to keep in step with the games.
       </p>
 
       <Sub>Start &amp; finish</Sub>
@@ -264,70 +189,32 @@ function MapSection({ val, set }) {
         <Coord label="Longitude" value={start.lng} onChange={set([...m, 'start', 'lng'])} placeholder="139.078452" />
       </div>
 
-      <Sub>Checkpoints</Sub>
+      <Sub>Areas</Sub>
+      <p className="note -mt-2">
+        The outlines are traced from the committee’s drawn map and live in the app’s code, so they can’t be
+        redrawn here — only what each one is called and what the popup says. Ask a developer to adjust a border.
+      </p>
       <ol className="space-y-2">
-        {stops.map((c, i) => (
-          <li key={i} className="rounded-lg border border-gray-200 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-6 h-6 shrink-0 rounded-full bg-ink dark:bg-flame text-white text-[11px] font-bold grid place-items-center">{i + 1}</span>
-              <input aria-label={`Note for checkpoint ${i + 1}`} value={c.note ?? ''} placeholder="What happens here (optional)"
-                onChange={(e) => set([...m, 'checkpoints', i, 'note'])(e.target.value)} className={`${inputCls} h-9 text-sm`} />
-              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move checkpoint ${i + 1} up`}
-                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">↑</button>
-              <button type="button" onClick={() => move(i, 1)} disabled={i === stops.length - 1} aria-label={`Move checkpoint ${i + 1} down`}
-                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">↓</button>
-              <button type="button" onClick={() => setStops(stops.filter((_, j) => j !== i))} aria-label={`Remove checkpoint ${i + 1}`}
-                className="shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer">×</button>
+        {areas.map((a, i) => (
+          <li key={i} className="rounded-lg border border-gray-200 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-ink dark:bg-flame text-white text-[11px] font-bold grid place-items-center">
+                {a.n ?? i + 1}
+              </span>
+              <input aria-label={`Name for area ${i + 1}`} value={a.label ?? ''} placeholder={`Area ${i + 1}`}
+                onChange={(e) => set([...m, 'areas', i, 'label'])(e.target.value)} className={`${inputCls} h-9 text-sm`} />
+              <span className="shrink-0 font-mono text-[10px] text-gray-400">{(a.polygon ?? []).length} pts</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 pl-8">
-              <Coord label="Latitude" value={c.lat} onChange={set([...m, 'checkpoints', i, 'lat'])} placeholder="35.1029235" />
-              <Coord label="Longitude" value={c.lng} onChange={set([...m, 'checkpoints', i, 'lng'])} placeholder="139.0776027" />
-            </div>
+            <input aria-label={`Note for area ${i + 1}`} value={a.note ?? ''} placeholder="What’s here (optional) — shown when the area is tapped"
+              onChange={(e) => set([...m, 'areas', i, 'note'])(e.target.value)} className={`${inputCls} h-9 text-sm`} />
           </li>
         ))}
       </ol>
-      <button type="button" onClick={() => setStops([...stops, { lat: '', lng: '', note: '' }])}
-        className="text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add checkpoint</button>
-
-      <Sub>Paste from Google Maps</Sub>
-      <div className="flex flex-wrap gap-2 items-start">
-        <input value={paste} onChange={(e) => setPaste(e.target.value)} aria-label="Coordinates or Google Maps link"
-          placeholder="https://www.google.com/maps/dir/35.1033,139.0784/…" className={`${inputCls} h-10 flex-1 min-w-[16rem] text-sm`} />
-        <button type="button" onClick={usePaste} disabled={!paste.trim()}
-          className="h-10 px-4 rounded-lg border-2 border-ink bg-white text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-          Replace checkpoints
-        </button>
-      </div>
-      <p className="note -mt-2">
-        Every coordinate pair in the link becomes a checkpoint, in order. A short maps.app.goo.gl link has to be opened in a browser first — then copy the long address it lands on.
-      </p>
-
-      <Sub>Walking line</Sub>
-      <div className="flex flex-wrap gap-3 items-center">
-        <button type="button" onClick={redraw} disabled={busy}
-          className="h-10 px-4 rounded-lg bg-ink dark:bg-flame text-white text-sm font-medium cursor-pointer disabled:opacity-60 disabled:cursor-wait">
-          {busy ? 'Drawing…' : 'Redraw along the streets'}
-        </button>
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-          <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} className="w-4 h-4 accent-[var(--color-red)]" />
-          Finish back at the start
-        </label>
-        {line.length > 1 && (
-          <button type="button" onClick={() => set([...m, 'route'])([])}
-            className="text-xs text-gray-500 underline underline-offset-2 cursor-pointer">Clear the line</button>
-        )}
-      </div>
-      <p className="note -mt-2">
-        {line.length > 1
-          ? `Line drawn with ${line.length} points. Redraw it whenever you move a checkpoint.`
-          : 'No line yet — the map joins the stops with straight lines until you draw one.'}
-      </p>
-      {msg && <p className="text-sm text-ink" aria-live="polite">{msg}</p>}
 
       <Sub>Details shown on the map</Sub>
       <div className="grid grid-cols-2 sm:grid-cols-[8rem_8rem_minmax(0,1fr)] gap-3">
-        <Num label="Distance (km)" value={val([...m, 'km'])} onChange={set([...m, 'km'])} />
-        <Num label="Walking (min)" value={val([...m, 'walkMin'])} onChange={set([...m, 'walkMin'])} />
+        <Num label="Across (km)" value={val([...m, 'km'])} onChange={set([...m, 'km'])} />
+        <Num label="End to end (min)" value={val([...m, 'walkMin'])} onChange={set([...m, 'walkMin'])} />
         <Text label="Google Maps link" hint="Opens in Google Maps from the map screen. Leave blank to hide the button."
           value={val([...m, 'link'])} onChange={set([...m, 'link'])} />
       </div>
@@ -405,20 +292,13 @@ export default function HuntEditor() {
         <Text label="Title" value={val([...cp(key), 'title'])} onChange={set([...cp(key), 'title'])} />
         <Text label="Japanese subtitle" value={val([...cp(key), 'kana'])} onChange={set([...cp(key), 'kana'])} />
       </div>
-      <Text label="Where on the route map" hint="Shown as a 📍 tag that opens the map, e.g. “Checkpoint 2”. Leave blank to hide."
+      <Text label="Where to play it" hint="Shown as a 📍 tag that opens the area map, e.g. “Anywhere in Area 3”. Leave blank to hide."
         value={val([...cp(key), 'stop'])} onChange={set([...cp(key), 'stop'])} />
       {body && <Area label="Instructions" hint={TEXT_HINT} value={val([...cp(key), 'body'])} onChange={set([...cp(key), 'body'])} rows={4} />}
       {photo && <Photo label="Photo under the instructions (optional)" value={val([...cp(key), 'photo'])} onChange={set([...cp(key), 'photo'])} />}
     </>
   );
 
-  const unlockFields = (key, n) => (
-    <>
-      <Sub>Unlock screen before checkpoint {n}</Sub>
-      <Text label="Heading" value={val(['unlocks', key, 'h'])} onChange={set(['unlocks', key, 'h'])} />
-      <Area label="Text" hint="Can use {budget}, {finish}, {quizCount}, {streak}." value={val(['unlocks', key, 'p'])} onChange={set(['unlocks', key, 'p'])} />
-    </>
-  );
 
   return (
     <div className="space-y-2.5">
@@ -440,14 +320,14 @@ export default function HuntEditor() {
           <Num label="Points per stamp" value={val(['points', 'checkpoint'])} onChange={set(['points', 'checkpoint'])} />
           <Num label="Quiz pts / answer" value={val(['points', 'quizPerAnswer'])} onChange={set(['points', 'quizPerAnswer'])} />
         </div>
-        <Area label="Finish point" hint="Shown on the last unlock screen and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
-        <Text label="Help note" hint="Small line under the first game (photo bingo). Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
+        <Area label="Finish point" hint="Shown on the hub and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
+        <Text label="Help note" hint="Small line under the list of games. Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
       </Section>
 
       <MapSection val={val} set={set} />
 
-      <Section title="1 · Photo bingo" sub="First game · nine prompts per team">
-        <p className="note">Its own game, played first. Locking the card opens the stamp rally.</p>
+      <Section title="1 · Photo bingo" sub="Nine prompts per team">
+        <p className="note">Playable whenever the team likes, like every other game.</p>
         {commonFields('bingo', { body: false })}
         <div className="grid grid-cols-2 gap-3">
           <Num label="Points per line" value={val([...cp('bingo'), 'linePts'])} onChange={set([...cp('bingo'), 'linePts'])} />
@@ -471,8 +351,7 @@ export default function HuntEditor() {
       </Section>
 
       <Section title="2 · Copy the pose" sub={`${posePhotoCount} of ${groupRoster.length} teams have a pose photo`}>
-        {unlockFields('cp1', 2)}
-        <Sub>Checkpoint</Sub>
+        <Sub>The game</Sub>
         {commonFields('cp1', { photo: false })}
         <Sub>Each team’s pose</Sub>
         <p className="note -mt-2">Every team gets a different pose. The photo is what they copy — add one for every team.</p>
@@ -487,7 +366,6 @@ export default function HuntEditor() {
       </Section>
 
       <Section title="3 · Find the place + riddle" sub={`${val([...cp('cp2a'), 'title'])} · ${val([...cp('cp2b'), 'title'])}`}>
-        {unlockFields('cp2', 3)}
         <Sub>Part A — find the place</Sub>
         {commonFields('cp2a', { photo: false })}
         <p className="note">Each team gets its own place to find — only that team sees its photo.</p>
@@ -525,8 +403,7 @@ export default function HuntEditor() {
       </Section>
 
       <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
-        {unlockFields('cp3', 4)}
-        <Sub>Checkpoint</Sub>
+        <Sub>The game</Sub>
         <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3">
           <Num label="Budget ¥" value={val([...cp('cp3'), 'budgetYen'])} onChange={set([...cp('cp3'), 'budgetYen'])} />
           <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
@@ -535,8 +412,7 @@ export default function HuntEditor() {
       </Section>
 
       <Section title="5 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>
-        {unlockFields('cp4', 5)}
-        <Sub>Checkpoint</Sub>
+        <Sub>The game</Sub>
         {commonFields('cp4')}
         <div>
           <p className="text-xs font-semibold text-gray-600 mb-1">Questions</p>
@@ -566,8 +442,7 @@ export default function HuntEditor() {
       </Section>
 
       <Section title="6 · Ask a stranger" sub={val([...cp('ask'), 'title'])}>
-        {unlockFields('ask', 6)}
-        <Sub>Checkpoint</Sub>
+        <Sub>The game</Sub>
         {commonFields('ask')}
         {val([...cp('ask'), 'tasks']).map((t, i) => (
           <div key={t.key} className="rounded-lg border border-gray-200 p-3 space-y-2">
@@ -583,8 +458,7 @@ export default function HuntEditor() {
         ))}
       </Section>
       <Section title="7 · General knowledge" sub={`${val([...cp('guess'), 'streak'])} in a row · ${val([...cp('guess'), 'bank']).length} questions`}>
-        {unlockFields('guess', 7)}
-        <Sub>Checkpoint</Sub>
+        <Sub>The game</Sub>
         {commonFields('guess')}
         <div className="grid grid-cols-[minmax(0,10rem)] gap-3">
           <Num label="Right in a row to pass" value={val([...cp('guess'), 'streak'])} onChange={set([...cp('guess'), 'streak'])} min={1} />
@@ -624,15 +498,6 @@ export default function HuntEditor() {
         </details>
       </Section>
 
-      <Section title="8 · Team cheer" sub={val([...cp('cheer'), 'title'])}>
-        {unlockFields('cheer', 8)}
-        <Sub>Checkpoint</Sub>
-        <div className="grid grid-cols-2 gap-3">
-          <Num label="Target length (s)" value={val([...cp('cheer'), 'seconds'])} onChange={set([...cp('cheer'), 'seconds'])} min={1} />
-          <Num label="Longest allowed (s)" value={val([...cp('cheer'), 'maxSeconds'])} onChange={set([...cp('cheer'), 'maxSeconds'])} min={1} />
-        </div>
-        {commonFields('cheer')}
-      </Section>
 
       <button type="button"
         onClick={() => { setSaveMsg(''); setDraft(structuredClone(DEFAULT_HUNT_CONFIG)); }}

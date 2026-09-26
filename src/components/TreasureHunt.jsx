@@ -164,7 +164,7 @@ function Rich({ text, lead }) {
   ));
 }
 
-/* Optional admin-supplied photo shown under a checkpoint's instructions. */
+/* Optional admin-supplied photo shown under a game's instructions. */
 function CheckpointPhoto({ src }) {
   if (!src) return null;
   return (
@@ -175,42 +175,36 @@ function CheckpointPhoto({ src }) {
   );
 }
 
-const SLOTS = Array.from({ length: 8 }, (_, i) => i);
-
-/* Photo bingo is its own game and comes first; the stamp rally follows. */
-const CP_INDEX = { bingo: 0, cp1: 1, cp2a: 2, cp2b: 2, cp3: 3, cp4: 4, ask: 5, guess: 6, cheer: 7 };
-const CP_NUM = Object.fromEntries(Object.entries(CP_INDEX).map(([k, v]) => [k, v + 1]));
-
-/* Label for each FLOW step, shown in the admin preview's jump menu. */
-function flowLabel(step, cp) {
-  const n = CP_NUM;
-  if (step.type === 'unlock') {
-    const key = step.to === 'cp2' ? 'cp2a' : step.to;
-    return `Unlock screen → ${n[key]}`;
-  }
-  if (step.type === 'finish') return 'Finish';
-  return `${n[step.key]}. ${cp[step.key]?.title ?? step.key}`;
-}
-
-const FLOW = [
-  { type: 'cp', key: 'bingo' },
-  { type: 'unlock', to: 'cp1' },
-  { type: 'cp', key: 'cp1' },
-  { type: 'unlock', to: 'cp2' },
-  { type: 'cp', key: 'cp2a' },
-  { type: 'cp', key: 'cp2b' },
-  { type: 'unlock', to: 'cp3' },
-  { type: 'cp', key: 'cp3' },
-  { type: 'unlock', to: 'cp4' },
-  { type: 'cp', key: 'cp4' },
-  { type: 'unlock', to: 'ask' },
-  { type: 'cp', key: 'ask' },
-  { type: 'unlock', to: 'guess' },
-  { type: 'cp', key: 'guess' },
-  { type: 'unlock', to: 'cheer' },
-  { type: 'cp', key: 'cheer' },
-  { type: 'finish' },
+/* ── The seven games ────────────────────────────────
+   Teams choose what to play and in what order, and may skip anything —
+   the numbering below is only how the games are listed and stamped, not
+   a sequence. Nothing here gates anything else. */
+const GAMES = [
+  { key: 'bingo', short: 'Photo bingo' },
+  { key: 'cp1', short: 'Pose photo' },
+  { key: 'cp2', short: 'Selfie + riddle' },
+  { key: 'cp3', short: 'Buy & try' },
+  { key: 'cp4', short: 'Observation quiz' },
+  { key: 'ask', short: 'Ask a stranger' },
+  { key: 'guess', short: 'General knowledge' },
 ];
+
+const SLOTS = GAMES.map((_, i) => i);
+
+/* Which rally slot a saved submission fills. cp2 is a two-parter — the
+   selfie opens the riddle, and the riddle is what earns the stamp — so
+   cp2a deliberately has no slot of its own. */
+const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, ask: 5, guess: 6 };
+
+/* The number printed on each game's header. cp2a and cp2b share one. */
+const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, ask: 6, guess: 7 };
+
+/* A game counts as collected once its stamping submission is in. */
+const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', ask: 'ask', guess: 'guess' };
+
+/* Title for a game in the hub and the preview menu. cp2 is titled by
+   its first screen. */
+const gameTitle = (key, cp) => cp[key === 'cp2' ? 'cp2a' : key]?.title ?? key;
 
 function blankState(team) {
   return {
@@ -219,7 +213,9 @@ function blankState(team) {
     members: '',
     startedAt: null,
     finishedAt: null,
-    stage: 0,
+    /* Which game is on screen; null means the team is at the hub
+       choosing one. Replaces the old linear stage pointer. */
+    open: null,
     subs: {},
     bonus: {},
   };
@@ -304,37 +300,48 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     setTimeout(() => setToast(null), 2600);
   }, []);
 
-  const handleFile = useCallback(async (file, draftKey) => {
+  const handleFile = useCallback(async (file) => {
     if (!file) return;
-    if (file.type.startsWith('video')) {
-      const v = document.createElement('video');
-      const url = URL.createObjectURL(file);
-      v.preload = 'metadata';
-      await new Promise((res, rej) => {
-        v.onloadedmetadata = () => {
-          setDraft((d) => ({
-            ...d,
-            [draftKey]: { url, seconds: Math.round(v.duration * 10) / 10, name: file.name, size: file.size },
-          }));
-          res();
-        };
-        v.onerror = rej;
-        v.src = url;
-      });
-    } else {
-      const dataUrl = await compressImage(file);
-      setDraft((d) => ({ ...d, photo: dataUrl }));
-    }
+    const dataUrl = await compressImage(file);
+    setDraft((d) => ({ ...d, photo: dataUrl }));
   }, []);
 
   const save = useCallback((run) => {
     store.save(run.teamId, run);
   }, []);
 
-  /* Deal the first general knowledge question when the team reaches it.
+  /* ── Clock ──────────────────────────────────────────
+     A team ends its own run with the Finish button whenever it likes —
+     half the games unplayed is a legitimate way to finish. If the race
+     time runs out first, the run closes itself so the committee's
+     board doesn't show teams still playing after time. */
+  const deadline = S?.startedAt ? S.startedAt + CONFIG.raceMinutes * 60000 : null;
+  const secondsLeft = deadline === null ? null : Math.max(0, Math.round((deadline - (tick ?? Date.now())) / 1000));
+
+  useEffect(() => {
+    if (view !== 'race' || !S?.startedAt || S?.finishedAt) return undefined;
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [view, S?.startedAt, S?.finishedAt]);
+
+  const finishRun = useCallback((run) => {
+    if (!run) return;
+    const next = { ...run, open: null, finishedAt: run.finishedAt ?? Date.now() };
+    store.save(next.teamId, next);
+    setS(next);
+    setDraft({});
+    setView('done');
+  }, [store]);
+
+  useEffect(() => {
+    if (view !== 'race' || !S?.startedAt || S.finishedAt || secondsLeft === null) return;
+    if (secondsLeft <= 0) finishRun(S);
+  }, [view, S, secondsLeft, finishRun]);
+
+  /* Deal the first general knowledge question when the team opens it.
      The question and any answer picked are saved with the run, so a
      reload can't be used to dodge a question. */
-  const onTrivia = FLOW[S?.stage]?.key === 'guess';
+  const onTrivia = S?.open === 'guess';
   useEffect(() => {
     if (!onTrivia || S.trivia?.current || !CONFIG.trivia.bank.length) return;
     const next = { ...S, trivia: { streak: 0, best: 0, answered: 0, ...drawTrivia(CONFIG.trivia.bank, S.trivia?.seen) } };
@@ -374,17 +381,29 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
   /* ── Render views ──────────────────────────────────── */
 
+  const doneSlots = () => new Set(
+    Object.keys(S?.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null)
+  );
+
+  const openGame = (key) => {
+    setDraft({});
+    const next = { ...S, open: key };
+    store.save(next.teamId, next);
+    setS(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const backToHub = () => {
+    setDraft({});
+    const next = { ...S, open: null };
+    store.save(next.teamId, next);
+    setS(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const renderStampRally = () => {
-    const doneStamps = new Set(
-      Object.keys(S.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter((v) => v != null)
-    );
-    const curFlow = FLOW[S.stage];
-    const nowIdx =
-      curFlow?.type === 'cp'
-        ? CP_INDEX[curFlow.key]
-        : curFlow?.type === 'unlock'
-        ? CP_INDEX[curFlow.to + 'a'] ?? CP_INDEX[curFlow.to]
-        : -1;
+    const doneStamps = doneSlots();
+    const nowIdx = S.open ? SLOT_OF[DONE_SUB[S.open]] ?? -1 : -1;
 
     return (
       <div style={{
@@ -399,6 +418,82 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           {SLOTS.map((i) => (
             <StampSlot key={i} idx={i} done={doneStamps.has(i)} now={!doneStamps.has(i) && i === nowIdx} />
           ))}
+        </div>
+      </div>
+    );
+  };
+
+  /* ── Hub ────────────────────────────────────────────
+     The list of games, all of them open from the moment the hunt
+     starts. Nothing is locked behind anything else, so a team can open
+     number 5 first and come back to number 2 later — or never. */
+  const renderHub = () => {
+    const done = doneSlots();
+    const left = GAMES.length - done.size;
+    return (
+      <div>
+        <div className="card">
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Pick any one</div>
+          <h2 className="display" style={{ fontSize: 22, margin: '4px 0 6px' }}>
+            {left === 0 ? 'Every stamp collected' : `${left} still to play`}
+          </h2>
+          <p style={{ margin: '0 0 4px' }}>
+            Play them in whatever order suits where you are. Skip anything you don’t fancy — an
+            unplayed game just scores nothing.
+          </p>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0' }}>
+            {GAMES.map((g, i) => {
+              const isDone = done.has(i);
+              const started = g.key === 'cp2' && !isDone && S.subs?.cp2a;
+              return (
+                <li key={g.key} style={{ marginBottom: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => openGame(g.key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
+                      padding: '11px 13px', borderRadius: 9, border: 'var(--line)', cursor: 'pointer',
+                      background: isDone ? 'var(--th-parchment)' : 'var(--card)',
+                      boxShadow: isDone ? 'none' : 'var(--hard-sm)',
+                    }}
+                  >
+                    <span aria-hidden="true" style={{
+                      flex: 'none', width: 32, height: 32, borderRadius: '50%',
+                      display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 15,
+                      background: isDone ? 'var(--red)' : 'var(--ink)',
+                      color: isDone ? '#fff' : 'var(--gold)',
+                    }}>{isDone ? '✓' : KANJI[i]}</span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <b style={{ display: 'block', fontSize: 15, lineHeight: 1.25 }}>
+                        {gameTitle(g.key, CONFIG.cp)}
+                      </b>
+                      <span className="note">
+                        {isDone ? 'Stamp collected' : started ? 'Selfie in — riddle waiting' : g.short}
+                      </span>
+                    </span>
+                    <span aria-hidden="true" style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
+                      {isDone ? 'Review' : 'Open'} →
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
+        </div>
+
+        <div style={{
+          background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
+          padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
+        }}>
+          <div className="eyebrow" style={{ color: 'var(--gold)' }}>When you’re ready</div>
+          <h2 className="display" style={{ fontSize: 26, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
+            Walk it in
+          </h2>
+          <p style={{ color: 'var(--th-body-alt)', marginTop: 0 }}>{CONFIG.finishPoint}</p>
+          <button className="btn block sea" type="button" onClick={() => finishRun(S)}>
+            Finish the hunt{left > 0 ? ` · ${left} unplayed` : ''}
+          </button>
         </div>
       </div>
     );
@@ -486,14 +581,14 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
       setView('done');
       return;
     }
-    const next = { ...base, stage: Number(target), finishedAt: null };
+    const next = { ...base, open: target === 'hub' ? null : target, finishedAt: null };
     store.save(team.id, next);
     setS(next);
     setView('race');
   };
 
   const currentJumpValue =
-    view === 'race' && S ? String(S.stage) : view;
+    view === 'race' && S ? (S.open ?? 'hub') : view;
 
   const renderPreviewBar = () => (
     <div style={{
@@ -523,9 +618,10 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             style={{ width: '100%', height: 36, borderRadius: 6, border: '2px solid #17232F', background: '#FFFFFF', color: '#17232F', fontSize: 13, padding: '0 6px' }}
           >
             <option value="start">Start screen</option>
-            {FLOW.map((step, i) => (step.type === 'finish' ? null : (
-              <option key={i} value={String(i)}>{flowLabel(step, CONFIG.cp)}</option>
-            )))}
+            <option value="hub">Hub · pick a game</option>
+            {GAMES.map((g, i) => (
+              <option key={g.key} value={g.key}>{i + 1}. {gameTitle(g.key, CONFIG.cp)}</option>
+            ))}
             <option value="done">Results</option>
             <option value="organizer">Organiser view</option>
           </select>
@@ -556,13 +652,24 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
               {doneCount}/{CONFIG.stamps} STAMPS
             </div>
           </div>
+          {view === 'race' && secondsLeft !== null && (
+            <div style={{ textAlign: 'right', flex: 'none' }} aria-live="off">
+              <div style={{
+                fontFamily: 'var(--mono)', fontSize: 18, lineHeight: 1,
+                color: secondsLeft <= 300 ? 'var(--gold)' : 'var(--card)',
+              }}>{mmss(secondsLeft)}</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--th-label)', letterSpacing: '.1em' }}>
+                LEFT
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
-  /* "Stamp", not "Checkpoint": checkpoints are the numbered pins on the
-     route map, and a stop can host more than one game. */
+  /* "Stamp", not "Area": areas are the outlined patches on the map that
+     a team may roam, and no game is tied to one. */
   const renderStop = (stop, style) => (String(stop ?? '').trim() ? (
     <button type="button" onClick={() => setMapOpen(true)} style={{
       display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 6,
@@ -573,21 +680,37 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     </button>
   ) : null);
 
+  /* Every game carries its own way out: leaving one half-done and
+     picking another is normal play, not an escape hatch. */
   const renderCpHead = (n, title, kana, stop) => (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
-      <div style={{
-        flex: 'none', width: 42, height: 42, borderRadius: '50%',
-        background: 'var(--ink)', color: 'var(--gold)',
-        display: 'grid', placeItems: 'center', fontFamily: 'var(--body)',
-        fontWeight: 900, fontSize: 19,
-      }}>{KANJI[n - 1]}</div>
-      <div>
-        <div className="eyebrow" style={{ color: 'var(--red)' }}>Stamp {n} of {CONFIG.stamps}</div>
-        <h2 className="display" style={{ fontSize: 25, margin: '2px 0 1px' }}>{title}</h2>
-        <div className="kana">{kana}</div>
-        {renderStop(stop, { color: 'var(--sea)' })}
+    <>
+      <button
+        type="button"
+        onClick={backToHub}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10,
+          padding: '5px 11px', borderRadius: 999, border: 'var(--line)',
+          background: 'var(--card)', color: 'var(--ink)',
+          font: '700 12px/1.2 var(--body)', cursor: 'pointer',
+        }}
+      >
+        ← All games
+      </button>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
+        <div style={{
+          flex: 'none', width: 42, height: 42, borderRadius: '50%',
+          background: 'var(--ink)', color: 'var(--gold)',
+          display: 'grid', placeItems: 'center', fontFamily: 'var(--body)',
+          fontWeight: 900, fontSize: 19,
+        }}>{KANJI[n - 1]}</div>
+        <div>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Stamp {n} of {CONFIG.stamps}</div>
+          <h2 className="display" style={{ fontSize: 25, margin: '2px 0 1px' }}>{title}</h2>
+          <div className="kana">{kana}</div>
+          {renderStop(stop, { color: 'var(--sea)' })}
+        </div>
       </div>
-    </div>
+    </>
   );
 
   const renderShot = (preview, label, sub) => {
@@ -635,7 +758,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     if (!t) return null;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana, CONFIG.cp.cp1.stop)}
+        {renderCpHead(STAMP_NO.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.kana, CONFIG.cp.cp1.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
         </div>
@@ -665,7 +788,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           onClick={() => {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp1: { photo: draft.photo, at: Date.now() } };
-            newS.stage = S.stage + 1;
+            newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
@@ -685,7 +808,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const s = t.spot;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana, CONFIG.cp.cp2a.stop)}
+        {renderCpHead(STAMP_NO.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.kana, CONFIG.cp.cp2a.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp2a.body} />
         </div>
@@ -722,7 +845,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           onClick={() => {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp2a: { photo: draft.photo, at: Date.now() } };
-            newS.stage = S.stage + 1;
+            /* Stays open on purpose: the selfie reveals the riddle, which
+               is the half that earns the stamp. */
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
@@ -752,7 +876,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const many = riddles.length > 1;
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana, CONFIG.cp.cp2b.stop)}
+        {renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.kana, CONFIG.cp.cp2b.stop)}
         {String(CONFIG.cp.cp2b.body || '').trim() && (
           <div className="task">
             <Rich text={CONFIG.cp.cp2b.body} />
@@ -793,11 +917,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             const list = riddles.map((_, i) => String(answers[i] || '').trim());
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp2b: { answers: list, answer: list.join('\n\n'), at: Date.now() } };
-            newS.stage = S.stage + 1;
+            newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
-            showToast(`${many ? 'Answers' : 'Answer'} sent. Stamp ${CP_NUM.cp2b} collected.`);
+            showToast(`${many ? 'Answers' : 'Answer'} sent. Stamp ${STAMP_NO.cp2b} collected.`);
           }}
           type="button"
         >
@@ -810,7 +934,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
   const renderCp3 = () => (
     <div className="card flag">
-      {renderCpHead(CP_NUM.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana, CONFIG.cp.cp3.stop)}
+      {renderCpHead(STAMP_NO.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.kana, CONFIG.cp.cp3.stop)}
       <div className="task">
         <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {CONFIG.buy.brief}</p>
         <Rich text={CONFIG.cp.cp3.body} />
@@ -853,7 +977,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
         onClick={() => {
           const newS = { ...S };
           newS.subs = { ...(newS.subs || {}), cp3: { photo: draft.photo, item: draft.item, price: draft.price, at: Date.now() } };
-          newS.stage = S.stage + 1;
+          newS.open = null;
           store.save(newS.teamId, newS);
           setS(newS);
           setDraft({});
@@ -871,7 +995,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const answers = draft.answers || [];
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana, CONFIG.cp.cp4.stop)}
+        {renderCpHead(STAMP_NO.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.kana, CONFIG.cp.cp4.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.cp4.body} />
         </div>
@@ -895,7 +1019,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             />
           </label>
         ))}
-        {renderShot(draft.photo, 'Add a team photo at Checkpoint 4', 'Proof you walked the stretch and made it')}
+        {renderShot(draft.photo, 'Add a team photo', 'Proof you walked the stretch and made it')}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
@@ -908,7 +1032,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             });
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp4: { answers, photo: draft.photo, correct, at: Date.now() } };
-            newS.stage = S.stage + 1;
+            newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
@@ -929,7 +1053,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const photoTask = CONFIG.ask.tasks.find((t) => t.key === 'photo');
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.kana, CONFIG.cp.ask.stop)}
+        {renderCpHead(STAMP_NO.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.kana, CONFIG.cp.ask.stop)}
         <div className="task">
           <Rich text={CONFIG.cp.ask.body} />
         </div>
@@ -969,7 +1093,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
               ...(newS.subs || {}),
               ask: { word: draft.word || '', rec: draft.rec || '', photo: draft.photo || null, at: Date.now() },
             };
-            newS.stage = S.stage + 1;
+            newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
@@ -981,7 +1105,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
         </button>
         <p className="note" style={{ margin: '12px 0 0' }}>
           {done === 0
-            ? 'One of the three is enough to move on.'
+            ? 'One of the three is enough for the stamp.'
             : `${done} of ${CONFIG.ask.tasks.length} done.`}
         </p>
       </div>
@@ -991,8 +1115,9 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
   /* ── Game 1 — photo bingo ────────────────────────────────
      One shared card per team. Each tile belongs to one member; the Team
      Lead can fill any tile, as backup for a member who can't upload.
-     The first game of the hunt: fill the card, lock it, and the stamp
-     rally opens. */
+     All nine tiles are still needed for this stamp — that is this
+     game's own rule, not a gate on the rest of the hunt, which a team
+     can go and play at any time. */
 
   const addBingoTile = async (i, file) => {
     setCoverTile(null);
@@ -1150,9 +1275,9 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
+        {renderCpHead(STAMP_NO.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
         <div className="task">
-          <p style={{ margin: 0 }}>The first game. Nine prompts, one photo each, each snapped by the teammate named on it. Fill all nine to move on.</p>
+          <p style={{ margin: 0 }}>Nine prompts, one photo each, each snapped by the teammate named on it. All nine earn the stamp — leave it part-filled and come back whenever you like.</p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.bingo.photo} />
         {renderBingoGrid(locked)}
@@ -1161,7 +1286,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             marginTop: 14, padding: '10px 12px', borderRadius: 8,
             border: '2px solid var(--red)', background: 'var(--th-parchment)', fontSize: 13,
           }}>
-            <b>All nine photos are needed before you can move on.</b> Still missing {stillMissing.length}:
+            <b>All nine photos are needed for this stamp.</b> Still missing {stillMissing.length}:
             <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
               {stillMissing.map((i) => (
                 <li key={i}>{i + 1}. {bingoCard[i]?.prompt} — {assignees[i]?.name ?? 'teammate'}</li>
@@ -1188,17 +1313,16 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
             setBingoMissing(null);
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(fresh, CONFIG), at: Date.now() } };
-            newS.stage = S.stage + 1;
+            newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
             showToast('Stamp collected.');
           }}
           type="button"
         >
-          {bingoChecking ? 'Checking…' : `Next · ${filled}/9`}
+          {bingoChecking ? 'Checking…' : `Collect the stamp · ${filled}/9`}
         </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>Next opens once all nine tiles have a photo.</p>
-        {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
+        <p className="note" style={{ margin: '12px 0 0' }}>The stamp lands once all nine tiles have a photo.</p>
       </div>
     );
   };
@@ -1230,7 +1354,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const collect = () => {
       const newS = { ...S };
       newS.subs = { ...(newS.subs || {}), guess: { streak: target, answered: run.answered, best: run.best, at: Date.now() } };
-      newS.stage = S.stage + 1;
+      newS.open = null;
       store.save(newS.teamId, newS);
       setS(newS);
       showToast('Stamp collected.');
@@ -1243,7 +1367,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
 
     return (
       <div className="card flag">
-        {renderCpHead(CP_NUM.guess, CONFIG.cp.guess.title, CONFIG.cp.guess.kana, CONFIG.cp.guess.stop)}
+        {renderCpHead(STAMP_NO.guess, CONFIG.cp.guess.title, CONFIG.cp.guess.kana, CONFIG.cp.guess.stop)}
         <div className="task">
           <p style={{ margin: 0 }}>
             <b>Get {target} questions right in a row</b> to collect this stamp. Get one wrong and your streak goes back to zero.
@@ -1329,170 +1453,74 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
-  const renderCheer = () => {
-    const v = draft.video;
-    return (
-      <div className="card flag">
-        {renderCpHead(CP_NUM.cheer, CONFIG.cp.cheer.title, CONFIG.cp.cheer.kana, CONFIG.cp.cheer.stop)}
-        <div className="task">
-          <Rich text={CONFIG.cp.cheer.body} lead={`${CONFIG.video.seconds} seconds. One take.`} />
-        </div>
-        <CheckpointPhoto src={CONFIG.cp.cheer.photo} />
-        {v ? (
-          <div>
-            <div style={{ position: 'relative', border: 'var(--line)', borderRadius: 8, overflow: 'hidden', background: 'var(--ink)' }}>
-              <video src={v.url} controls playsInline style={{ display: 'block', width: '100%', maxHeight: 340, objectFit: 'contain', background: '#0E1720' }} />
-              <button
-                onClick={() => setDraft((d) => ({ ...d, video: null }))}
-                style={{
-                  position: 'absolute', top: 8, right: 8, background: 'var(--card)',
-                  border: 'var(--line)', borderRadius: 6, padding: '5px 9px',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                }}
-                type="button"
-              >
-                Retake
-              </button>
-            </div>
-            <p className="meta" style={{ marginTop: 8, fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
-              {v.seconds}s · {(v.size / 1048576).toFixed(1)} MB
-              {v.seconds > CONFIG.video.maxSeconds && <span style={{ color: 'var(--red)' }}> · over {CONFIG.video.maxSeconds}s</span>}
-            </p>
-          </div>
-        ) : (
-          <label style={{
-            display: 'block', width: '100%', border: '3px dashed var(--th-dash)', borderRadius: 8,
-            background: 'var(--th-parchment)', padding: '20px 14px', textAlign: 'center', cursor: 'pointer',
-          }}>
-            <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, letterSpacing: '.03em' }}>Add your video</b>
-            <small style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>Max {CONFIG.video.maxSeconds} seconds</small>
-            <input
-              type="file"
-              accept="video/*"
-              capture="environment"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const f = e.target.files[0];
-                if (f) handleFile(f, 'video').catch(() => showToast("That file didn't load. Try another."));
-              }}
-            />
-          </label>
-        )}
-        <button
-          className="btn block"
-          style={{ marginTop: 14 }}
-          disabled={!v || v.seconds > CONFIG.video.maxSeconds}
-          onClick={() => {
-            const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cheer: { name: v.name, seconds: v.seconds, at: Date.now() } };
-            newS.finishedAt = Date.now();
-            newS.stage = S.stage + 1;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            setDraft({});
-            setView('done');
-          }}
-          type="button"
-        >
-          Send video and finish
-        </button>
-      </div>
-    );
-  };
-
-  const renderUnlock = (to) => {
-    const copy = CONFIG.unlocks[to] ?? { h: 'Next checkpoint', p: '' };
-    return (
-      <div style={{
-        background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
-        padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
-      }}>
-        <div className="eyebrow" style={{ color: 'var(--gold)' }}>Stamp collected</div>
-        <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
-          {copy.h}
-        </h2>
-        <p style={{ color: 'var(--th-body-alt)' }}>{copy.p}</p>
-        {renderStop((CONFIG.cp[to + 'a'] ?? CONFIG.cp[to])?.stop, { color: 'var(--gold)', margin: '0 0 14px' })}
-        <button
-          className="btn block sea"
-          onClick={() => {
-            const newS = { ...S };
-            newS.stage = S.stage + 1;
-            store.save(newS.teamId, newS);
-            setS(newS);
-          }}
-          type="button"
-        >
-          Open it
-        </button>
-      </div>
-    );
-  };
-
+  /* Whichever game the team has open, or the hub if none. The only
+     gate left is inside game 3, where the selfie reveals the riddle. */
   const renderStage = () => {
     if (!S) return null;
-    const st = FLOW[S.stage];
-    if (!st) return null;
-    if (st.type === 'unlock') return renderUnlock(st.to);
-    if (st.type === 'finish') {
-      // Auto-finish — trigger the done screen
-      setTimeout(() => {
-        if (view !== 'done') {
-          const newS = { ...S };
-          newS.finishedAt = Date.now();
-          store.save(newS.teamId, newS);
-          setS(newS);
-          setView('done');
-        }
-      }, 100);
-      return <p className="note" style={{ textAlign: 'center', padding: 20 }}>Finishing...</p>;
-    }
+    if (!S.open) return renderHub();
     const renderers = {
-      cp1: renderCp1, cp2a: renderCp2a, cp2b: renderCp2b, cp3: renderCp3, cp4: renderCp4,
-      ask: renderAsk, bingo: renderBingo, guess: renderTrivia, cheer: renderCheer,
+      cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
+      ask: renderAsk, bingo: renderBingo, guess: renderTrivia,
+      cp2: () => (S.subs?.cp2a ? renderCp2b() : renderCp2a()),
     };
-    const fn = renderers[st.key];
-    return fn ? fn() : null;
+    const fn = renderers[S.open];
+    return fn ? fn() : renderHub();
   };
 
   const renderDoneScreen = () => {
-    const rows = [
-      ['1', 'Photo bingo', 'bingo'],
-      ['2', 'Pose photo', 'cp1'],
-      ['3', 'Selfie + riddle', 'cp2b'],
-      ['4', 'Buy &amp; try', 'cp3'],
-      ['5', 'Observation quiz', 'cp4'],
-      ['6', 'Ask a stranger', 'ask'],
-      ['7', 'General knowledge', 'guess'],
-      ['8', 'Team cheer', 'cheer'],
-    ];
-    const doneStamps = new Set(
-      Object.keys(S.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter((v) => v != null)
-    );
+    const done = doneSlots();
+    const ranOut = S.startedAt && S.finishedAt >= S.startedAt + CONFIG.raceMinutes * 60000 - 1500;
     return (
       <div>
         {renderStampRally()}
         <div className="hero" style={{ padding: '10px 0' }}>
-          <div className="big" style={{ fontSize: 'clamp(40px, 13vw, 62px)' }}>All eight<em>stamped</em></div>
+          <div className="big" style={{ fontSize: 'clamp(40px, 13vw, 62px)' }}>
+            {done.size}<em>of {CONFIG.stamps} stamped</em>
+          </div>
           <div className="rule" />
         </div>
         <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>{esc(S.teamName)}</div>
-          <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>Hunt complete</h2>
+          <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>
+            {ranOut ? 'Time’s up' : 'Hunt complete'}
+          </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {rows.map((r, i) => (
-              <li key={i} style={{
+            {GAMES.map((g, i) => (
+              <li key={g.key} style={{
                 display: 'flex', gap: 10, alignItems: 'center', padding: '9px 0',
                 borderBottom: '1px dashed var(--th-rule)', fontSize: 14,
               }}>
-                <span style={{ fontFamily: 'var(--body)', fontWeight: 900, color: 'var(--red)', width: 22 }}>{r[0]}</span>
-                <span dangerouslySetInnerHTML={{ __html: r[1] }} />
-                <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 12 }}>{S.subs?.[r[2]] ? '✓' : '—'}</span>
+                <span style={{ fontFamily: 'var(--body)', fontWeight: 900, color: 'var(--red)', width: 22 }}>{i + 1}</span>
+                <span>{g.short}</span>
+                <span style={{ marginLeft: 'auto', fontFamily: '"DM Mono", monospace', fontSize: 12 }}>
+                  {done.has(i) ? '✓' : 'skipped'}
+                </span>
               </li>
             ))}
           </ul>
           <p className="note" style={{ margin: '12px 0 0' }}>The committee tallies the results at the finish point.</p>
         </div>
+        {/* Finishing is the team's own call, so leave a way back in for
+            anyone who tapped it early and still has time on the clock. */}
+        {!ranOut && secondsLeft > 0 && (
+          <div className="card">
+            <p style={{ margin: '0 0 10px' }}>
+              Still {mmss(secondsLeft)} on the clock. Finished by mistake?
+            </p>
+            <button
+              className="btn block sea"
+              type="button"
+              onClick={() => {
+                const next = { ...S, finishedAt: null, open: null };
+                store.save(next.teamId, next);
+                setS(next);
+                setView('race');
+              }}
+            >
+              Keep playing
+            </button>
+          </div>
+        )}
         <div style={{
           background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
           padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
@@ -1521,7 +1549,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const bonuses = [
       ['photo', 'Best pose photo', 5],
       ['item', 'Most interesting buy', 5],
-      ['video', 'Best cheer video', 10],
       ['first', 'First to finish', 5],
     ];
 
@@ -1589,7 +1616,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
                 <tbody>
                   {allRuns.map((run, i) => {
                     const done = new Set(
-                      Object.keys(run.subs || {}).map((k) => (k === 'cp2a' ? null : CP_INDEX[k])).filter((v) => v != null)
+                      Object.keys(run.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null)
                     );
                     const left = run.startedAt
                       ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
@@ -1674,7 +1701,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
                         : 'GENERAL KNOWLEDGE — done (old closest-guess answers)'}
                     </p>
                   )}
-                  {s.cheer && <p className="note">VIDEO — {esc(s.cheer.name)} · {s.cheer.seconds}s (held on the team's phone)</p>}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
                     {bonuses.map((b) => (
                       <button
@@ -1720,7 +1746,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           type="button"
           className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-card text-ink transition-all duration-100 hover:opacity-90"
         >
-          🗺️ Route map
+          🗺️ Area map
         </button>
         <button
           onClick={onClose}

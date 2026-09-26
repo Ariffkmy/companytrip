@@ -3,21 +3,21 @@
    ═══════════════════════════════════════════════════
 
    Everything an admin can change lives in one JSON document
-   (public.hunt_config, id 'atami'). The flow itself — eight stamps in a
-   fixed order (photo bingo first), and the scoring rules — stays in TreasureHunt.jsx.
+   (public.hunt_config, id 'atami'). The flow itself — seven stamps a
+   team may collect in any order — and the scoring rules stay in
+   TreasureHunt.jsx.
 
    DEFAULT_HUNT_CONFIG is the game as originally written. A stored
    document is merged over it, so a field added here later still has a
    value on a trip whose config was saved before the field existed.
 
    Text fields: blank line = new paragraph, **double stars** = bold.
-   Unlock texts may use {budget}, {finish}, {quizCount}, {streak}.
 */
 
 import { supabase } from './supabase';
 import groupRoster from '../data/groupRoster';
 import TRIVIA_BANK from '../data/triviaBank';
-import { CHECKPOINTS, HUNT_MAP_LINK, ROUTE, ROUTE_STATS, START } from '../data/huntRoute';
+import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
 
 export const HUNT_ID = 'atami';
 export const MEDIA_BUCKET = 'hunt-media';
@@ -120,30 +120,31 @@ export const DEFAULT_HUNT_CONFIG = {
     },
   },
 
-  /* Route map. Checkpoints are numbered by their order here, so a trip
-     can have as many as it likes. `route` is the walking line; the
-     editor can redraw it through the stops, or it falls back to
-     straight lines between them. */
+  /* Area map. The areas tile the playing field side by side, sharing
+     borders and covering it completely, so a team is always inside
+     exactly one. There is no walking line — the order is the team's to
+     choose. Outlines are fixed in ../data/huntRoute, which explains how
+     they are derived; admins edit the labels and notes. */
   map: {
     link: HUNT_MAP_LINK,
     km: ROUTE_STATS.km,
     walkMin: ROUTE_STATS.walkMin,
     start: { lat: START.lat, lng: START.lng, label: START.label },
-    checkpoints: CHECKPOINTS.map((c) => ({ lat: c.lat, lng: c.lng, note: '' })),
-    route: ROUTE,
+    boundary: FIELD_BOUNDARY,
+    areas: AREAS.map((a) => ({ n: a.n, label: a.label, note: a.note, polygon: a.polygon })),
   },
 
   checkpoints: {
     cp1: {
-      title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null, stop: 'Checkpoint 2',
+      title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null, stop: '',
       body: 'Everyone in the frame. Ask a stranger to hold the phone if you have to.',
     },
     cp2a: {
-      title: 'Find the place', kana: '現地で自撮り', photo: null, stop: 'Checkpoint 3',
+      title: 'Find the place', kana: '現地で自撮り', photo: null, stop: '',
       body: 'Work out where this is, go there, and take a team selfie on the spot. The riddle unlocks when the selfie lands.',
     },
     cp2b: {
-      title: 'Three switches', kana: 'スイッチの謎', photo: null, stop: 'Checkpoint 3',
+      title: 'Three switches', kana: 'スイッチの謎', photo: null, stop: '',
       /* Optional intro above the riddles; every riddle must be answered. */
       body: '',
       riddles: [
@@ -151,13 +152,13 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     cp3: {
-      title: 'Buy it, try it', kana: '買って食べる', photo: null, stop: 'Checkpoint 3',
+      title: 'Buy it, try it', kana: '買って食べる', photo: null, stop: '',
       budgetYen: 500,
       brief: 'Something Japanese that nobody on your team has tried before.',
       body: 'Every member has to taste it. Photo has to show all of you eating or drinking, mid-bite.',
     },
     cp4: {
-      title: 'Look around you', kana: '周りを見ろ', photo: null, stop: 'Walk from Checkpoint 3 to 4',
+      title: 'Look around you', kana: '周りを見ろ', photo: null, stop: '',
       body: 'This one is played **on the walk from Checkpoint 3 to Checkpoint 4**. Every answer is somewhere along that stretch — shop signs, things in windows, what is on the street and above it.\n\nKeep your eyes up and notice everything as you go: once you reach Checkpoint 4 you can\'t walk back to check. Split the questions between you before you set off. Phones down — none of this is on the internet.',
       questions: [
         { q: 'Something that is red. Name the object.', accept: [] },
@@ -168,7 +169,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     ask: {
-      title: 'Ask a stranger', kana: '声かけ', photo: null, stop: 'Checkpoint 4',
+      title: 'Ask a stranger', kana: '声かけ', photo: null, stop: '',
       body: 'Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.\n\nAsk before you photograph anyone. If they say no, thank them and find someone else.',
       tasks: [
         { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
@@ -177,7 +178,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     bingo: {
-      title: 'Photo bingo', kana: 'ビンゴ', photo: null, stop: 'Checkpoint 1',
+      title: 'Photo bingo', kana: 'ビンゴ', photo: null, stop: '',
       linePts: 3,
       fullPts: 5,
     },
@@ -189,23 +190,6 @@ export const DEFAULT_HUNT_CONFIG = {
       streak: 10,
       bank: TRIVIA_BANK,
     },
-    cheer: {
-      title: 'The team cheer', kana: 'チームコール', photo: null, stop: '',
-      seconds: 15, maxSeconds: 30,
-      body: 'Your team cheer — chant, dance, war cry, whatever you invented on the way here.\n\nEveryone on camera. Say "Atami" once. Loud enough to embarrass yourselves.',
-    },
-  },
-
-  /* The "Stamp collected" screen shown before each checkpoint opens.
-     stop on each checkpoint above is its place on the route map. */
-  unlocks: {
-    cp1: { h: 'Copy the pose', p: 'Bingo card is in. Now the stamp rally: your first stamp is a team photo copying the pose in the next picture — everyone in the frame.' },
-    cp2: { h: 'Find the spot', p: 'Somewhere along the way is the thing in the next photo — find it, selfie with it, and the riddle opens. Your photo is different from every other team\'s, so following another team won\'t help.' },
-    cp3: { h: 'Buy it, try it', p: 'Find the shops. ¥{budget} for the team, one thing none of you have tried, everyone tastes it.' },
-    cp4: { h: 'Look around you', p: 'Read the {quizCount} questions before you leave Checkpoint 3 — every answer is somewhere on the walk to Checkpoint 4. Watch your surroundings the whole way. Nothing to google.' },
-    ask: { h: 'Talk to a stranger', p: 'Next one is not a place, it is a person. Find someone who is not on this trip and come away with something — a word, a recommendation, a photo.' },
-    guess: { h: 'Brain check', p: 'Multiple choice, one question at a time. Get {streak} right in a row to collect the stamp — one wrong answer and your streak goes back to zero.' },
-    cheer: { h: 'Last one', p: 'Film your team cheer, then walk it in. {finish}' },
   },
 };
 
@@ -229,28 +213,43 @@ export function withDefaults(stored) {
     merged.checkpoints.cp2b.riddles = [oldRiddle.body];
     merged.checkpoints.cp2b.body = '';
   }
-  /* Saved while stamp 7 was still the closest-guess game: its title,
-     text and unlock screen describe a game that no longer exists. */
+  /* Saved while stamp 7 was still the closest-guess game: its title and
+     text describe a game that no longer exists. */
   const oldGuess = stored?.checkpoints?.guess;
   if (oldGuess && !Array.isArray(oldGuess.bank)) {
     merged.checkpoints.guess = {
       ...structuredClone(DEFAULT_HUNT_CONFIG.checkpoints.guess),
       stop: oldGuess.stop ?? '', photo: oldGuess.photo ?? null,
     };
-    merged.unlocks.guess = structuredClone(DEFAULT_HUNT_CONFIG.unlocks.guess);
+  }
+  /* Saved while the hunt was a fixed route: the team cheer, the unlock
+     interstitials and the walking line are all gone, and the numbered
+     stops are now outlined areas. */
+  delete merged.checkpoints.cheer;
+  delete merged.unlocks;
+  delete merged.map.checkpoints;
+  delete merged.map.route;
+  if (!Array.isArray(merged.map.areas) || !merged.map.areas.length) {
+    merged.map.areas = structuredClone(DEFAULT_HUNT_CONFIG.map.areas);
+  }
+  /* Saved before the areas tiled the field: the old outlines were
+     separate islands, and there was no field boundary at all. */
+  if (merged.map.areas.some((a) => !Array.isArray(a.polygon) || a.polygon.length < 3)
+    || !Array.isArray(merged.map.boundary) || merged.map.boundary.length < 3) {
+    merged.map.boundary = structuredClone(DEFAULT_HUNT_CONFIG.map.boundary);
+    /* Rebuilt from the defaults rather than from what was stored:
+       deepMerge replaces arrays whole, so a document saved with a
+       different number of areas would otherwise drop the rest of the
+       tiling and leave holes in the field. Labels and notes the
+       committee wrote are carried across by position. */
+    const stored = merged.map.areas;
+    merged.map.areas = DEFAULT_HUNT_CONFIG.map.areas.map((fresh, i) => ({
+      ...structuredClone(fresh),
+      label: stored[i]?.label ?? fresh.label,
+      note: stored[i]?.note ?? fresh.note,
+    }));
   }
   return merged;
-}
-
-/* Fill {tokens} in unlock text from the rest of the config. */
-export function fillTokens(text, config) {
-  const values = {
-    budget: config.checkpoints.cp3.budgetYen,
-    finish: config.finishPoint,
-    quizCount: config.checkpoints.cp4.questions.length,
-    streak: config.checkpoints.guess.streak,
-  };
-  return String(text ?? '').replace(/\{(\w+)\}/g, (m, k) => (k in values ? String(values[k]) : m));
 }
 
 /* The shape TreasureHunt was written against, derived from the config. */
@@ -258,7 +257,7 @@ export function toRuntime(config) {
   const cp = config.checkpoints;
   return {
     raceMinutes: Number(config.raceMinutes) || 90,
-    stamps: 8,
+    stamps: 7,
     points: config.points,
     finishPoint: config.finishPoint,
     helpNote: config.helpNote,
@@ -276,11 +275,7 @@ export function toRuntime(config) {
     bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, size: 9 },
     map: config.map,
     trivia: { streak: Math.max(1, Number(cp.guess.streak) || 10), bank: cp.guess.bank },
-    video: { seconds: cp.cheer.seconds, maxSeconds: cp.cheer.maxSeconds },
     cp,
-    unlocks: Object.fromEntries(
-      Object.entries(config.unlocks).map(([k, u]) => [k, { h: u.h, p: fillTokens(u.p, config) }])
-    ),
   };
 }
 
@@ -306,11 +301,12 @@ export function validate(config) {
   });
   const coord = (p) => Math.abs(Number(p?.lat)) <= 90 && Math.abs(Number(p?.lng)) <= 180
     && String(p?.lat ?? '').trim() !== '' && String(p?.lng ?? '').trim() !== '';
-  if (!coord(config.map.start)) errs.push('Route map: the start needs a latitude and longitude.');
-  (config.map.checkpoints ?? []).forEach((c, i) => {
-    if (!coord(c)) errs.push(`Route map: checkpoint ${i + 1} needs a latitude between -90 and 90 and a longitude between -180 and 180.`);
+  if (!coord(config.map.start)) errs.push('Area map: the start needs a latitude and longitude.');
+  (config.map.areas ?? []).forEach((a, i) => {
+    if (!Array.isArray(a.polygon) || a.polygon.length < 3) {
+      errs.push(`Area map: area ${i + 1} needs an outline of at least three points.`);
+    }
   });
-  if (!(Number(cp.cheer.maxSeconds) >= Number(cp.cheer.seconds))) errs.push('Stamp 8: the maximum video length must be at least the target length.');
   if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Stamp 6: each task needs a label and a points value.');
   return errs;
 }

@@ -235,7 +235,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
           type="button"
           className="w-full -mt-1 h-11 rounded-xl border border-gray-200 bg-white text-sm font-medium text-ink cursor-pointer transition-colors hover:border-gray-300"
         >
-          View the hunt route map
+          View the hunt area map
         </button>
       )}
       {mapOpen && (
@@ -285,9 +285,9 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
       {index === 4 && (
         <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
           <p className="font-display text-base tracking-wide">Atami Treasure Hunt</p>
-          <p className="text-sm text-gray-500 mt-1">5 checkpoints · 14:10–17:30 · All downhill</p>
+          <p className="text-sm text-gray-500 mt-1">7 games, any order · 14:10–17:30 · All downhill</p>
           <div className="flex gap-2 justify-center mt-3">
-            {[0, 1, 2, 3, 4].map((i) => (
+            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="w-8 h-8 rounded-full border border-dashed border-gray-300 grid place-items-center font-mono text-xs text-gray-400">
                 {i + 1}
               </div>
@@ -357,7 +357,7 @@ export default function App() {
   }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
 
-  /* The route map is reachable from the itinerary without opening the
+  /* The area map is reachable from the itinerary without opening the
      hunt, so pick up any admin edits on the way in. */
   useEffect(() => { fetchHuntConfig().then(({ config }) => setHuntConfig(config)); }, []);
 

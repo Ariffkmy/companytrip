@@ -61,17 +61,17 @@ function urlFor(id, blob) {
 
 /* ── Treasure hunt photos ────────────────────────────
    Read-only. The hunt writes compressed data URLs into
-   localStorage under `treasure:<teamId>`; cp5 is a video but only its
-   metadata is kept (the file stays on the team's phone), so there is
-   nothing to show for it here. */
+   localStorage under `treasure:<teamId>`. Teams play the games in any
+   order, so these are labelled by the game, not by a position on a
+   route. */
 
 const CP_LABELS = {
-  cp1: 'Checkpoint 1 · Copy the pose',
-  cp2a: 'Checkpoint 2 · Find the spot',
-  cp2b: 'Checkpoint 2 · The riddle',
-  cp3: 'Checkpoint 3 · Buy it, try it',
-  cp4: 'Checkpoint 4 · Look around you',
-  cp5: 'Checkpoint 5 · Team cheer',
+  cp1: 'Copy the pose',
+  cp2a: 'Find the spot',
+  cp2b: 'The riddle',
+  cp3: 'Buy it, try it',
+  cp4: 'Look around you',
+  ask: 'Ask a stranger',
 };
 
 function readHuntPhotos() {

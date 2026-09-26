@@ -307,24 +307,39 @@
 }
 
 /* ── Hunt map (Leaflet) ───────────────────────────────
-   SVG presentation attributes can't read CSS variables, so the route
+   SVG presentation attributes can't read CSS variables, so the area
    colours are set here where both themes can reach them. */
-.hunt-route-casing { stroke: var(--color-card); stroke-opacity: .9; fill: none; }
-.hunt-route { stroke: var(--color-red); fill: none; }
-/* Moving dashes show which way to walk. */
-.hunt-route-flow {
-  stroke: #fff; stroke-opacity: .95; fill: none; stroke-width: 3px;
-  stroke-dasharray: 0.1 34; animation: huntFlow 2s linear infinite;
+/* The areas tile the field, so the heavy line goes around the whole
+   playing field and the borders between neighbours stay hairline —
+   otherwise six equal outlines read as six islands. A pale casing keeps
+   the field edge legible over the busy street render. */
+.hunt-field-casing { stroke: var(--color-card); stroke-opacity: .85; fill: none; }
+.hunt-field { stroke: var(--color-red); stroke-linejoin: round; fill: none; }
+/* Shared edges are stroked by both neighbours, so a hairline here draws
+   at roughly double weight on the borders that matter. */
+.hunt-area {
+  stroke: var(--color-ink); stroke-opacity: .35; stroke-linejoin: round;
+  fill-opacity: .18; transition: fill-opacity .15s;
 }
-@keyframes huntFlow { to { stroke-dashoffset: -34.1; } }
-@media (prefers-reduced-motion: reduce) { .hunt-route-flow { animation: none; } }
+.hunt-area:hover, .hunt-area:focus { fill-opacity: .34; }
+/* Six tints that stay distinct from each other and from the red field
+   edge, in both themes. */
+.hunt-area-1 { fill: var(--color-sea); }
+.hunt-area-2 { fill: var(--color-gold); }
+.hunt-area-3 { fill: var(--color-green); }
+.hunt-area-4 { fill: #8A4B9E; }
+.hunt-area-5 { fill: #E9A82C; }
+.hunt-area-6 { fill: #5B7F3E; }
+.dark .hunt-area { stroke: var(--color-card); stroke-opacity: .4; fill-opacity: .26; }
+.leaflet-tooltip.hunt-area-tip {
+  background: none; border: 0; box-shadow: none; padding: 0;
+  font: 700 13px/1 var(--font-display); letter-spacing: .04em;
+  color: var(--color-ink); text-shadow:
+    0 0 3px var(--color-card), 0 0 3px var(--color-card), 0 0 6px var(--color-card);
+}
+.leaflet-tooltip.hunt-area-tip::before { display: none; }
+.dark .leaflet-tooltip.hunt-area-tip { color: var(--color-flame); }
 .hunt-start { stroke: var(--color-red); fill: var(--color-card); fill-opacity: 1; }
-.hunt-cp span {
-  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px;
-  background: var(--color-ink); color: #fff; border: 2px solid #fff;
-  font: 700 12px/1 var(--font-body); box-shadow: 0 1px 4px rgba(0,0,0,.35);
-}
-.dark .hunt-cp span { background: var(--color-flame); color: #0A0A0C; }
 .hunt-me { stroke: #fff; fill: var(--color-sea); fill-opacity: 1; }
 .hunt-me-ring { stroke: var(--color-sea); fill: var(--color-sea); fill-opacity: .12; }
 .leaflet-tooltip.hunt-tip {

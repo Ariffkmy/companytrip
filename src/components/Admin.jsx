@@ -373,7 +373,7 @@ function TripList({ currentEmail, onSelfChanged }) {
 
 const SECTIONS = [
   { id: 'people', label: 'Trip list' },
-  { id: 'hunt', label: 'Treasure hunt', lede: 'Every checkpoint’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
+  { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
 ];
 
 /* ── Admin page ──────────────────────────────────── */
