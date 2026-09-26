@@ -752,6 +752,38 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
+  /* The dark mount a reference photo sits in, with a caption bar across
+     the bottom. Stamp 2 shows two of these — where to go, then what to
+     do there — and stamp 3 shows one. */
+  const renderPlate = ({ src, alt, caption, tag, missing }) => (
+    <div style={{
+      background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
+      position: 'relative', color: 'var(--card)', marginBottom: 14,
+    }}>
+      <div style={{ background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+        {src
+          ? <img src={src} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : missing}
+      </div>
+      <div style={{
+        position: 'absolute', left: 12, right: 12, bottom: 9,
+        fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
+        display: 'flex', justifyContent: 'space-between', gap: 8,
+      }}>
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caption}</span>
+        <b style={{ color: 'var(--gold)', fontWeight: 500, flex: 'none' }}>{tag}</b>
+      </div>
+    </div>
+  );
+
+  const missingPhoto = (what) => (
+    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#FFFCF4', padding: 16, textAlign: 'center' }}>
+      {what} photo not added yet — ask the committee.
+    </span>
+  );
+
+  /* Two photos, in the order you act on them: the place tells you where
+     to stand, the pose tells you what to do once you are there. */
   const renderCp1 = () => {
     const t = currentTeam;
     if (!t) return null;
@@ -761,25 +793,21 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
         </div>
-        <div style={{
-          background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
-          position: 'relative', color: 'var(--card)', marginBottom: 14,
-        }}>
-          <div style={{ background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-            {t.pose.photo
-              ? <img src={t.pose.photo} alt={`Pose for ${t.name} to copy`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              : <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#FFFCF4', padding: 16, textAlign: 'center' }}>Pose photo not added yet — ask the committee.</span>}
-          </div>
-          <div style={{
-            position: 'absolute', left: 12, right: 12, bottom: 9,
-            fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
-            display: 'flex', justifyContent: 'space-between', gap: 8,
-          }}>
-            <span>REFERENCE — {esc(t.name)}</span>
-            <b style={{ color: 'var(--gold)', fontWeight: 500 }}>NO.1</b>
-          </div>
-        </div>
-        {renderShot(draft.photo, 'Add your group photo', 'Camera or gallery · one photo')}
+        {renderPlate({
+          src: t.pose.place,
+          alt: `The place ${t.name} has to go to`,
+          caption: t.pose.placeHint || 'Go to this place',
+          tag: 'WHERE',
+          missing: missingPhoto('Place'),
+        })}
+        {renderPlate({
+          src: t.pose.photo,
+          alt: `The pose for ${t.name} to copy`,
+          caption: `Copy this pose — ${esc(t.name)}`,
+          tag: 'POSE',
+          missing: missingPhoto('Pose'),
+        })}
+        {renderShot(draft.photo, 'Add your group photo', 'At the place, in the pose · one photo')}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
@@ -811,31 +839,21 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
         <div className="task">
           <Rich text={CONFIG.cp.cp2a.body} />
         </div>
-        <div style={{
-          background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
-          position: 'relative', color: 'var(--card)', marginBottom: 14,
-        }}>
-          <div style={{
-            background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2',
-            display: 'grid', placeItems: 'center', overflow: 'hidden',
-          }}>
-            {s.photo ? <img src={s.photo} alt="The place to find" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" style={{ width: '78%', height: '78%' }}>
+        {renderPlate({
+          src: s.photo,
+          alt: 'The place to find',
+          caption: s.hint,
+          tag: 'WHERE',
+          missing: (
+            <svg viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" style={{ width: '78%', height: '78%' }}>
               <g stroke="currentColor" strokeWidth="6" fill="none" strokeLinejoin="round">
                 <rect x="44" y="46" width="152" height="86" rx="10" />
                 <path d="M92 46l12-16h32l12 16" />
                 <circle cx="120" cy="90" r="26" />
               </g>
-            </svg>}
-          </div>
-          <div style={{
-            position: 'absolute', left: 12, right: 12, bottom: 9,
-            fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
-            display: 'flex', justifyContent: 'space-between', gap: 8,
-          }}>
-            <span>{s.hint}</span>
-            <b style={{ color: 'var(--gold)', fontWeight: 500 }}>NO.2</b>
-          </div>
-        </div>
+            </svg>
+          ),
+        })}
         {renderShot(draft.photo, 'Add your selfie', 'Everyone in frame, landmark behind you')}
         <button
           className="btn block"

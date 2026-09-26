@@ -265,7 +265,11 @@ export default function HuntEditor() {
     );
   }
 
-  const posePhotoCount = groupRoster.filter((g) => draft.teams[g.id]?.pose?.photo).length;
+  /* Both halves are needed for the game to make sense, so the summary
+     counts teams that have the place and the pose, not just a pose. */
+  const posePairCount = groupRoster.filter(
+    (g) => draft.teams[g.id]?.pose?.photo && draft.teams[g.id]?.pose?.place
+  ).length;
   const set = (path) => (value) => { setSaveMsg(''); setDraft((d) => setIn(d, path, value)); };
   const val = (path) => getIn(draft, path);
   const cp = (key) => ['checkpoints', key];
@@ -350,16 +354,22 @@ export default function HuntEditor() {
         </div>
       </Section>
 
-      <Section title="2 · Copy the pose" sub={`${posePhotoCount} of ${groupRoster.length} teams have a pose photo`}>
+      <Section title="2 · Copy the pose" sub={`${posePairCount} of ${groupRoster.length} teams have both photos`}>
         <Sub>The game</Sub>
         {commonFields('cp1', { photo: false })}
-        <Sub>Each team’s pose</Sub>
-        <p className="note -mt-2">Every team gets a different pose. The photo is what they copy — add one for every team.</p>
+        <Sub>Each team’s place and pose</Sub>
+        <p className="note -mt-2">
+          Two photos per team: where to go, then the pose to copy once they are there. Both differ by team, so
+          one team can’t just follow another to the spot — add both for every team.
+        </p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
           {groupRoster.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
-              <Photo label="Pose photo" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
+              <Photo label="Place photo — where to go" value={val(['teams', g.id, 'pose', 'place'])} onChange={set(['teams', g.id, 'pose', 'place'])} />
+              <Text label="Caption under the place photo" hint="Optional. Leave blank for “Go to this place”."
+                value={val(['teams', g.id, 'pose', 'placeHint'])} onChange={set(['teams', g.id, 'pose', 'placeHint'])} />
+              <Photo label="Pose photo — what to copy" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
             </div>
           ))}
         </div>

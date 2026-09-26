@@ -44,7 +44,7 @@ export const DEFAULT_HUNT_CONFIG = {
 
   teams: {
     'team-ruby': {
-      pose: { photo: null },
+      pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'Something older than everyone here',
@@ -59,7 +59,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ]),
     },
     'team-sapphire': {
-      pose: { photo: null },
+      pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'Steam rising from anything',
@@ -74,7 +74,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ]),
     },
     'team-emerald': {
-      pose: { photo: null },
+      pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'A lantern',
@@ -89,7 +89,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ]),
     },
     'team-diamond': {
-      pose: { photo: null },
+      pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'A torii gate',
@@ -104,7 +104,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ]),
     },
     'team-pearl': {
-      pose: { photo: null },
+      pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
       bingo: bingoCard([
         'A hot spring sign (♨)',
@@ -137,7 +137,7 @@ export const DEFAULT_HUNT_CONFIG = {
   checkpoints: {
     cp1: {
       title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null, stop: '',
-      body: 'Everyone in the frame. Ask a stranger to hold the phone if you have to.',
+      body: 'Go to the place in the first photo, then copy the pose in the second.\n\nEveryone in the frame. Ask a stranger to hold the phone if you have to.',
     },
     cp2a: {
       title: 'Find the place', kana: '現地で自撮り', photo: null, stop: '',
@@ -265,7 +265,7 @@ export function toRuntime(config) {
       id: g.id,
       name: g.name,
       colour: TEAM_COLOURS[g.id] ?? 'var(--ink)',
-      pose: config.teams[g.id]?.pose ?? { photo: null },
+      pose: { photo: null, place: null, placeHint: '', ...config.teams[g.id]?.pose },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: config.teams[g.id]?.bingo ?? [],
     })),
