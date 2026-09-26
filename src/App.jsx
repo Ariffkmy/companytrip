@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import schedule from './data/schedule';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
@@ -6,10 +6,10 @@ import Album from './components/Album';
 import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
+import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
 import { cachedHuntConfig, fetchHuntConfig, withDefaults } from './lib/huntConfig';
 
-const HuntMap = lazy(() => import('./components/HuntMap'));
 
 const THEME_KEY = 'olc-theme';
 
@@ -238,11 +238,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
           View the hunt area map
         </button>
       )}
-      {mapOpen && (
-        <Suspense fallback={null}>
-          <HuntMap map={huntMap} onClose={closeMap} />
-        </Suspense>
-      )}
+      {mapOpen && <HuntMapLoader map={huntMap} onClose={closeMap} />}
 
       {/* Timeline */}
       <div className="relative space-y-2.5 pl-5">

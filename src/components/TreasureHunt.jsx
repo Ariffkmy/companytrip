@@ -1,14 +1,13 @@
-import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
 import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
 import confetti from '../lib/confetti';
+import HuntMapLoader from './HuntMapLoader';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
    ═══════════════════════════════════════════════════ */
 
-/* Leaflet is heavy; only fetch it when someone opens the map. */
-const HuntMap = lazy(() => import('./HuntMap'));
 
 const KANJI =['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
 
@@ -1770,11 +1769,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
       {view === 'done' && renderDoneScreen()}
       {view === 'organizer' && renderOrganizer()}
 
-      {mapOpen && (
-        <Suspense fallback={<div className="fixed inset-0 z-[90] grid place-items-center bg-paper note">Loading map…</div>}>
-          <HuntMap map={CONFIG.map} onClose={closeMap} />
-        </Suspense>
-      )}
+      {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}
 
       {/* Toast */}
       {toast && (
