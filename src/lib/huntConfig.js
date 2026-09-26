@@ -42,6 +42,50 @@ export const DEFAULT_HUNT_CONFIG = {
   finishPoint: 'The committee will point you to the finish at the briefing.',
   helpNote: 'Stuck? The committee is in the WhatsApp group.',
 
+  /* Shown behind the "How it works" button on the hub. Points, not
+     prose: this is read standing up, in a group, with the clock
+     running. A line starting "- " is a bullet.
+
+     The game count, the clock and the finish point are printed from the
+     live config above this text, so they are deliberately not repeated
+     here — those are the parts that would go stale. */
+  rules: [
+    '**The clock**',
+    '- Starts when your team taps Start the hunt',
+    '- Counts down in the header; at zero the hunt closes itself',
+    '- You can finish early any time',
+    '',
+    '**Order**',
+    '- Any order — open whichever game suits where you are',
+    '- Skipping is allowed; a game you never play scores nothing',
+    '- Leave one half-done and come back to it',
+    '',
+    '**Where you can go**',
+    '- Stay inside the marked areas on the map',
+    '- No route to follow, so walk where you like within them',
+    '',
+    '**Stay together**',
+    '- One team — most photos need everyone in the frame',
+    '- Photo bingo is the exception: each tile belongs to one teammate, and the Team Lead can cover a dead phone',
+    '',
+    '**No looking things up**',
+    '- Riddle and general knowledge: no searching, no asking anyone outside the team, no AI',
+    '- Observation quiz: from what you noticed on the way, with no doubling back',
+    '- Every photo taken today, by your team',
+    '',
+    '**Money**',
+    '- ¥500 for the whole team on Buy it, try it',
+    '- Everyone tastes it; spending more earns nothing extra',
+    '',
+    '**What scores**',
+    '- 10 a stamp',
+    '- Photo bingo: 1 a tile, 3 a line, 5 for all nine',
+    '- Observation quiz: 2 a right answer',
+    '- Ask a stranger: 2 for a word, 3 for a recommendation, 5 for a photo',
+    '- General knowledge: 10 right in a row earns the stamp',
+    '- Judged at the finish: best pose photo, most interesting buy, first back — 5 each',
+  ].join('\n'),
+
   teams: {
     'team-ruby': {
       pose: { photo: null, place: null, placeHint: '' },
@@ -261,6 +305,7 @@ export function toRuntime(config) {
     points: config.points,
     finishPoint: config.finishPoint,
     helpNote: config.helpNote,
+    rules: config.rules,
     teams: groupRoster.map((g) => ({
       id: g.id,
       name: g.name,
@@ -324,19 +369,50 @@ export function cachedHuntConfig() {
 
 /* Returns { config, updatedAt }. Falls back to the phone's last copy,
    then to the defaults, so the hunt still opens with no signal. */
+/* Whether the committee has opened the hunt, as last seen on this
+   phone. Atami is where the signal goes, and a team standing at the
+   start line should not be told the game is shut because their phone
+   could not ask. Only a phone that has never seen the answer assumes
+   it is closed. */
+const OPEN_KEY = 'olc-hunt-open';
+
+export function cachedHuntOpen() {
+  try { return localStorage.getItem(OPEN_KEY) === 'true'; } catch (e) { return false; }
+}
+
 export async function fetchHuntConfig() {
-  if (!supabase) return { config: cachedHuntConfig() ?? withDefaults(null), updatedAt: null };
+  if (!supabase) {
+    return { config: cachedHuntConfig() ?? withDefaults(null), updatedAt: null, isOpen: cachedHuntOpen() };
+  }
   const { data, error } = await supabase
     .from('hunt_config')
-    .select('config, updated_at')
+    .select('config, updated_at, is_open')
     .eq('id', HUNT_ID)
     .maybeSingle();
   if (error) {
-    return { config: cachedHuntConfig() ?? withDefaults(null), updatedAt: null, error };
+    return { config: cachedHuntConfig() ?? withDefaults(null), updatedAt: null, isOpen: cachedHuntOpen(), error };
   }
   const config = withDefaults(data?.config);
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(data?.config ?? {})); } catch (e) { /* silent */ }
-  return { config, updatedAt: data?.updated_at ?? null };
+  const isOpen = data?.is_open === true;
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data?.config ?? {}));
+    localStorage.setItem(OPEN_KEY, String(isOpen));
+  } catch (e) { /* silent */ }
+  return { config, updatedAt: data?.updated_at ?? null, isOpen };
+}
+
+/** Open or close the hunt. Admin only — RLS refuses everyone else. */
+export async function setHuntOpen(isOpen) {
+  /* Upsert, because the row only exists once someone has saved content
+     and the switch may well be flipped before that ever happens. */
+  const { data, error } = await supabase
+    .from('hunt_config')
+    .upsert({ id: HUNT_ID, is_open: isOpen })
+    .select('is_open')
+    .single();
+  if (error) throw error;
+  try { localStorage.setItem(OPEN_KEY, String(data.is_open === true)); } catch (e) { /* silent */ }
+  return data.is_open === true;
 }
 
 export async function saveHuntConfig(config) {

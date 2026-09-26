@@ -8,7 +8,7 @@ import Login from './components/Login';
 import Admin from './components/Admin';
 import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
-import { cachedHuntConfig, fetchHuntConfig, withDefaults } from './lib/huntConfig';
+import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig, withDefaults } from './lib/huntConfig';
 
 
 const THEME_KEY = 'olc-theme';
@@ -346,16 +346,23 @@ export default function App() {
   /* Hunt content is edited by admins. Open with the phone's last copy
      straight away, then swap in the latest if there is signal. */
   const [huntConfig, setHuntConfig] = useState(() => cachedHuntConfig());
+  /* The committee's switch. Teams cannot start until it is on, so it is
+     re-read on the way in rather than trusted from page load — it is
+     flipped at the briefing, with the app already open in every
+     pocket. */
+  const [huntOpen, setHuntOpen] = useState(() => cachedHuntOpen());
   const openTreasureHunt = useCallback(() => {
     refreshMember();
-    fetchHuntConfig().then(({ config }) => setHuntConfig(config));
+    fetchHuntConfig().then(({ config, isOpen }) => { setHuntConfig(config); setHuntOpen(isOpen); });
     setTreasureOpen(true);
   }, [refreshMember]);
   const closeTreasureHunt = useCallback(() => setTreasureOpen(false), []);
 
   /* The area map is reachable from the itinerary without opening the
      hunt, so pick up any admin edits on the way in. */
-  useEffect(() => { fetchHuntConfig().then(({ config }) => setHuntConfig(config)); }, []);
+  useEffect(() => {
+    fetchHuntConfig().then(({ config, isOpen }) => { setHuntConfig(config); setHuntOpen(isOpen); });
+  }, []);
 
   /* Admin is a laptop job: on large screens it gets the full width.
      Phones and every other tab keep the 640px column. */
@@ -429,6 +436,7 @@ export default function App() {
             teamId={auth.member.team}
             me={{ email: auth.user?.email?.toLowerCase() ?? '', team: auth.member.team, role: auth.member.role, isAdmin: auth.isAdmin }}
             config={huntConfig}
+            isOpen={huntOpen}
           />
         </div>
       </>

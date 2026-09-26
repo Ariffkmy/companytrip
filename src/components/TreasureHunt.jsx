@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
 import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
 import confetti from '../lib/confetti';
@@ -151,16 +151,44 @@ function makeStore(preview) {
 }
 
 /* Admin-written text: blank line = paragraph, **stars** = bold. */
+/* **stars** anywhere in a line become bold. */
+const bold = (s) => s.split(/(\*\*[^*]+\*\*)/g).map((chunk, j) =>
+  /^\*\*[^*]+\*\*$/.test(chunk) ? <b key={j}>{chunk.slice(2, -2)}</b> : chunk
+);
+
 function Rich({ text, lead }) {
-  const paras = String(text ?? '').split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
-  if (lead) paras[0] = `**${lead}** ${paras[0] ?? ''}`.trim();
-  return paras.map((para, i) => (
-    <p key={i}>
-      {para.split(/(\*\*[^*]+\*\*)/g).map((chunk, j) =>
-        /^\*\*[^*]+\*\*$/.test(chunk) ? <b key={j}>{chunk.slice(2, -2)}</b> : chunk
-      )}
-    </p>
-  ));
+  const blocks = String(text ?? '').split(/\n\s*\n/).map((t) => t.trim()).filter(Boolean);
+  if (lead) blocks[0] = `**${lead}** ${blocks[0] ?? ''}`.trim();
+  return blocks.map((block, i) => {
+    /* Lines starting "- " are bullets, and a block may mix them with
+       prose — typically a heading sitting directly above its list. So
+       group the block into runs and render each in kind, rather than
+       forcing the whole block to be one or the other.
+
+       Prose lines are joined with a space, which is how a paragraph's
+       soft line breaks have always collapsed. */
+    const runs = [];
+    block.split('\n').map((l) => l.trim()).filter(Boolean).forEach((line) => {
+      const bullet = line.startsWith('- ');
+      const last = runs[runs.length - 1];
+      if (last && last.bullet === bullet) last.lines.push(line);
+      else runs.push({ bullet, lines: [line] });
+    });
+
+    return (
+      <Fragment key={i}>
+        {runs.map((run, j) => (run.bullet ? (
+          <ul key={j} style={{ margin: '0 0 10px', paddingLeft: 20 }}>
+            {run.lines.map((l, k) => (
+              <li key={k} style={{ marginBottom: 4 }}>{bold(l.slice(2))}</li>
+            ))}
+          </ul>
+        ) : (
+          <p key={j}>{bold(run.lines.join(' '))}</p>
+        )))}
+      </Fragment>
+    );
+  });
 }
 
 /* Optional admin-supplied photo shown under a game's instructions. */
@@ -267,7 +295,12 @@ function scoreOf(run, CONFIG) {
    ════════════════════════════════════════════════════════════ */
 
 /* `me` is the signed-in member: { email, team, role, isAdmin }. */
-export default function TreasureHunt({ onClose, teamId, me, config, preview = false }) {
+/* `isOpen` is the committee's switch. It gates starting a run, not
+   playing one: a team already out there keeps its progress if the
+   switch is thrown, because losing a half-finished submission in a
+   backstreet is worse than letting them finish. Defaults true so the
+   admin preview plays regardless. */
+export default function TreasureHunt({ onClose, teamId, me, config, isOpen = true, preview = false }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const store = useMemo(() => makeStore(preview), [preview]);
   /* Preview only: which team the admin is playing as. */
@@ -290,6 +323,20 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
   const [bingoChecking, setBingoChecking] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const closeMap = useCallback(() => setMapOpen(false), []);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  /* Escape closes it, as it does the map — and the page behind stops
+     scrolling, so a long set of rules doesn't drag the hub with it. */
+  useEffect(() => {
+    if (!rulesOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setRulesOpen(false); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [rulesOpen]);
   /* Scores and times are for the committee only. */
   const canOrganise = preview || !!me?.isAdmin;
   const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
@@ -422,6 +469,65 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     );
   };
 
+  /* ── How it works ───────────────────────────────────
+     The counts and the clock are printed from the live config, so they
+     cannot drift from the game actually being played; the prose under
+     them is the committee's to edit. */
+  const renderRules = () => {
+    if (!rulesOpen) return null;
+    const close = () => setRulesOpen(false);
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="How the hunt works"
+        onClick={close}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 95, overflowY: 'auto',
+          background: 'rgba(10,10,12,.55)', padding: '24px 14px',
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        }}
+      >
+        <div
+          className="card"
+          onClick={(e) => e.stopPropagation()}
+          style={{ maxWidth: 540, width: '100%', margin: 0 }}
+        >
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>About</div>
+          <h2 className="display" style={{ fontSize: 25, margin: '4px 0 2px' }}>How it works</h2>
+          <p className="note" style={{ margin: '0 0 12px' }}>
+            {CONFIG.stamps} games · any order · {CONFIG.raceMinutes} minutes
+          </p>
+          <div className="task">
+            <Rich text={CONFIG.rules} />
+          </div>
+          <p style={{ margin: '12px 0 0' }}>
+            <b>Finish:</b> {CONFIG.finishPoint}
+          </p>
+          {CONFIG.helpNote && <p className="note" style={{ marginTop: 10 }}>{CONFIG.helpNote}</p>}
+          <button className="btn block" style={{ marginTop: 16 }} type="button" onClick={close} autoFocus>
+            Got it
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const rulesButton = (style) => (
+    <button
+      type="button"
+      onClick={() => setRulesOpen(true)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '6px 12px', borderRadius: 999, border: 'var(--line)',
+        background: 'var(--card)', color: 'var(--ink)',
+        font: '700 12px/1.2 var(--body)', cursor: 'pointer', ...style,
+      }}
+    >
+      ？ How it works
+    </button>
+  );
+
   /* ── Hub ────────────────────────────────────────────
      The list of games, all of them open from the moment the hunt
      starts. Nothing is locked behind anything else, so a team can open
@@ -436,10 +542,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
           <h2 className="display" style={{ fontSize: 22, margin: '4px 0 6px' }}>
             {left === 0 ? 'Every stamp collected' : `${left} still to play`}
           </h2>
-          <p style={{ margin: '0 0 4px' }}>
+          <p style={{ margin: '0 0 10px' }}>
             Play them in whatever order suits where you are. Skip anything you don’t fancy — an
             unplayed game just scores nothing.
           </p>
+          {rulesButton()}
           <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0' }}>
             {GAMES.map((g, i) => {
               const isDone = done.has(i);
@@ -502,9 +609,22 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
     const team = CONFIG.teams.find((t) => t.id === activeTeamId);
     const existing = team ? store.load(team.id) : null;
     const underway = Boolean(existing?.startedAt);
+    /* Shut, and this team has not started: nothing to carry on with. */
+    const shut = !isOpen && !preview && !underway;
 
     return (
       <div>
+        {shut && (
+          <div className="card flag">
+            <div className="eyebrow" style={{ color: 'var(--red)' }}>Not yet</div>
+            <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>The hunt hasn’t started</h2>
+            <p style={{ margin: 0 }}>
+              The committee opens it at the briefing. Come back to this screen then — you don’t need to
+              do anything now.
+            </p>
+            {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
+          </div>
+        )}
         <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>Your team</div>
           {team ? (
@@ -518,7 +638,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
               </div>
               <button
                 className="btn block"
-                style={{ marginTop: 14 }}
+                style={{ marginTop: 14, ...(shut ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+                disabled={shut}
                 onClick={() => {
                   if (underway) {
                     setS(existing);
@@ -534,10 +655,12 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
                 }}
                 type="button"
               >
-                {underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
+                {shut ? 'Waiting for the committee' : underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
               </button>
+              <div style={{ marginTop: 12 }}>{rulesButton()}</div>
               <p className="note" style={{ margin: '12px 0 0' }}>
-                {underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
+                {shut ? 'This opens when the committee starts the game.'
+                  : underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
               </p>
             </>
           ) : (
@@ -1788,6 +1911,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, preview = fa
       {view === 'organizer' && renderOrganizer()}
 
       {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}
+
+      {renderRules()}
 
       {/* Toast */}
       {toast && (

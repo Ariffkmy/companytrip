@@ -2,8 +2,76 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import TreasureHunt from './TreasureHunt';
 import groupRoster from '../data/groupRoster';
 import {
-  DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, uploadHuntPhoto, validate,
+  DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, setHuntOpen, uploadHuntPhoto, validate,
 } from '../lib/huntConfig';
+
+/* ── The switch ──────────────────────────────────────
+   Deliberately outside the accordions and above the content: it is the
+   one control the committee needs at the briefing, with five teams
+   waiting, and it is not something to go hunting for.
+
+   It saves the moment it is flipped rather than joining the draft that
+   the Save button writes. A kill switch that needs a second confirming
+   press is not one. */
+function GameSwitch() {
+  const [open, setOpen] = useState(null); // null until we know
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let live = true;
+    fetchHuntConfig()
+      .then(({ isOpen }) => { if (live) setOpen(isOpen); })
+      .catch(() => { if (live) setError('Couldn’t read the switch.'); });
+    return () => { live = false; };
+  }, []);
+
+  const flip = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      setOpen(await setHuntOpen(!open));
+    } catch (e) {
+      const msg = e?.message ?? '';
+      setError(/is_open|column/i.test(msg)
+        ? 'The hunt switch migration hasn’t been run yet.'
+        : /row-level security|permission/i.test(msg)
+        ? 'Your account isn’t an admin any more.'
+        : 'Couldn’t change it. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const live = open === true;
+  return (
+    <div className={`rounded-lg border-2 p-4 ${live ? 'border-green bg-white' : 'border-red bg-white'}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${live ? 'bg-green' : 'bg-red'}`} />
+        <span className="font-display text-lg tracking-wide">
+          {open === null ? 'Checking…' : live ? 'The hunt is open' : 'The hunt is closed'}
+        </span>
+        <button
+          type="button"
+          onClick={flip}
+          disabled={busy || open === null}
+          className={`ml-auto h-10 px-4 rounded-lg font-display text-base tracking-wide cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${
+            live ? 'border-2 border-ink bg-white text-ink' : 'bg-red text-paper'
+          }`}
+        >
+          {busy ? 'Saving…' : live ? 'Close the hunt' : 'Open the hunt'}
+        </button>
+      </div>
+      <p className="note mt-2 leading-relaxed">
+        {live
+          ? 'Teams can start. Closing it stops anyone new from starting — teams already playing keep their progress.'
+          : 'Teams see “the hunt hasn’t started” and cannot begin. Open it at the briefing.'}
+        {' '}Takes effect immediately; it is not part of Save.
+      </p>
+      {error && <p role="alert" className="text-sm text-red mt-2">{error}</p>}
+    </div>
+  );
+}
 
 /* ── Immutable path update ───────────────────────── */
 function setIn(obj, path, value) {
@@ -158,7 +226,7 @@ function Sub({ children }) {
   return <p className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 pt-2">{children}</p>;
 }
 
-const TEXT_HINT = 'Blank line starts a new paragraph. **Double stars** make text bold.';
+const TEXT_HINT = 'Blank line starts a new paragraph. **Double stars** make text bold. A run of lines each starting "- " becomes a bullet list.';
 
 /* ── Area map ─────────────────────────────────────── */
 function Coord({ label, value, onChange, placeholder }) {
@@ -320,6 +388,8 @@ export default function HuntEditor() {
 
       {loadError && <p role="alert" className="text-sm text-red">{loadError}</p>}
 
+      <GameSwitch />
+
       <Section title="General" sub="Clock, points, finish">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Num label="Race length (min)" value={val(['raceMinutes'])} onChange={set(['raceMinutes'])} min={1} />
@@ -328,6 +398,9 @@ export default function HuntEditor() {
         </div>
         <Area label="Finish point" hint="Shown on the hub and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
         <Text label="Help note" hint="Small line under the list of games. Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />
+        <Area label="How it works" rows={10}
+          hint={`Behind the “How it works” button on the hub. ${TEXT_HINT} The game count, the clock and the finish point are printed above it automatically — no need to repeat them.`}
+          value={val(['rules'])} onChange={set(['rules'])} />
       </Section>
 
       <MapSection val={val} set={set} />
