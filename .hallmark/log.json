@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-09-12",
+    "macrostructure": "Workbench",
+    "theme": "project-owned (Anton + Inter + JetBrains Mono / red-flame)",
+    "theme_axes": "light paper / display-heavy / warm accent",
+    "enrichment": "none - typography only",
+    "nav": "N9 edge-aligned strip + pinned SOS affordance",
+    "footer": "Ft2 inline single line",
+    "brief": "OLC Japan 2026 trip PWA - add Home landing screen, differentiate page heads, fix stale chrome"
+  }
+]

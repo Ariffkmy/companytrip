@@ -1,0 +1,23 @@
+{
+  "scanned": "2026-09-12",
+  "framework": "Vite 8 + React 19",
+  "css": "Tailwind v4 (@tailwindcss/vite), tokens in src/index.css @theme",
+  "fonts": {
+    "display": "Anton",
+    "body": "Inter",
+    "mono": "JetBrains Mono",
+    "source": "src/index.css L24-26"
+  },
+  "palette": {
+    "format": "hex",
+    "source": "src/index.css @theme + :root / .dark remap",
+    "note": "Class-based dark mode remaps the neutral scale, so bg-white / text-gray-500 flip without markup changes. Accent shifts red -> flame on dark."
+  },
+  "motion": "none installed - CSS keyframes only (fadeUp). Motion-cut project.",
+  "spacing": "Tailwind v4 default 4pt scale",
+  "pwa": "vite-plugin-pwa, generateSW",
+  "preserved": ["fonts", "palette", "spacing", "hard-shadow component voice", "tab IA"],
+  "dead_assets": [
+    "src/assets/hero.png - unused purple isometric slab from a template. Not used by Hallmark (purple-gradient tell). Left in place; deletion needs user approval."
+  ]
+}
