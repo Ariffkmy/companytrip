@@ -7,8 +7,11 @@
    the committee loads them before most members have accepted their
    invite — so a policy is already waiting the first time someone signs
    in, with nothing to backfill. The certificate PDF sits in the private
-   `insurance` bucket, so it is fetched through a signed URL minted at
-   the moment someone taps download.
+   `insurance` bucket, so it is opened through a signed URL minted at
+   the moment someone asks for it.
+
+   The policy fields are read off the certificate as it is uploaded, so
+   the committee never types them in twice — see ./policyPdf.
 
    The policy numbers are what you read out to an insurer's hotline
    after an accident, which is exactly when there is no signal — so the
@@ -16,6 +19,7 @@
 */
 
 import { supabase } from './supabase';
+import { readPolicyPdf } from './policyPdf';
 
 const BUCKET = 'insurance';
 const URL_TTL = 60; // seconds — the link is used immediately or not at all
@@ -103,6 +107,12 @@ export async function uploadCertificate(userEmail, file) {
   const { data: previous } = await supabase
     .from('insurance_policies').select('pdf_path').eq('email', email).maybeSingle();
 
+  /* Read the certificate before storing it: the same eight fields
+     typed back in by hand are eight chances to get them wrong. A PDF
+     that will not parse still uploads — it is the record, and the
+     fields are a convenience on top of it. */
+  const { insured_name: insuredName, ...columns } = await readPolicyPdf(file);
+
   const store = supabase.storage.from(BUCKET);
   const up = await store.upload(path, file, { contentType: 'application/pdf' });
   if (up.error) throw up.error;
@@ -112,7 +122,7 @@ export async function uploadCertificate(userEmail, file) {
      at it would be unreachable — nobody could ever read it. */
   const { data, error } = await supabase
     .from('insurance_policies')
-    .upsert({ email, pdf_path: path }, { onConflict: 'email' })
+    .upsert({ ...columns, email, pdf_path: path }, { onConflict: 'email' })
     .select(ADMIN_COLUMNS)
     .single();
   if (error) {
@@ -127,7 +137,9 @@ export async function uploadCertificate(userEmail, file) {
   if (previous?.pdf_path && previous.pdf_path !== path) {
     await store.remove([previous.pdf_path]);
   }
-  return data;
+  /* insured_name is not a column — it is only for checking the right
+     person's certificate went to the right member. */
+  return { ...data, insured_name: insuredName ?? null };
 }
 
 /** Drop a member's certificate, keeping their policy details. */

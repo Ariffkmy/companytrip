@@ -4,6 +4,7 @@ import groupRoster from '../data/groupRoster';
 import HuntEditor from './HuntEditor';
 import { sendInvites, inviteProblem } from '../lib/invites';
 import { listPolicies, removeCertificate, uploadCertificate } from '../lib/insurance';
+import { nameLooksWrong } from '../lib/policyPdf';
 
 const ROLES = ['Member', 'Team Lead', 'JP Speaker'];
 
@@ -376,7 +377,7 @@ function TripList({ currentEmail, onSelfChanged }) {
    One row per person on the trip list, whether or not they have joined
    yet: policies are keyed by email, so a certificate can be uploaded
    for someone who has not accepted their invite. */
-function InsuranceRow({ person, policy, busy, note, onUpload, onRemove }) {
+function InsuranceRow({ person, policy, busy, note, mismatch, onUpload, onRemove }) {
   const who = person.full_name || person.email;
   const id = `ins-${person.email.replace(/[^a-z0-9]/gi, '-')}`;
   const hasFile = !!policy?.pdf_path;
@@ -392,10 +393,13 @@ function InsuranceRow({ person, policy, busy, note, onUpload, onRemove }) {
         {details ? (
           <>
             <span className="block text-sm truncate">{policy.product || 'Policy loaded'}</span>
-            <span className="block note truncate">{details}</span>
+            <span className="block note truncate">
+              {details}
+              {policy.effective_date && ` · ${policy.effective_date} to ${policy.expiry_date ?? '?'}`}
+            </span>
           </>
         ) : (
-          <span className="text-sm text-gray-400">Details not loaded</span>
+          <span className="text-sm text-gray-400">Read from the PDF when you upload it</span>
         )}
       </td>
       <td className="px-2 py-2.5">
@@ -404,6 +408,13 @@ function InsuranceRow({ person, policy, busy, note, onUpload, onRemove }) {
         </span>
         {note && (
           <span className={`block text-xs ${note.ok ? 'text-gray-600' : 'text-red'}`}>{note.text}</span>
+        )}
+        {/* Uploading one person's certificate against another is a
+            privacy problem, not a typo, so it gets said plainly. */}
+        {mismatch && (
+          <span role="alert" className="block text-xs text-red leading-snug">
+            Certificate names {mismatch} — check this is the right person’s PDF.
+          </span>
         )}
       </td>
       <td className="pl-2 pr-3 py-2.5 text-right whitespace-nowrap">
@@ -439,6 +450,10 @@ function InsuranceAdmin() {
   const [policies, setPolicies] = useState({});
   const [busy, setBusy] = useState(new Set());
   const [notes, setNotes] = useState({});
+  /* The name printed on each certificate, as read from the PDF. Not a
+     column — it exists only to catch the wrong file going to the wrong
+     member, so it lives for as long as the page is open. */
+  const [insured, setInsured] = useState({});
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
@@ -467,6 +482,7 @@ function InsuranceAdmin() {
     try {
       const row = await work();
       setPolicies((prev) => ({ ...prev, [email]: row }));
+      if ('insured_name' in row) setInsured((prev) => ({ ...prev, [email]: row.insured_name }));
       setNotes((prev) => ({ ...prev, [email]: { ok: true, text: okText } }));
     } catch (e) {
       const msg = e?.message ?? '';
@@ -513,6 +529,7 @@ function InsuranceAdmin() {
                     policy={policies[p.email]}
                     busy={busy.has(p.email)}
                     note={notes[p.email]}
+                    mismatch={nameLooksWrong(insured[p.email], p.full_name) ? insured[p.email] : null}
                     onUpload={(file) => run(p.email, () => uploadCertificate(p.email, file), 'Uploaded')}
                     onRemove={() => run(p.email, () => removeCertificate(policies[p.email]), 'Removed')}
                   />
@@ -521,8 +538,8 @@ function InsuranceAdmin() {
             </table>
           </div>
           <p className="note mt-6 leading-relaxed">
-            Policy numbers and dates are loaded straight into public.insurance_policies; this page only handles the
-            PDFs. Replacing a certificate deletes the old file once the new one is safely in place.
+            Policy numbers, plan and cover dates are read off the certificate as it uploads — there is nothing to type
+            in. Replacing a certificate deletes the old file once the new one is safely in place.
           </p>
         </>
       )}
