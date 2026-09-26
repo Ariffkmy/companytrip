@@ -107,6 +107,9 @@ function Insurance({ userEmail }) {
   const [policy, setPolicy] = useState(() => cachedPolicy(userEmail));
   const [state, setState] = useState('loading'); // loading · ready · offline
   const [opening, setOpening] = useState(false);
+  /* Only set when the browser refused the new tab: a real link the
+     reader can tap, since their own tap is never blocked. */
+  const [link, setLink] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -122,13 +125,23 @@ function Insurance({ userEmail }) {
   const view = async () => {
     setOpening(true);
     setError('');
-    /* Opened before the await, because a tab opened after one is a
-       popup as far as the browser is concerned and gets blocked. */
-    const tab = window.open('', '_blank', 'noopener');
+    setLink(null);
+    /* Opened before the await: a tab opened after one has lost the
+       click that justified it, and the browser blocks it as a popup.
+       Deliberately no 'noopener' feature — with it window.open returns
+       null and there is nothing left to point at the PDF. The opener is
+       severed by hand instead, while the tab is still blank and
+       same-origin. */
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
     try {
       const url = await certificateUrl(policy);
-      if (tab) tab.location = url;
-      else window.location.assign(url); // popups blocked: go in place
+      /* replace(), so Back from the PDF returns to the app rather than
+         to the blank page the tab started as. */
+      if (tab) tab.location.replace(url);
+      /* Never navigate this tab: on an installed app that closes the
+         app to show a PDF. Offer something to tap instead. */
+      else setLink(url);
     } catch (e) {
       tab?.close();
       setError('Couldn’t open the certificate. Try again with signal.');
@@ -188,6 +201,17 @@ function Insurance({ userEmail }) {
         >
           {opening ? 'Opening…' : policy.pdf_path ? 'View certificate (PDF)' : 'Certificate not uploaded yet'}
         </button>
+
+        {link && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-2 text-sm font-medium text-ink underline underline-offset-2 decoration-red"
+          >
+            Your browser blocked the new tab — tap here to open it ↗
+          </a>
+        )}
 
         {error && <p className="text-xs text-red mt-2">{error}</p>}
         <p className="note mt-2 leading-relaxed">
