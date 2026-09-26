@@ -42,7 +42,7 @@ function Greeting({ userName, userEmail }) {
 
 /* ── Groups ───────────────────────────────────────── */
 function Groups() {
-  const [openGroups, setOpenGroups] = useState([0]);
+  const [openGroups, setOpenGroups] = useState([]);
 
   const toggleGroup = (idx) => {
     setOpenGroups((prev) => prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]);

@@ -137,9 +137,11 @@ function StringList({ label, items, onChange, addLabel, fixedLength }) {
   );
 }
 
-function Section({ title, sub, children, defaultOpen = false }) {
+/* Every section starts shut, like every other accordion in the app —
+   the editor is a long page and an open section hides the rest of it. */
+function Section({ title, sub, children }) {
   return (
-    <details open={defaultOpen} className="group bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <details className="group bg-white border border-gray-200 rounded-lg overflow-hidden">
       <summary className="flex items-center gap-3 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
           <span className="block font-display text-base tracking-wide truncate">{title}</span>
@@ -318,7 +320,7 @@ export default function HuntEditor() {
 
       {loadError && <p role="alert" className="text-sm text-red">{loadError}</p>}
 
-      <Section title="General" sub="Clock, points, finish" defaultOpen>
+      <Section title="General" sub="Clock, points, finish">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Num label="Race length (min)" value={val(['raceMinutes'])} onChange={set(['raceMinutes'])} min={1} />
           <Num label="Points per stamp" value={val(['points', 'checkpoint'])} onChange={set(['points', 'checkpoint'])} />

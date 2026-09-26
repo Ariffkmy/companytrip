@@ -93,8 +93,8 @@ function PageHead({ kicker, title, accent, lede }) {
 }
 
 /* ── ActivityCard ──────────────────────────────────── */
-function ActivityCard({ act, i }) {
-  const [open, setOpen] = useState(i === 0);
+function ActivityCard({ act }) {
+  const [open, setOpen] = useState(false);
   const isSpecial = act.time === '🎯';
 
   return (
@@ -246,7 +246,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
         {day.activities.map((act, i) => (
           <div key={i} className="relative">
             <div className="absolute left-[-18px] top-[18px] w-2.5 h-2.5 rounded-full bg-red border-2 border-white shadow-sm" />
-            <ActivityCard act={act} i={i} />
+            <ActivityCard act={act} />
           </div>
         ))}
       </div>
