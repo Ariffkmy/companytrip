@@ -2,22 +2,33 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PAGE_SIZE, deletePhoto, formatUploaded, listPhotos, uploadPhoto } from '../lib/album';
 import schedule from '../data/schedule';
 
-/* D0–D5 only: the days people are actually out taking photos. */
-const DAY_TABS = [
-  { id: 'all', label: 'All' },
-  ...schedule.slice(0, 6).map((d) => ({ id: d.day, label: d.day, date: d.date })),
-];
-
 function dateKey(iso) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/* Defaults to today's leg of the trip, so whoever opens the album on
-   Day 3 lands straight on Day 3's photos instead of "All". */
-function todaysTab() {
-  const today = dateKey(new Date());
-  return DAY_TABS.find((t) => t.date === today)?.id ?? 'all';
+/* Trip day (D0, D1, …) for a date that falls inside the schedule;
+   any other date — before D0 or after the trip — just gets its own
+   plain-language date. */
+const DAY_BY_DATE = Object.fromEntries(schedule.map((d) => [d.date, `${d.day} · ${d.label}`]));
+
+function dayHeading(key) {
+  if (DAY_BY_DATE[key]) return DAY_BY_DATE[key];
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/* Newest-first photos, already grouped by day when they load — so
+   consecutive same-day photos just extend the current group. */
+function groupByDay(photos) {
+  const groups = [];
+  for (const p of photos) {
+    const key = dateKey(p.created_at);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.photos.push(p);
+    else groups.push({ key, photos: [p] });
+  }
+  return groups;
 }
 
 function friendly(err) {
@@ -101,7 +112,6 @@ export default function Album({ userId, isAdmin }) {
   const [upload, setUpload] = useState(null); // { done, total, failed }
   const [open, setOpen] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [dayFilter, setDayFilter] = useState(todaysTab);
 
   const load = useCallback(async () => {
     try {
@@ -170,10 +180,7 @@ export default function Album({ userId, isAdmin }) {
   }
 
   const uploading = Boolean(upload);
-  const activeTab = DAY_TABS.find((t) => t.id === dayFilter);
-  const filteredPhotos = !photos ? photos
-    : dayFilter === 'all' ? photos
-    : photos.filter((p) => dateKey(p.created_at) === activeTab.date);
+  const groups = photos ? groupByDay(photos) : [];
 
   return (
     <section className="pt-9">
@@ -193,40 +200,25 @@ export default function Album({ userId, isAdmin }) {
         </div>
       ) : (
         <>
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-4 px-4 mt-7">
-            {DAY_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setDayFilter(t.id)}
-                className={`flex-none px-3.5 py-2 rounded-lg font-display text-sm tracking-wide transition-colors ${
-                  t.id === dayFilter
-                    ? 'bg-ink dark:bg-flame text-white'
-                    : 'bg-white text-gray-500 border border-gray-200 active:border-gray-300'
-                }`}
-              >
-                {t.label}
-              </button>
+          <div className="mt-7 space-y-6">
+            {groups.map((g) => (
+              <div key={g.key}>
+                <p className="text-center font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+                  {dayHeading(g.key)}
+                </p>
+                <ul className="grid grid-cols-3 gap-0.5">
+                  {g.photos.map((p) => (
+                    <li key={p.id} className="aspect-square min-w-0">
+                      <button type="button" onClick={() => setOpen(photos.indexOf(p))}
+                        className="block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
+                        {p.thumb && <img src={p.thumb} alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
           </div>
-
-          {filteredPhotos.length === 0 ? (
-            <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-10 text-center">
-              <p className="font-display text-lg tracking-wide">No photos for {activeTab.label} yet</p>
-              <p className="text-sm text-gray-500 mt-1">They’ll show up here once someone adds one.</p>
-            </div>
-          ) : (
-            <ul className="grid grid-cols-3 gap-0.5 mt-4">
-              {filteredPhotos.map((p) => (
-                <li key={p.id} className="aspect-square min-w-0">
-                  <button type="button" onClick={() => setOpen(photos.indexOf(p))}
-                    className="block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
-                    {p.thumb && <img src={p.thumb} alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
           {hasMore && (
             <button type="button" onClick={loadMore} disabled={loadingMore}
               className="mt-5 w-full h-11 rounded-lg border border-gray-200 bg-white text-sm font-medium cursor-pointer disabled:cursor-wait">

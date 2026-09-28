@@ -60,7 +60,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
     return (
       <section className="mt-9" aria-labelledby="photos-h">
         {heading}
-        <div className="aspect-[4/3] rounded-lg bg-gray-100 border border-gray-200" />
+        <div className="aspect-[2/1] rounded-3xl bg-gray-100 border border-gray-200" />
       </section>
     );
   }
@@ -70,7 +70,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
       <section className="mt-9" aria-labelledby="photos-h">
         {heading}
         <button type="button" onClick={onOpenAlbum}
-          className="w-full rounded-lg border border-dashed border-gray-300 bg-white px-4 py-8 text-center cursor-pointer hover:border-gray-400">
+          className="w-full aspect-[2/1] rounded-3xl border border-dashed border-gray-300 bg-white px-4 text-center cursor-pointer hover:border-gray-400 flex flex-col items-center justify-center">
           <span className="block font-display text-lg tracking-wide">
             {!failed ? 'No photos yet' : navigator.onLine === false ? 'Photos need a connection' : 'Photos didn’t load'}
           </span>
@@ -85,7 +85,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
   return (
     <section className="mt-9" aria-labelledby="photos-h" aria-roledescription="carousel">
       {heading}
-      <div className="relative rounded-lg overflow-hidden border border-gray-200 bg-black">
+      <div className="relative rounded-3xl overflow-hidden bg-black">
         <ul
           ref={track}
           onScroll={onScroll}
@@ -93,7 +93,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
           className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
         >
           {photos.map((p, i) => (
-            <li key={p.id} className="relative w-full shrink-0 snap-center aspect-[4/3]"
+            <li key={p.id} className="relative w-full shrink-0 snap-center aspect-[2/1]"
               aria-roledescription="slide" aria-label={`${i + 1} of ${photos.length}`}>
               <button type="button" onClick={onOpenAlbum} className="block w-full h-full cursor-pointer">
                 <img src={p.src} alt={`Photo by ${p.uploader_name}`} loading={i < 2 ? 'eager' : 'lazy'}

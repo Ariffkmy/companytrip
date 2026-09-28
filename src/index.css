@@ -148,28 +148,6 @@
     -webkit-font-smoothing: antialiased;
   }
   .dark body { color-scheme: dark; }
-
-  /* Background illustration. A fixed pseudo-element rather than
-     `background-attachment: fixed`, which iOS Safari ignores (it
-     scrolls the image and rescales it on every repaint).
-     The art is portrait (941×1672), so it stays a centred phone-shaped
-     column at full viewport height: on desktop the sides are plain
-     paper; on a phone the column is the full width and crops a sliver
-     off the sides rather than letterboxing top and bottom. */
-  body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: min(100vw, calc(100dvh * 941 / 1672));
-    transform: translateX(-50%);
-    z-index: -1;
-    pointer-events: none;
-    background:
-      linear-gradient(var(--bg-scrim), var(--bg-scrim)),
-      url("/bg-japan.webp") center / cover no-repeat;
-  }
 }
 
 @layer utilities {
@@ -189,6 +167,29 @@
   /* Header is 52px; the nav sticks directly beneath it. */
   .h-13 { height: 52px; }
   .top-13 { top: 52px; }
+
+  /* Background illustration, scoped to the sign-in/sign-up screen only
+     (see Login.jsx) rather than every page. A fixed pseudo-element
+     rather than `background-attachment: fixed`, which iOS Safari
+     ignores (it scrolls the image and rescales it on every repaint).
+     The art is portrait (941×1672), so it stays a centred phone-shaped
+     column at full viewport height: on desktop the sides are plain
+     paper; on a phone the column is the full width and crops a sliver
+     off the sides rather than letterboxing top and bottom. */
+  .auth-bg::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: min(100vw, calc(100dvh * 941 / 1672));
+    transform: translateX(-50%);
+    z-index: -1;
+    pointer-events: none;
+    background:
+      linear-gradient(var(--bg-scrim), var(--bg-scrim)),
+      url("/bg-japan.webp") center / cover no-repeat;
+  }
   .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-ink-soft); }
   .note { font-family: var(--font-mono); font-size: 11px; color: var(--color-ink-soft); }
 

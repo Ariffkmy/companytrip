@@ -477,7 +477,6 @@ export default function App() {
         {tab === 'home' && (
           <Home
             onGo={go}
-            onOpenTreasureHunt={openTreasureHunt}
             userEmail={auth.user?.email}
             isAdmin={auth.isAdmin}
             onSignOut={auth.signOut}
