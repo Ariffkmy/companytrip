@@ -34,7 +34,7 @@ function Greeting({ userName, userEmail }) {
   return (
     <section className="pt-7 pb-1">
       <h1 className="display text-3xl sm:text-4xl leading-[1.05]">
-        Hi {firstName(userName, userEmail)}<span className="text-red">!</span>
+        Hi {firstName(userName, userEmail)}{' '}<span className="text-red">!</span>
       </h1>
     </section>
   );
@@ -176,14 +176,7 @@ function Insurance({ userEmail }) {
         Travel insurance
       </h2>
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <p className="font-display text-base tracking-wide leading-snug">{policy.product || 'Travel cover'}</p>
-          {policy.destination && (
-            <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-sea">
-              {policy.destination}
-            </span>
-          )}
-        </div>
+        <p className="font-display text-base tracking-wide leading-snug">{policy.product || 'Travel cover'}</p>
 
         <dl className="grid grid-cols-2 gap-x-3 gap-y-3 mt-3.5">
           <Field label="Master policy no." value={policy.master_policy_no} />
@@ -214,9 +207,6 @@ function Insurance({ userEmail }) {
         )}
 
         {error && <p className="text-xs text-red mt-2">{error}</p>}
-        <p className="note mt-2 leading-relaxed">
-          Saved on this phone so the numbers are readable offline. Opening the PDF needs signal — save it from there if you want it with you.
-        </p>
       </div>
     </section>
   );

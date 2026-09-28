@@ -301,8 +301,8 @@ function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay, huntMap }) {
     <section>
       <PageHead
         kicker="22 – 27 Oct 2026"
-        title="The"
-        accent="Plan"
+        title=""
+        accent={schedule[activeDay]?.day === 'D0' ? 'Checklist' : 'Itinerary'}
       />
 
       {/* Day tabs */}
@@ -382,7 +382,6 @@ export default function App() {
           aria-label="Go to home"
           className="flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer"
         >
-          <span className="block font-display text-sm tracking-wide text-ink">Orangeleaf · Japan 2026</span>
         </button>
 
         {/* Pinned, not a tab: the one screen you must never have to hunt for. */}
