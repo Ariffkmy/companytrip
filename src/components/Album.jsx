@@ -247,18 +247,12 @@ export default function Album({ userId, isAdmin }) {
               <p className="text-sm text-gray-500 mt-1">They’ll show up here once someone adds one.</p>
             </div>
           ) : (
-            <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-4">
+            <ul className="grid grid-cols-3 gap-0.5 mt-4">
               {filteredPhotos.map((p) => (
-                <li key={p.id} className="min-w-0">
+                <li key={p.id} className="aspect-square min-w-0">
                   <button type="button" onClick={() => setOpen(photos.indexOf(p))}
-                    className="block w-full text-left cursor-pointer rounded-lg overflow-hidden bg-white border border-gray-200 focus-visible:outline-2 focus-visible:outline-red">
-                    <span className="block aspect-square bg-gray-100">
-                      {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
-                    </span>
-                    <span className="block px-2.5 py-2">
-                      <span className="block text-[13px] font-medium leading-snug truncate">{p.uploader_name}</span>
-                      <span className="block font-mono text-[10px] text-gray-400 truncate">{formatUploaded(p.created_at)}</span>
-                    </span>
+                    className="block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
+                    {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
                   </button>
                 </li>
               ))}
