@@ -107,7 +107,7 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
   }
 
   return (
-    <main className="min-h-dvh flex flex-col max-w-[440px] mx-auto px-4">
+    <main className="auth-bg min-h-dvh flex flex-col max-w-[440px] mx-auto px-4">
       <div className="h-13 flex items-center justify-between gap-3">
         <span className="font-display text-sm tracking-wide text-ink">Orangeleaf · Japan 2026</span>
         {themeToggle}

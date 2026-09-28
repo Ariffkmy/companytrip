@@ -368,12 +368,6 @@ export default function App() {
      Phones and every other tab keep the 640px column. */
   const wide = tab === 'admin' && !treasureOpen ? 'lg:max-w-[1280px] lg:px-8' : '';
 
-  const onAdmin = tab === 'admin' && !treasureOpen;
-  useEffect(() => {
-    document.body.classList.toggle('no-bg-art', onAdmin);
-    return () => document.body.classList.remove('no-bg-art');
-  }, [onAdmin]);
-
   const go = useCallback((id) => {
     setTab(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -518,7 +512,6 @@ export default function App() {
         {tab === 'home' && (
           <Home
             onGo={go}
-            onOpenTreasureHunt={openTreasureHunt}
             userName={auth.member.fullName}
             userEmail={auth.user?.email}
             isAdmin={auth.isAdmin}

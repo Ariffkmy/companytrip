@@ -222,42 +222,7 @@ function Insurance({ userEmail }) {
   );
 }
 
-/* ── Jump ───────────────────────────────────────────
-   Two-up, deliberately uneven in weight: Safety is the one you
-   need under pressure, so it reads loudest. */
-function Jump({ onGo, onOpenTreasureHunt }) {
-  const items = [
-    { label: 'Emergency', sub: 'Hospitals · 119 · phrases', go: () => onGo('safety'), urgent: true, wide: true },
-    { label: 'Treasure Hunt', sub: 'Atami · Day 4', go: onOpenTreasureHunt },
-  ];
-
-  return (
-    <section className="mt-9">
-      <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
-        Jump to
-      </h2>
-      <div className="grid grid-cols-2 gap-2">
-        {items.map((it) => (
-          <button
-            key={it.label}
-            type="button"
-            onClick={it.go}
-            className={`px-3.5 py-3 rounded-lg border text-left cursor-pointer transition-colors bg-white ${
-              it.urgent ? 'border-red' : 'border-gray-200 hover:border-gray-300'
-            } ${it.wide ? 'col-span-2' : ''}`}
-          >
-            <span className={`block text-sm font-medium leading-snug ${it.urgent ? 'text-red' : ''}`}>
-              {it.label}
-            </span>
-            <span className="block text-xs text-gray-500 leading-snug mt-0.5">{it.sub}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export default function Home({ onGo, onOpenTreasureHunt, userName, userEmail, isAdmin, onSignOut }) {
+export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut }) {
   return (
     <section>
       <Greeting userName={userName} userEmail={userEmail} />
@@ -265,7 +230,6 @@ export default function Home({ onGo, onOpenTreasureHunt, userName, userEmail, is
       <WeatherWidget />
       <ForexWidget />
       <Insurance userEmail={userEmail} />
-      <Jump onGo={onGo} onOpenTreasureHunt={onOpenTreasureHunt} />
       {/* Last: who is on which team is looked up once or twice a trip,
           while the weather, the rate and your policy are daily reads. */}
       <Groups />
