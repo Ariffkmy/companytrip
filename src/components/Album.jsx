@@ -181,34 +181,8 @@ export default function Album({ userId, isAdmin }) {
     : photos.filter((p) => dateKey(p.created_at) === activeTab.date);
 
   return (
-    <section>
-      <div className="pt-9 pb-6">
-        <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Shared by everyone</p>
-        <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Digital <span className="text-red">album</span>
-        </h1>
-        <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">
-          Every photo shows who added it and when. Only trip members can see them.
-        </p>
-      </div>
-
-      <label className={`flex items-center justify-center gap-2 w-full h-13 rounded-lg font-display text-lg tracking-wide transition-transform duration-100 ${
-        uploading ? 'bg-gray-200 text-gray-600 cursor-wait' : 'bg-red text-paper cursor-pointer active:translate-y-px'
-      } focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink`}>
-        {uploading
-          ? `Uploading ${Math.min(upload.done + 1, upload.total)} of ${upload.total}…`
-          : '+ Add photos'}
-        <input type="file" accept="image/*" multiple className="sr-only" disabled={uploading}
-          onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
-      </label>
-      {uploading && (
-        <div className="h-1 mt-2 rounded-full bg-gray-200 overflow-hidden" aria-hidden="true">
-          <div className="h-full bg-red transition-[width] duration-300" style={{ width: `${(upload.done / upload.total) * 100}%` }} />
-        </div>
-      )}
-      <p className="note mt-2">Photos are resized before upload to save data. Keep the app open until it finishes.</p>
-
-      {error && <p role="alert" className="text-sm text-red mt-4">{error}</p>}
+    <section className="pt-9">
+      {error && <p role="alert" className="text-sm text-red">{error}</p>}
 
       {photos === null ? (
         <p className="note mt-8">Loading photos…</p>
@@ -277,6 +251,21 @@ export default function Album({ userId, isAdmin }) {
           onDelete={onDelete}
         />
       )}
+
+      <div className="fixed inset-x-0 z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 pointer-events-none">
+        <div className="max-w-[640px] mx-auto px-4 relative">
+          <label
+            aria-label={uploading ? `Uploading ${Math.min(upload.done + 1, upload.total)} of ${upload.total}` : 'Add photos'}
+            className={`absolute right-4 bottom-0 pointer-events-auto w-14 h-14 rounded-full shadow-lg grid place-items-center text-2xl leading-none transition-transform active:scale-95 ${
+              uploading ? 'bg-gray-300 text-gray-600 cursor-wait' : 'bg-red text-paper cursor-pointer'
+            } focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink`}
+          >
+            {uploading ? '…' : '+'}
+            <input type="file" accept="image/*" multiple className="sr-only" disabled={uploading}
+              onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+          </label>
+        </div>
+      </div>
     </section>
   );
 }
