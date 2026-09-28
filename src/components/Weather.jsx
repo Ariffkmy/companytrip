@@ -131,7 +131,7 @@ export default function WeatherWidget() {
 
   return (
     <section className="pt-9" aria-labelledby="wx-h">
-      <h2 id="wx-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+      <h2 id="wx-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
         Weather · next {dates.length || 5} days
       </h2>
 

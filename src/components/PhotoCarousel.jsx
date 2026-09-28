@@ -56,7 +56,7 @@ export default function PhotoCarousel({ onOpenAlbum }) {
 
   const heading = (
     <div className="flex items-baseline justify-between mb-2.5">
-      <h2 id="photos-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400">Latest photos</h2>
+      <h2 id="photos-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700">Latest photos</h2>
       <button type="button" onClick={onOpenAlbum}
         className="text-xs font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">Open album</button>
     </div>

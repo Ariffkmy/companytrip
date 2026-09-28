@@ -57,7 +57,7 @@ export default function ForexWidget() {
 
   return (
     <section className="mt-9" aria-labelledby="fx-h">
-      <h2 id="fx-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+      <h2 id="fx-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
         Exchange rate
       </h2>
       <div className="bg-white border border-gray-200 rounded-lg p-4">

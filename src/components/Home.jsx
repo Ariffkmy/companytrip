@@ -50,7 +50,7 @@ function Groups() {
 
   return (
     <section className="mt-9">
-      <h2 className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+      <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
         Teams
       </h2>
       <div className="space-y-2.5">
@@ -156,7 +156,7 @@ function Insurance({ userEmail }) {
     if (state === 'loading') return null;
     return (
       <section className="mt-9" aria-labelledby="ins-h">
-        <h2 id="ins-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+        <h2 id="ins-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
           Travel insurance
         </h2>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -172,7 +172,7 @@ function Insurance({ userEmail }) {
 
   return (
     <section className="mt-9" aria-labelledby="ins-h">
-      <h2 id="ins-h" className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+      <h2 id="ins-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
         Travel insurance
       </h2>
       <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -233,7 +233,7 @@ function Jump({ onGo, onOpenTreasureHunt }) {
 
   return (
     <section className="mt-9">
-      <h2 className="font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
+      <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
         Jump to
       </h2>
       <div className="grid grid-cols-2 gap-2">
