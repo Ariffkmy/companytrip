@@ -291,6 +291,208 @@ function scoreOf(run, CONFIG) {
 }
 
 /* ════════════════════════════════════════════════════════════
+   Organiser view — lives on the Admin page, not in the game.
+   Team runs are read from this device's storage, the same place the
+   game writes them, so it shows the teams that played on this phone.
+   ════════════════════════════════════════════════════════════ */
+export function HuntOrganiser({ config }) {
+  const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
+  const store = useMemo(() => makeStore(false), []);
+  const [, setTick] = useState(0);
+  const [allShots, setAllShots] = useState([]);
+
+  useEffect(() => {
+    listShots().then(setAllShots).catch(() => {});
+  }, []);
+
+  const allRuns = CONFIG.teams
+    .map((t) => store.load(t.id))
+    .filter(Boolean)
+    .sort((a, b) => scoreOf(b, CONFIG) - scoreOf(a, CONFIG));
+
+  const bonuses = [
+    ['photo', 'Best pose photo', 5],
+    ['item', 'Most interesting buy', 5],
+    ['first', 'First to finish', 5],
+  ];
+
+  const handleBonus = (teamId, key, val) => {
+    const run = store.load(teamId);
+    if (!run) return;
+    run.bonus = run.bonus || {};
+    if (run.bonus[key]) delete run.bonus[key];
+    else run.bonus[key] = val;
+    store.save(teamId, run);
+    // force re-render
+    setTick((n) => n + 1);
+  };
+
+  const handleReset = (teamId) => {
+    store.remove(teamId);
+    setTick((n) => n + 1);
+  };
+
+  return (
+    <div>
+      <div className="hero" style={{ padding: '10px 0' }}>
+        <div className="big" style={{ fontSize: 'clamp(36px, 12vw, 54px)' }}>Organiser</div>
+        <div className="rule" />
+      </div>
+      {allRuns.length === 0 ? (
+        <div className="card">
+          <p style={{ margin: 0 }}>No teams have started yet. Once a team taps <b>Start the hunt</b>, they show up here.</p>
+        </div>
+      ) : (
+        <div>
+          {/* Leaderboard */}
+          <div className="card flag">
+            <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Live board</div>
+            <table style={{
+              width: '100%', borderCollapse: 'collapse', fontSize: 13,
+            }}>
+              <thead>
+                <tr>
+                  <th style={{
+                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
+                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
+                    borderBottom: 'var(--line)',
+                  }}>Team</th>
+                  <th style={{
+                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
+                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
+                    borderBottom: 'var(--line)',
+                  }}>Stamps</th>
+                  <th style={{
+                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
+                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
+                    borderBottom: 'var(--line)',
+                  }}>Time</th>
+                  <th style={{
+                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
+                    textTransform: 'uppercase', textAlign: 'right', padding: '6px 4px',
+                    borderBottom: 'var(--line)',
+                  }}>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allRuns.map((run, i) => {
+                  const done = new Set(
+                    Object.keys(run.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null)
+                  );
+                  const left = run.startedAt
+                    ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
+                    : 0;
+                  return (
+                    <tr key={i}>
+                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
+                        <b style={{ fontFamily: 'var(--body)', fontSize: 13 }}>{run.teamName}</b>
+                        <br /><span className="note">{run.members || '—'}</span>
+                      </td>
+                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
+                        {SLOTS.map((si) => (
+                          <span key={si} style={{
+                            display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
+                            border: '2px solid var(--ink)', marginRight: 3,
+                            background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
+                          }} />
+                        ))}
+                      </td>
+                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
+                        {run.finishedAt ? 'DONE' : mmss(left)}
+                      </td>
+                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', textAlign: 'right' }}>
+                        <b className="display" style={{ fontSize: 20 }}>{scoreOf(run, CONFIG)}</b>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Team panels */}
+          {allRuns.map((run, i) => {
+            const s = run.subs || {};
+            const imgs = [s.cp1?.photo, s.cp2a?.photo, s.cp3?.photo, s.cp4?.photo, s.ask?.photo].filter(Boolean);
+            const bingoShots = allShots.filter((b) => b.team === run.teamId && b.src).sort((a, b) => a.tile - b.tile);
+            return (
+              <div key={i} className="card">
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <b className="display" style={{ fontSize: 20 }}>{esc(run.teamName)}</b>
+                  <span className="note" style={{ marginLeft: 'auto' }}>{Object.keys(s).filter((k) => k !== 'cp2a').length}/{CONFIG.stamps}</span>
+                </div>
+                {imgs.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 10 }}>
+                    {imgs.map((img, ii) => <img key={ii} src={img} alt="" style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 6 }} />)}
+                  </div>
+                )}
+                {s.cp2b && (s.cp2b.answers ?? [s.cp2b.answer]).map((a, ai, all) => (
+                  <p key={ai} className="note" style={{ marginTop: ai ? 4 : 12 }}>
+                    RIDDLE{all.length > 1 ? ` ${ai + 1}` : ''} — {esc(a).slice(0, 220)}
+                  </p>
+                ))}
+                {s.cp3 && <p className="note">BOUGHT — {esc(s.cp3.item)} · ¥{esc(s.cp3.price || '?')}</p>}
+                {s.cp4 && <p className="note">QUIZ — {s.cp4.answers.map((a, ai) => `${ai + 1}. ${esc(a)}`).join(' · ')} <span className="tag" style={{
+                  background: s.cp4.correct ? 'rgba(143,190,126,.3)' : 'var(--th-slot)',
+                  color: s.cp4.correct ? '#2f6b1f' : 'var(--ink-soft)',
+                }}>{s.cp4.correct} auto-marked</span></p>}
+                {s.ask && (
+                  <p className="note">
+                    STRANGER — word: {esc(s.ask.word || '—')} · rec: {esc(s.ask.rec || '—')} · photo: {s.ask.photo ? 'yes' : 'no'}
+                    <span className="tag">+{askPoints(s.ask, CONFIG)}</span>
+                  </p>
+                )}
+                {s.bingo && (
+                  <div>
+                    <p className="note">BINGO — {s.bingo.tiles}/9 <span className="tag">+{s.bingo.points}</span></p>
+                    {bingoShots.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 5 }}>
+                        {bingoShots.map((b) => (
+                          <img key={b.tile} src={b.src} alt="" title={`Tile ${b.tile + 1} · ${b.uploader_name}${b.on_behalf ? ' (on behalf)' : ''}`}
+                            style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {s.guess && (
+                  <p className="note">
+                    {s.guess.streak
+                      ? `GENERAL KNOWLEDGE — ${s.guess.streak} in a row after ${s.guess.answered} questions`
+                      : 'GENERAL KNOWLEDGE — done (old closest-guess answers)'}
+                  </p>
+                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
+                  {bonuses.map((b) => (
+                    <button
+                      key={b[0]}
+                      className="mini"
+                      style={run.bonus?.[b[0]] ? { background: 'var(--gold)' } : {}}
+                      onClick={() => handleBonus(run.teamId, b[0], b[2])}
+                      type="button"
+                    >
+                      {b[1]} +{b[2]}
+                    </button>
+                  ))}
+                  <button
+                    className="mini"
+                    style={{ marginLeft: 'auto', color: 'var(--red)' }}
+                    onClick={() => handleReset(run.teamId)}
+                    type="button"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
    Main Game Component
    ════════════════════════════════════════════════════════════ */
 
@@ -306,17 +508,15 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
   /* Preview only: which team the admin is playing as. */
   const [previewTeam, setPreviewTeam] = useState(teamId ?? 'team-ruby');
   const activeTeamId = preview ? previewTeam : teamId;
-  const [view, setView] = useState('start'); // start | race | done | organizer
+  const [view, setView] = useState('start'); // start | race | done
   const [S, setS] = useState(null);
   const [draft, setDraft] = useState({});
   const [tick, setTick] = useState(null);
   const [toast, setToast] = useState(null);
-  const [, setOrgS] = useState(null); // for organizer bonus toggle
   /* Shared bingo card for the active team: { [tile]: shot }. Preview keeps
      its shots in memory and plays as the team's lead. */
   const [shots, setShots] = useState({});
   const [assignees, setAssignees] = useState({});
-  const [allShots, setAllShots] = useState([]);
   const [busyTile, setBusyTile] = useState(null);
   const [coverTile, setCoverTile] = useState(null);
   const [bingoMissing, setBingoMissing] = useState(null);
@@ -338,7 +538,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     };
   }, [rulesOpen]);
   /* Scores and times are for the committee only. */
-  const canOrganise = preview || !!me?.isAdmin;
   const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
 
   const showToast = useCallback((msg) => {
@@ -419,11 +618,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     const id = setInterval(() => { if (!document.hidden) refreshShots(); }, 20000);
     return () => clearInterval(id);
   }, [preview, view, refreshShots, activeTeamId]);
-
-  useEffect(() => {
-    if (preview || view !== 'organizer') return;
-    listShots().then(setAllShots).catch(() => {});
-  }, [preview, view]);
 
   /* ── Render views ──────────────────────────────────── */
 
@@ -670,14 +864,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
             </>
           )}
         </div>
-
-        {canOrganise && (
-          <div style={{ textAlign: 'center' }}>
-            <button className="linky" onClick={() => setView('organizer')} type="button">
-              Organiser view →
-            </button>
-          </div>
-        )}
       </div>
     );
   };
@@ -694,7 +880,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
       setView('start');
       return;
     }
-    if (target === 'organizer') { setView('organizer'); return; }
     const base = S && S.teamId === team.id ? S : { ...blankState(team), startedAt: Date.now() };
     if (target === 'done') {
       const next = { ...base, finishedAt: base.finishedAt ?? Date.now() };
@@ -745,7 +930,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
               <option key={g.key} value={g.key}>{i + 1}. {gameTitle(g.key, CONFIG.cp)}</option>
             ))}
             <option value="done">Results</option>
-            <option value="organizer">Organiser view</option>
           </select>
         </label>
       </div>
@@ -1671,206 +1855,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
           </h2>
           <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>
         </div>
-        {canOrganise && (
-          <div style={{ textAlign: 'center' }}>
-            <button className="linky" onClick={() => setView('organizer')} type="button">Organiser view →</button>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderOrganizer = () => {
-    const allRuns = CONFIG.teams
-      .map((t) => store.load(t.id))
-      .filter(Boolean)
-      .sort((a, b) => scoreOf(b, CONFIG) - scoreOf(a, CONFIG));
-
-    const bonuses = [
-      ['photo', 'Best pose photo', 5],
-      ['item', 'Most interesting buy', 5],
-      ['first', 'First to finish', 5],
-    ];
-
-    const handleBonus = (teamId, key, val) => {
-      const run = store.load(teamId);
-      if (!run) return;
-      run.bonus = run.bonus || {};
-      if (run.bonus[key]) delete run.bonus[key];
-      else run.bonus[key] = val;
-      store.save(teamId, run);
-      // force re-render
-      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
-    };
-
-    const handleReset = (teamId) => {
-      store.remove(teamId);
-      setOrgS((o) => ({ ...(o || {}), _tick: Date.now() }));
-    };
-
-    return (
-      <div>
-        <div className="hero" style={{ padding: '10px 0' }}>
-          <div className="big" style={{ fontSize: 'clamp(36px, 12vw, 54px)' }}>Organiser</div>
-          <div className="rule" />
-        </div>
-        {allRuns.length === 0 ? (
-          <div className="card">
-            <p style={{ margin: 0 }}>No teams have started yet. Once a team taps <b>Start the hunt</b>, they show up here.</p>
-            <div style={{ textAlign: 'center', marginTop: 12 }}>
-              <button className="linky" onClick={() => setView('start')} type="button">← Back to start</button>
-            </div>
-          </div>
-        ) : (
-          <div>
-            {/* Leaderboard */}
-            <div className="card flag">
-              <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Live board</div>
-              <table style={{
-                width: '100%', borderCollapse: 'collapse', fontSize: 13,
-              }}>
-                <thead>
-                  <tr>
-                    <th style={{
-                      fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                      textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                      borderBottom: 'var(--line)',
-                    }}>Team</th>
-                    <th style={{
-                      fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                      textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                      borderBottom: 'var(--line)',
-                    }}>Stamps</th>
-                    <th style={{
-                      fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                      textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                      borderBottom: 'var(--line)',
-                    }}>Time</th>
-                    <th style={{
-                      fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                      textTransform: 'uppercase', textAlign: 'right', padding: '6px 4px',
-                      borderBottom: 'var(--line)',
-                    }}>Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allRuns.map((run, i) => {
-                    const done = new Set(
-                      Object.keys(run.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null)
-                    );
-                    const left = run.startedAt
-                      ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
-                      : 0;
-                    return (
-                      <tr key={i}>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
-                          <b style={{ fontFamily: 'var(--body)', fontSize: 13 }}>{run.teamName}</b>
-                          <br /><span className="note">{run.members || '—'}</span>
-                        </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
-                          {SLOTS.map((si) => (
-                            <span key={si} style={{
-                              display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
-                              border: '2px solid var(--ink)', marginRight: 3,
-                              background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
-                            }} />
-                          ))}
-                        </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
-                          {run.finishedAt ? 'DONE' : mmss(left)}
-                        </td>
-                        <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', textAlign: 'right' }}>
-                          <b className="display" style={{ fontSize: 20 }}>{scoreOf(run, CONFIG)}</b>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Team panels */}
-            {allRuns.map((run, i) => {
-              const s = run.subs || {};
-              const imgs = [s.cp1?.photo, s.cp2a?.photo, s.cp3?.photo, s.cp4?.photo, s.ask?.photo].filter(Boolean);
-              const bingoShots = allShots.filter((b) => b.team === run.teamId && b.src).sort((a, b) => a.tile - b.tile);
-              return (
-                <div key={i} className="card">
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <b className="display" style={{ fontSize: 20 }}>{esc(run.teamName)}</b>
-                    <span className="note" style={{ marginLeft: 'auto' }}>{Object.keys(s).filter((k) => k !== 'cp2a').length}/{CONFIG.stamps}</span>
-                  </div>
-                  {imgs.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: 8, marginTop: 10 }}>
-                      {imgs.map((img, ii) => <img key={ii} src={img} alt="" style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 6 }} />)}
-                    </div>
-                  )}
-                  {s.cp2b && (s.cp2b.answers ?? [s.cp2b.answer]).map((a, ai, all) => (
-                    <p key={ai} className="note" style={{ marginTop: ai ? 4 : 12 }}>
-                      RIDDLE{all.length > 1 ? ` ${ai + 1}` : ''} — {esc(a).slice(0, 220)}
-                    </p>
-                  ))}
-                  {s.cp3 && <p className="note">BOUGHT — {esc(s.cp3.item)} · ¥{esc(s.cp3.price || '?')}</p>}
-                  {s.cp4 && <p className="note">QUIZ — {s.cp4.answers.map((a, ai) => `${ai + 1}. ${esc(a)}`).join(' · ')} <span className="tag" style={{
-                    background: s.cp4.correct ? 'rgba(143,190,126,.3)' : 'var(--th-slot)',
-                    color: s.cp4.correct ? '#2f6b1f' : 'var(--ink-soft)',
-                  }}>{s.cp4.correct} auto-marked</span></p>}
-                  {s.ask && (
-                    <p className="note">
-                      STRANGER — word: {esc(s.ask.word || '—')} · rec: {esc(s.ask.rec || '—')} · photo: {s.ask.photo ? 'yes' : 'no'}
-                      <span className="tag">+{askPoints(s.ask, CONFIG)}</span>
-                    </p>
-                  )}
-                  {s.bingo && (
-                    <div>
-                      <p className="note">BINGO — {s.bingo.tiles}/9 <span className="tag">+{s.bingo.points}</span></p>
-                      {bingoShots.length > 0 && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 5 }}>
-                          {bingoShots.map((b) => (
-                            <img key={b.tile} src={b.src} alt="" title={`Tile ${b.tile + 1} · ${b.uploader_name}${b.on_behalf ? ' (on behalf)' : ''}`}
-                              style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {s.guess && (
-                    <p className="note">
-                      {s.guess.streak
-                        ? `GENERAL KNOWLEDGE — ${s.guess.streak} in a row after ${s.guess.answered} questions`
-                        : 'GENERAL KNOWLEDGE — done (old closest-guess answers)'}
-                    </p>
-                  )}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 12 }}>
-                    {bonuses.map((b) => (
-                      <button
-                        key={b[0]}
-                        className="mini"
-                        style={run.bonus?.[b[0]] ? { background: 'var(--gold)' } : {}}
-                        onClick={() => handleBonus(run.teamId, b[0], b[2])}
-                        type="button"
-                      >
-                        {b[1]} +{b[2]}
-                      </button>
-                    ))}
-                    <button
-                      className="mini"
-                      style={{ marginLeft: 'auto', color: 'var(--red)' }}
-                      onClick={() => handleReset(run.teamId)}
-                      type="button"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div style={{ textAlign: 'center' }}>
-              <button className="linky" onClick={() => setView('start')} type="button">← Back to start</button>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -1908,7 +1892,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
         </div>
       )}
       {view === 'done' && renderDoneScreen()}
-      {view === 'organizer' && renderOrganizer()}
 
       {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}
 

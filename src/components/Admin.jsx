@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import groupRoster from '../data/groupRoster';
 import HuntEditor from './HuntEditor';
+import { HuntOrganiser } from './TreasureHunt';
+import { fetchHuntConfig } from '../lib/huntConfig';
 import { sendInvites, inviteProblem } from '../lib/invites';
 import { listPolicies, removeCertificate, uploadCertificate } from '../lib/insurance';
 import { nameLooksWrong } from '../lib/policyPdf';
@@ -555,7 +557,20 @@ const SECTIONS = [
   { id: 'people', label: 'Trip list' },
   { id: 'insurance', label: 'Insurance', lede: 'One travel insurance certificate per person. Upload the PDF and it shows on their home screen — they can only ever see their own.' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
+  { id: 'organiser', label: 'Organiser', lede: 'Live board for the hunt: scores, each team’s answers and photos, bonus points and resets.' },
 ];
+
+/* The organiser scores against the hunt as saved, not as being edited. */
+function OrganiserAdmin() {
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetchHuntConfig().then((r) => { if (live) setConfig(r.config); });
+    return () => { live = false; };
+  }, []);
+  if (!config) return <p className="text-sm text-gray-500">Loading…</p>;
+  return <HuntOrganiser config={config} />;
+}
 
 /* ── Admin page ──────────────────────────────────── */
 export default function Admin({ currentEmail, onSelfChanged }) {
@@ -573,12 +588,12 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       <div className="pt-9 pb-5">
         <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Committee</p>
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover' }[current.id] ?? 'list'}</span>
+          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board' }[current.id] ?? 'list'}</span>
         </h1>
         {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
 
-      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-md">
+      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-xl">
         {SECTIONS.map((x) => (
           <button key={x.id} type="button" role="tab" aria-selected={section === x.id} onClick={() => choose(x.id)}
             className={`h-9 rounded-md text-sm font-medium cursor-pointer transition-colors ${
@@ -591,7 +606,8 @@ export default function Admin({ currentEmail, onSelfChanged }) {
 
       {section === 'hunt' && <HuntEditor />}
       {section === 'insurance' && <InsuranceAdmin />}
-      {section !== 'hunt' && section !== 'insurance' && (
+      {section === 'organiser' && <OrganiserAdmin />}
+      {!['hunt', 'insurance', 'organiser'].includes(section) && (
         <TripList currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
       )}
     </section>
