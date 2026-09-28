@@ -518,7 +518,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
   const [shots, setShots] = useState({});
   const [assignees, setAssignees] = useState({});
   const [busyTile, setBusyTile] = useState(null);
-  const [coverTile, setCoverTile] = useState(null);
+  /* The bingo tile opened full-size: its photo to find, and who snaps it. */
+  const [openTile, setOpenTile] = useState(null);
   const [bingoMissing, setBingoMissing] = useState(null);
   const [bingoChecking, setBingoChecking] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
@@ -537,6 +538,17 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
       document.body.style.overflow = prev;
     };
   }, [rulesOpen]);
+  useEffect(() => {
+    if (openTile == null) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setOpenTile(null); };
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [openTile]);
   /* Scores and times are for the committee only. */
   const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
 
@@ -677,29 +689,36 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
         aria-label="How the hunt works"
         onClick={close}
         style={{
-          position: 'fixed', inset: 0, zIndex: 95, overflowY: 'auto',
+          position: 'fixed', inset: 0, zIndex: 95,
           background: 'rgba(10,10,12,.55)', padding: '24px 14px',
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
+        {/* The card stays put; only the rules between the title and the
+            button scroll, so "Got it" is always in reach. */}
         <div
           className="card"
           onClick={(e) => e.stopPropagation()}
-          style={{ maxWidth: 540, width: '100%', margin: 0 }}
+          style={{
+            maxWidth: 540, width: '100%', margin: 0, maxHeight: '100%',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}
         >
           <div className="eyebrow" style={{ color: 'var(--red)' }}>About</div>
           <h2 className="display" style={{ fontSize: 25, margin: '4px 0 2px' }}>How it works</h2>
           <p className="note" style={{ margin: '0 0 12px' }}>
             {CONFIG.stamps} games · any order · {CONFIG.raceMinutes} minutes
           </p>
-          <div className="task">
-            <Rich text={CONFIG.rules} />
+          <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+            <div className="task">
+              <Rich text={CONFIG.rules} />
+            </div>
+            <p style={{ margin: '12px 0 0' }}>
+              <b>Finish:</b> {CONFIG.finishPoint}
+            </p>
+            {CONFIG.helpNote && <p className="note" style={{ marginTop: 10 }}>{CONFIG.helpNote}</p>}
           </div>
-          <p style={{ margin: '12px 0 0' }}>
-            <b>Finish:</b> {CONFIG.finishPoint}
-          </p>
-          {CONFIG.helpNote && <p className="note" style={{ marginTop: 10 }}>{CONFIG.helpNote}</p>}
-          <button className="btn block" style={{ marginTop: 16 }} type="button" onClick={close} autoFocus>
+          <button className="btn block" style={{ marginTop: 16, flex: 'none' }} type="button" onClick={close} autoFocus>
             Got it
           </button>
         </div>
@@ -1437,6 +1456,10 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
   };
 
   /* ── Game 1 — photo bingo ────────────────────────────────
+     Each tile is a photo the committee took around the area: the team
+     has to find that spot or thing and take the same shot. The tile
+     shows the photo to find until the team's own one replaces it; tap
+     it to see the original full-size next to theirs.
      One shared card per team. Each tile belongs to one member; the Team
      Lead can fill any tile, as backup for a member who can't upload.
      All nine tiles are still needed for this stamp — that is this
@@ -1444,7 +1467,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
      can go and play at any time. */
 
   const addBingoTile = async (i, file) => {
-    setCoverTile(null);
     setBusyTile(i);
     try {
       if (preview) {
@@ -1490,7 +1512,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
 
   const renderBingoGrid = (locked) => {
     const lead = player?.role === 'Team Lead' && player?.team === activeTeamId;
-    const cover = coverTile != null ? { ...bingoCard[coverTile], ...assignees[coverTile] } : null;
     return (
       <>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
@@ -1498,95 +1519,138 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
             const shot = shots[i];
             const assignee = assignees[i];
             const access = tileAccess(assignee, player, activeTeamId);
-            const who = assignee?.name ?? '…';
             const mine = access === 'mine';
-            const inner = (
-              <>
-                {shot?.src && <img src={shot.src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+            const img = shot?.src ?? tile.photo;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setOpenTile(i)}
+                aria-label={`Tile ${i + 1}${shot ? ', done' : ''}`}
+                style={{
+                  position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
+                  textAlign: 'center', overflow: 'hidden', borderRadius: 8, padding: '0 0 16px',
+                  border: shot ? 'var(--line)' : mine ? '3px dashed var(--red)' : '3px dashed var(--th-dash)',
+                  background: img ? 'var(--ink)' : 'var(--th-parchment)',
+                  opacity: !shot && access === 'no' && !locked ? 0.6 : 1,
+                  cursor: 'pointer', color: 'inherit', font: 'inherit',
+                }}
+              >
+                {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {!img && (
+                  <span style={{
+                    position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
+                    fontSize: 9.5, lineHeight: 1.3, padding: 5, color: 'var(--ink-soft)',
+                  }}>{tile.prompt}</span>
+                )}
                 <span style={{
-                  position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
-                  fontSize: 9.5, lineHeight: 1.3, padding: 5,
-                  color: shot ? '#fff' : 'var(--ink-soft)',
-                  textShadow: shot ? '0 1px 4px rgba(0,0,0,.95)' : 'none',
-                }}>{busyTile === i ? 'Uploading…' : tile.prompt}</span>
+                  position: 'absolute', top: 3, left: 3, zIndex: 1,
+                  fontFamily: '"DM Mono", monospace', fontSize: 9, fontWeight: 700, lineHeight: 1,
+                  padding: '3px 5px', borderRadius: 4, border: '1px solid var(--ink)',
+                  background: shot ? 'var(--gold)' : 'var(--card)', color: 'var(--ink)',
+                }}>
+                  {busyTile === i ? '…' : shot ? '✓' : 'FIND'}
+                </span>
                 <span style={{
                   position: 'absolute', left: 3, right: 3, bottom: 3, zIndex: 1,
                   fontFamily: '"DM Mono", monospace', fontSize: 9, fontWeight: 700, lineHeight: 1.2,
                   padding: '2px 4px', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   background: mine ? 'var(--gold)' : 'var(--card)', color: 'var(--ink)', border: '1px solid var(--ink)',
                 }}>
-                  📷 {mine ? 'You' : who}{shot?.on_behalf ? ` · by ${shot.uploader_name}` : ''}
+                  📷 {mine ? 'You' : assignee?.name ?? '…'}{shot?.on_behalf ? ` · by ${shot.uploader_name}` : ''}
                 </span>
-                {shot && !locked && access !== 'no' && (
-                  <span
-                    onClick={(e) => { e.preventDefault(); clearBingoTile(i); }}
-                    style={{
-                      position: 'absolute', top: 3, right: 3, zIndex: 2, background: 'var(--card)',
-                      border: '2px solid var(--ink)', borderRadius: 5, width: 19, height: 19,
-                      display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 900, lineHeight: 1,
-                    }}
-                  >×</span>
-                )}
-              </>
-            );
-            const box = {
-              position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
-              textAlign: 'center', overflow: 'hidden', borderRadius: 8, paddingBottom: 16,
-              border: shot ? 'var(--line)' : mine ? '3px dashed var(--red)' : '3px dashed var(--th-dash)',
-              background: shot ? 'var(--ink)' : 'var(--th-parchment)',
-              opacity: !shot && access === 'no' && !locked ? 0.6 : 1,
-            };
-            if (locked || busyTile === i) return <div key={i} style={box}>{inner}</div>;
-            if (access === 'no') {
-              return (
-                <button key={i} type="button" style={{ ...box, cursor: 'not-allowed', color: 'inherit', font: 'inherit' }}
-                  onClick={() => showToast(assignee ? `This tile is ${assignee.name}’s to snap.` : 'Still loading who snaps this one.')}>
-                  {inner}
-                </button>
-              );
-            }
-            if (access === 'cover') {
-              return (
-                <button key={i} type="button" style={{ ...box, cursor: 'pointer', color: 'inherit', font: 'inherit' }}
-                  onClick={() => setCoverTile(coverTile === i ? null : i)}>
-                  {inner}
-                </button>
-              );
-            }
-            return (
-              <label key={i} style={{ ...box, cursor: 'pointer' }}>
-                {inner}
-                {bingoFileInput(i)}
-              </label>
+              </button>
             );
           })}
         </div>
 
-        {cover && !locked && (
-          <div style={{
-            marginTop: 10, padding: '10px 12px', border: 'var(--line)', borderRadius: 8,
-            background: 'var(--th-parchment)',
-          }}>
-            <p style={{ margin: '0 0 8px', fontSize: 13 }}>
-              <b>“{cover.prompt}”</b> is {cover.name || 'a teammate'}’s tile. Only upload it for them if they have a technical
-              problem — a dead phone, no signal, the upload won’t go through.
-            </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <label className="mini" htmlFor={`bingo-cover-${coverTile}`} style={{ cursor: 'pointer' }}>
-                {shots[coverTile] ? 'Replace' : 'Snap'} it for {cover.name || 'them'}
-              </label>
-              {bingoFileInput(coverTile, `bingo-cover-${coverTile}`)}
-              <button className="mini" type="button" onClick={() => setCoverTile(null)}>Cancel</button>
-            </div>
-          </div>
-        )}
-
         <p className="note" style={{ margin: '10px 0 0' }}>
           {lead
-            ? 'Each tile has a name on it — that person snaps it on their own phone. As Team Lead you can upload any tile, but only when its owner has a technical issue uploading.'
-            : 'Each tile has a name on it — only that person can snap it. Yours are marked 📷 You. Can’t upload? Ask your Team Lead to do it for you.'}
+            ? 'Tap a tile to see the photo full-size. The person named on it snaps it on their own phone. As Team Lead you can upload any tile, but only when its owner has a technical issue uploading.'
+            : 'Tap a tile to see the photo full-size. Only the person named on it can snap it — yours are marked 📷 You. Can’t upload? Ask your Team Lead to do it for you.'}
         </p>
       </>
+    );
+  };
+
+  /* One tile, full-size: the photo to find, the team's shot under it to
+     compare, and the snap button for whoever may upload it. */
+  const renderBingoTile = () => {
+    if (openTile == null) return null;
+    const i = openTile;
+    const tile = bingoCard[i] ?? {};
+    const shot = shots[i];
+    const assignee = assignees[i];
+    const access = tileAccess(assignee, player, activeTeamId);
+    const locked = !!S?.subs?.bingo;
+    const busy = busyTile === i;
+    const name = assignee?.name ?? 'a teammate';
+    const canSnap = !locked && (access === 'mine' || access === 'cover');
+    const close = () => setOpenTile(null);
+    const pic = {
+      display: 'block', width: '100%', maxHeight: '42vh', objectFit: 'contain',
+      background: 'var(--ink)', border: 'var(--line)', borderRadius: 8,
+    };
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Bingo tile ${i + 1}`}
+        onClick={close}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 95,
+          background: 'rgba(10,10,12,.55)', padding: '24px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <div
+          className="card"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            maxWidth: 540, width: '100%', margin: 0, maxHeight: '100%',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}
+        >
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Tile {i + 1} of {bingoCard.length}</div>
+          <h2 className="display" style={{ fontSize: 25, margin: '4px 0 10px' }}>{shot ? 'Found it' : 'Find this'}</h2>
+          <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+            {tile.photo && <img src={tile.photo} alt="The photo to find" style={pic} />}
+            {tile.prompt && <p style={{ margin: tile.photo ? '8px 0 0' : 0 }}>{tile.prompt}</p>}
+            {shot?.src && (
+              <>
+                <div className="eyebrow" style={{ margin: '14px 0 6px' }}>
+                  Your team’s shot{shot.on_behalf ? ` · uploaded by ${shot.uploader_name}` : ''}
+                </div>
+                <img src={shot.src} alt="Your team’s photo" style={pic} />
+              </>
+            )}
+            <p className="note" style={{ margin: '12px 0 0' }}>
+              {locked ? 'Stamp collected — this card is final.'
+                : access === 'mine' ? 'Find it, then take the same shot — same spot, same angle.'
+                : access === 'cover' ? `This is ${name}’s tile. Only upload it for them if they have a technical problem — a dead phone, no signal, the upload won’t go through.`
+                : `${name} snaps this one — only they can upload it.`}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, flex: 'none', flexWrap: 'wrap' }}>
+            {canSnap && (
+              <label
+                className="btn"
+                htmlFor={`bingo-snap-${i}`}
+                style={{ flex: '1 1 auto', justifyContent: 'center', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}
+              >
+                {busy ? 'Uploading…' : shot ? 'Retake' : access === 'cover' ? `Snap it for ${name}` : '📷 Take the photo'}
+              </label>
+            )}
+            {canSnap && !busy && bingoFileInput(i, `bingo-snap-${i}`)}
+            {shot && canSnap && !busy && (
+              <button className="mini" type="button" onClick={() => clearBingoTile(i)}>Clear</button>
+            )}
+            <button className="mini" type="button" onClick={close} autoFocus style={canSnap ? {} : { flex: '1 1 auto' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -1601,10 +1665,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
       <div className="card flag">
         {renderCpHead(STAMP_NO.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
         <div className="task">
-          <p style={{ margin: 0 }}>Nine prompts, one photo each, each snapped by the teammate named on it. All nine earn the stamp — leave it part-filled and come back whenever you like.</p>
+          <p style={{ margin: 0 }}>Every tile is a photo of something around the area. Find it and take the same shot — same spot, same angle. Each tile is snapped by the teammate named on it. All nine earn the stamp — leave it part-filled and come back whenever you like.</p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.bingo.photo} />
         {renderBingoGrid(locked)}
+        {renderBingoTile()}
         {stillMissing.length > 0 && (
           <div role="alert" style={{
             marginTop: 14, padding: '10px 12px', borderRadius: 8,
@@ -1613,7 +1678,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
             <b>All nine photos are needed for this stamp.</b> Still missing {stillMissing.length}:
             <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
               {stillMissing.map((i) => (
-                <li key={i}>{i + 1}. {bingoCard[i]?.prompt} — {assignees[i]?.name ?? 'teammate'}</li>
+                <li key={i}>Tile {i + 1}{bingoCard[i]?.prompt ? ` · ${bingoCard[i].prompt}` : ''} — {assignees[i]?.name ?? 'teammate'}</li>
               ))}
             </ul>
           </div>

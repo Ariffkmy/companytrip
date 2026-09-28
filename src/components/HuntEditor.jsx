@@ -178,29 +178,62 @@ function Photo({ label, hint, value, onChange }) {
   );
 }
 
-/* A list of one-line strings with add / remove. */
-function StringList({ label, items, onChange, addLabel, fixedLength }) {
+/* A team's nine bingo tiles as a 3×3 grid, laid out as players see it:
+   the photo to find, and an optional caption under it. */
+function BingoTiles({ items, onChange }) {
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState('');
+  const baseId = useFieldId();
+  const patch = (i, next) => onChange(items.map((t, j) => (j === i ? { ...t, ...next } : t)));
+
+  async function onFile(i, file) {
+    if (!file) return;
+    setBusy(i);
+    setError('');
+    try {
+      patch(i, { photo: await uploadHuntPhoto(file) });
+    } catch (e) {
+      setError(/fetch|network/i.test(e?.message ?? '') ? 'No connection. Uploading needs internet.' : 'Upload failed. Try a JPG or PNG under 5 MB.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div>
-      <p className="text-xs font-semibold text-gray-600 mb-1">{label}</p>
-      <ol className="space-y-2">
-        {items.map((item, i) => (
-          <li key={i} className="flex gap-2 items-center">
-            <span className="font-mono text-[11px] text-gray-400 w-5 shrink-0 text-right">{i + 1}</span>
-            <input aria-label={`${label} ${i + 1}`} value={item} onChange={(e) => onChange(setIn(items, [i], e.target.value))}
-              className={`${inputCls} h-10`} />
-            {!fixedLength && (
-              <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={`Remove ${i + 1}`}
-                disabled={items.length <= 1}
-                className="shrink-0 h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">×</button>
-            )}
-          </li>
-        ))}
+      <ol className="grid grid-cols-3 gap-2">
+        {items.map((t, i) => {
+          const id = `${baseId}-${i}`;
+          return (
+            <li key={i} className="min-w-0">
+              <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                {t.photo ? (
+                  <>
+                    <img src={t.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-x-1 bottom-1 flex gap-1">
+                      <label htmlFor={id} className="flex-1 h-6 grid place-items-center rounded bg-white/95 border border-gray-200 text-[10px] font-medium cursor-pointer">Replace</label>
+                      <button type="button" onClick={() => patch(i, { photo: null })} aria-label={`Remove photo ${i + 1}`}
+                        className="h-6 w-6 rounded bg-white/95 border border-gray-200 text-[11px] text-red cursor-pointer">×</button>
+                    </div>
+                  </>
+                ) : (
+                  <label htmlFor={id} className="absolute inset-0 grid place-items-center border-2 border-dashed border-gray-300 rounded-lg text-[11px] text-gray-500 cursor-pointer hover:border-gray-400">
+                    {busy === i ? 'Uploading…' : '+ Photo'}
+                  </label>
+                )}
+                <span className="absolute top-1 left-1 font-mono text-[10px] px-1 rounded bg-white/90 text-gray-500">{i + 1}</span>
+                {busy === i && t.photo && <span className="absolute inset-0 grid place-items-center bg-white/70 text-[11px]">Uploading…</span>}
+              </div>
+              <input id={id} type="file" accept="image/*" className="sr-only" disabled={busy != null}
+                onChange={(e) => { onFile(i, e.target.files?.[0]); e.target.value = ''; }} />
+              <input aria-label={`Caption ${i + 1}`} placeholder="Caption (optional)" value={t.prompt ?? ''}
+                onChange={(e) => patch(i, { prompt: e.target.value })}
+                className={`${inputCls} h-8 mt-1 text-xs`} />
+            </li>
+          );
+        })}
       </ol>
-      {!fixedLength && (
-        <button type="button" onClick={() => onChange([...items, ''])}
-          className="mt-2 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ {addLabel}</button>
-      )}
+      {error && <p role="alert" className="text-xs text-red mt-1">{error}</p>}
     </div>
   );
 }
@@ -340,6 +373,9 @@ export default function HuntEditor() {
   const posePairCount = groupRoster.filter(
     (g) => draft.teams[g.id]?.pose?.photo && draft.teams[g.id]?.pose?.place
   ).length;
+  const bingoPhotoCount = groupRoster.reduce(
+    (n, g) => n + (draft.teams[g.id]?.bingo ?? []).filter((t) => t?.photo).length, 0
+  );
   const set = (path) => (value) => { setSaveMsg(''); setDraft((d) => setIn(d, path, value)); };
   const val = (path) => getIn(draft, path);
   const cp = (key) => ['checkpoints', key];
@@ -405,7 +441,7 @@ export default function HuntEditor() {
 
       <MapSection val={val} set={set} />
 
-      <Section title="1 · Photo bingo" sub="Nine prompts per team">
+      <Section title="1 · Photo bingo" sub={`${bingoPhotoCount} of ${groupRoster.length * 9} tiles have a photo`}>
         <p className="note">Playable whenever the team likes, like every other game.</p>
         {commonFields('bingo', { body: false })}
         <div className="grid grid-cols-2 gap-3">
@@ -414,16 +450,17 @@ export default function HuntEditor() {
         </div>
         <Sub>Each team’s card</Sub>
         <p className="note -mt-2">
-          Every team gets its own nine prompts (left to right, top to bottom). Who snaps each tile is drawn at random when the team
-          first opens its card — one member per tile, spread evenly. Only that member can upload it; the Team Lead can upload any
-          tile, but only to cover for a member with a technical issue.
+          Every team gets its own nine photos (left to right, top to bottom) of things around the area. Players have to find each
+          one and take the same shot, so use something findable — a sign, a shopfront, a statue — not a passing car. The caption
+          is optional; add one as a hint. Who snaps each tile is drawn at random when the team first opens its card — one member
+          per tile, spread evenly. Only that member can upload it; the Team Lead can upload any tile, but only to cover for a
+          member with a technical issue.
         </p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
           {groupRoster.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
-              <StringList label="Prompts" items={val(['teams', g.id, 'bingo']).map((t) => t.prompt)}
-                onChange={(items) => set(['teams', g.id, 'bingo'])(items.map((prompt) => ({ prompt })))} fixedLength />
+              <BingoTiles items={val(['teams', g.id, 'bingo'])} onChange={set(['teams', g.id, 'bingo'])} />
             </div>
           ))}
         </div>

@@ -32,9 +32,11 @@ const TEAM_COLOURS = {
   'team-pearl': '#8A4B9E',
 };
 
-/* Nine prompts for one team's bingo card. Who snaps each tile is drawn
-   at random by the server, not set here. */
-const bingoCard = (prompts) => prompts.map((prompt) => ({ prompt }));
+/* One team's bingo card: nine photos the committee took around the
+   area, each with an optional caption. Teams find the spot and take the
+   same shot. The captions below are placeholders until the photos go in.
+   Who snaps each tile is drawn at random by the server, not set here. */
+const bingoCard = (prompts) => prompts.map((prompt) => ({ prompt, photo: null }));
 
 export const DEFAULT_HUNT_CONFIG = {
   raceMinutes: 90,
@@ -334,7 +336,7 @@ export function validate(config) {
   if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Stamp 5: every question needs text, and there must be at least one.');
   groupRoster.forEach((g) => {
     const card = config.teams[g.id]?.bingo ?? [];
-    if (card.length !== 9 || card.some((t) => !String(t?.prompt ?? '').trim())) errs.push(`Stamp 1: all nine of ${g.name}’s bingo tiles need a prompt.`);
+    if (card.length !== 9 || card.some((t) => !t?.photo && !String(t?.prompt ?? '').trim())) errs.push(`Stamp 1: all nine of ${g.name}’s bingo tiles need a photo (or at least a caption).`);
   });
   const bank = cp.guess.bank ?? [];
   if (!(Number(cp.guess.streak) >= 1)) errs.push('Stamp 7: the streak needed must be at least 1.');
