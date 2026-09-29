@@ -37,6 +37,11 @@ const COPY = {
 
 const domainOk = (addr) => SIGNUP_DOMAINS.includes(addr.split('@')[1] ?? '');
 
+/* A shareable link straight to sign-up: https://<site>/?signup */
+const startsOnSignup = () => {
+  try { return new URLSearchParams(window.location.search).has('signup'); } catch (e) { return false; }
+};
+
 const inputCls =
   'w-full h-12 px-3.5 rounded-lg border bg-white text-[15px] text-ink placeholder:text-gray-400 ' +
   'outline-none transition-colors focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-red/40 ' +
@@ -57,7 +62,7 @@ function Field({ id, label, hint, children }) {
 }
 
 export default function Login({ setup = null, onPasswordSet, themeToggle }) {
-  const [mode, setMode] = useState(setup ?? 'signin');
+  const [mode, setMode] = useState(() => setup ?? (startsOnSignup() ? 'signup' : 'signin'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
