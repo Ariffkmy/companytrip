@@ -112,8 +112,19 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
         if (err) throw err;
         setSent({ to: addr, kind: 'reset' });
       } else if (mode === 'signup') {
-        /* Creates the account on first use, then just signs in. The
-           allowlist trigger turns away anyone not on the trip list. */
+        /* Sign-up is for a first account only. If the check itself fails
+           (no signal, or the function isn't deployed yet) it carries on:
+           the allowlist trigger still turns away anyone not on the list. */
+        const { data: status, error: checkErr } = await supabase.rpc('signup_status', { p_email: addr });
+        if (!checkErr && status === 'registered') {
+          setError('You’ve already registered with this email. Sign in instead — tap “Forgot?” there if you don’t know your password.');
+          return;
+        }
+        if (!checkErr && status === 'not_listed') {
+          setError('That email isn’t on the trip list. Ask the committee to add you.');
+          return;
+        }
+        /* Creates the account on first use, then just signs in. */
         const { error: err } = await supabase.auth.signInWithOtp({
           email: addr,
           options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
