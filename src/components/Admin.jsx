@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import groupRoster from '../data/groupRoster';
+import rooms from '../data/rooms';
 import HuntEditor from './HuntEditor';
 import { HuntOrganiser } from './TreasureHunt';
 import { fetchHuntConfig } from '../lib/huntConfig';
@@ -547,14 +548,85 @@ function InsuranceAdmin() {
       )}
 
       {people && people.length === 0 && (
-        <p className="text-sm text-gray-500">Nobody on the trip list yet — add people under Trip list first.</p>
+        <p className="text-sm text-gray-500">Nobody on the trip list yet — add people under Trip members first.</p>
       )}
     </div>
   );
 }
 
+/* ── Room pairing ─────────────────────────────────── */
+const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+
+/* The roster's short names don't always match how the rooms were
+   written ("Ragina" vs "Regina"), so the first word of the full name
+   counts too. */
+function rosterEntry(name) {
+  const n = norm(name);
+  for (const g of groupRoster) {
+    const m = g.members.find((x) => norm(x.name) === n || norm(x.full).split(' ')[0] === n);
+    if (m) return { team: g.name.replace(/^Team /, ''), role: m.role };
+  }
+  return null;
+}
+
+function RoomPairing() {
+  return (
+    <div>
+      <p className="text-sm text-gray-500 mb-4">
+        {rooms.length} rooms, two to a room. Team is shown so you can see who’s rooming across teams.
+      </p>
+      <ol className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {rooms.map((pair, i) => (
+          <li key={i} className="bg-white border border-gray-200 rounded-lg p-3.5">
+            <p className="font-mono text-[11px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2">
+              Room {i + 1}{i === rooms.length - 1 && <span className="text-gray-400 font-normal"> · last</span>}
+            </p>
+            <ul className="space-y-1.5">
+              {pair.map((name) => {
+                const who = rosterEntry(name);
+                return (
+                  <li key={name} className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium text-ink">{name}</span>
+                    {who && (
+                      <span className="ml-auto text-xs text-gray-400 truncate">
+                        {who.team}{who.role !== 'Member' ? ` · ${who.role}` : ''}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/* Trip members has two views: the allowlist itself, and who shares a room. */
+function TripMembers({ currentEmail, onSelfChanged }) {
+  const [view, setView] = useState('members');
+  return (
+    <div>
+      <div role="tablist" aria-label="Trip members views" className="inline-flex gap-1 p-1 mb-5 rounded-full bg-gray-100">
+        {[['members', 'Members'], ['rooms', 'Room pairing']].map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
+            className={`h-8 px-3.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${
+              view === id ? 'bg-white text-ink shadow-sm' : 'text-gray-500 hover:text-ink'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'rooms'
+        ? <RoomPairing />
+        : <TripList currentEmail={currentEmail} onSelfChanged={onSelfChanged} />}
+    </div>
+  );
+}
+
 const SECTIONS = [
-  { id: 'people', label: 'Trip list' },
+  { id: 'people', label: 'Trip members' },
   { id: 'insurance', label: 'Insurance', lede: 'One travel insurance certificate per person. Upload the PDF and it shows on their home screen — they can only ever see their own.' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
   { id: 'organiser', label: 'Organiser', lede: 'Live board for the hunt: scores, each team’s answers and photos, bonus points and resets.' },
@@ -588,7 +660,7 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       <div className="pt-9 pb-5">
         <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Committee</p>
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board' }[current.id] ?? 'list'}</span>
+          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board' }[current.id] ?? 'members'}</span>
         </h1>
         {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
@@ -608,7 +680,7 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       {section === 'insurance' && <InsuranceAdmin />}
       {section === 'organiser' && <OrganiserAdmin />}
       {!['hunt', 'insurance', 'organiser'].includes(section) && (
-        <TripList currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
+        <TripMembers currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
       )}
     </section>
   );
