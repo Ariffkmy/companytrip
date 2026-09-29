@@ -37,13 +37,20 @@ const COPY = {
 
 const domainOk = (addr) => SIGNUP_DOMAINS.includes(addr.split('@')[1] ?? '');
 
-/* The field is pre-filled with the main company domain so people type
-   only their name. Typing an @ (another company domain, or a password
-   manager filling the whole address) uses exactly what was typed. */
-const EMAIL_DOMAIN = SIGNUP_DOMAINS[0];
-const fullEmail = (typed) => {
+/* The field ends in a company domain picker so people type only their
+   name. Typing an @ (a password manager filling the whole address, say)
+   uses exactly what was typed. The last domain used is remembered, since
+   each person only ever has the one. */
+const DOMAIN_KEY = 'olc-email-domain';
+const savedDomain = () => {
+  try {
+    const d = localStorage.getItem(DOMAIN_KEY);
+    return SIGNUP_DOMAINS.includes(d) ? d : SIGNUP_DOMAINS[0];
+  } catch (e) { return SIGNUP_DOMAINS[0]; }
+};
+const fullEmail = (typed, domain) => {
   const t = typed.trim().toLowerCase();
-  return t.includes('@') ? t : `${t}@${EMAIL_DOMAIN}`;
+  return t.includes('@') ? t : `${t}@${domain}`;
 };
 
 /* A shareable link straight to sign-up: https://<site>/?signup */
@@ -73,6 +80,7 @@ function Field({ id, label, hint, children }) {
 export default function Login({ setup = null, onPasswordSet, themeToggle }) {
   const [mode, setMode] = useState(() => setup ?? (startsOnSignup() ? 'signup' : 'signin'));
   const [email, setEmail] = useState('');
+  const [domain, setDomain] = useState(savedDomain);
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -98,7 +106,8 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
     if (busy || !supabase) return;
     setError('');
 
-    const addr = fullEmail(email);
+    const addr = fullEmail(email, domain);
+    if (!email.includes('@')) { try { localStorage.setItem(DOMAIN_KEY, domain); } catch (e) { /* silent */ } }
     if (mode === 'signup' && !domainOk(addr)) {
       setError(`Use your company email — ${SIGNUP_DOMAINS.map((d) => `@${d}`).join(' or ')}.`);
       return;
@@ -220,17 +229,25 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
                       onChange={(e) => setEmail(e.target.value.replace(/\s/g, ''))}
                       disabled={busy}
                       placeholder="yourname"
-                      aria-describedby="auth-email-domain"
                       className="flex-1 min-w-0 h-full pl-3.5 pr-1 bg-transparent text-[15px] text-ink placeholder:text-gray-400 outline-none"
                     />
                     {!email.includes('@') && (
-                      <span
-                        id="auth-email-domain"
-                        onClick={() => document.getElementById('auth-email')?.focus()}
-                        className="shrink-0 pr-3.5 text-[15px] text-gray-500 select-none cursor-text"
-                      >
-                        @{EMAIL_DOMAIN}
-                      </span>
+                      <label className="relative shrink-0 flex items-center h-full pl-1 pr-3 text-[15px] text-gray-500 cursor-pointer hover:text-ink">
+                        <span className="sr-only">Email domain</span>
+                        <span aria-hidden="true">@{domain}</span>
+                        <span aria-hidden="true" className="ml-1 text-[10px]">▾</span>
+                        {/* Invisible native select over the text: the phone's own
+                            picker, with no styling fights. */}
+                        <select
+                          id="auth-email-domain"
+                          value={domain}
+                          onChange={(e) => setDomain(e.target.value)}
+                          disabled={busy}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        >
+                          {SIGNUP_DOMAINS.map((d) => <option key={d} value={d}>@{d}</option>)}
+                        </select>
+                      </label>
                     )}
                   </div>
                 </Field>
