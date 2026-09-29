@@ -37,6 +37,15 @@ const COPY = {
 
 const domainOk = (addr) => SIGNUP_DOMAINS.includes(addr.split('@')[1] ?? '');
 
+/* The field is pre-filled with the main company domain so people type
+   only their name. Typing an @ (another company domain, or a password
+   manager filling the whole address) uses exactly what was typed. */
+const EMAIL_DOMAIN = SIGNUP_DOMAINS[0];
+const fullEmail = (typed) => {
+  const t = typed.trim().toLowerCase();
+  return t.includes('@') ? t : `${t}@${EMAIL_DOMAIN}`;
+};
+
 /* A shareable link straight to sign-up: https://<site>/?signup */
 const startsOnSignup = () => {
   try { return new URLSearchParams(window.location.search).has('signup'); } catch (e) { return false; }
@@ -89,7 +98,7 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
     if (busy || !supabase) return;
     setError('');
 
-    const addr = email.trim().toLowerCase();
+    const addr = fullEmail(email);
     if (mode === 'signup' && !domainOk(addr)) {
       setError(`Use your company email — ${SIGNUP_DOMAINS.map((d) => `@${d}`).join(' or ')}.`);
       return;
@@ -189,20 +198,41 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
             <form onSubmit={onSubmit} noValidate={false} className="mt-7 space-y-4">
               {needsEmail && (
                 <Field id="auth-email" label="Email">
-                  <input
-                    id="auth-email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    autoCapitalize="none"
-                    spellCheck={false}
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={busy}
-                    placeholder="you@orangeleaf.consulting"
-                    className={`${inputCls} border-gray-200`}
-                  />
+                  {/* Styled as one input; the domain suffix sits inside the
+                      border and drops away once an @ is typed. */}
+                  <div
+                    className={
+                      'flex items-center w-full h-12 rounded-lg border border-gray-200 bg-white transition-colors ' +
+                      'focus-within:border-ink focus-within:ring-2 focus-within:ring-red/40 ' +
+                      (busy ? 'opacity-50' : '')
+                    }
+                  >
+                    <input
+                      id="auth-email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value.replace(/\s/g, ''))}
+                      disabled={busy}
+                      placeholder="yourname"
+                      aria-describedby="auth-email-domain"
+                      className="flex-1 min-w-0 h-full pl-3.5 pr-1 bg-transparent text-[15px] text-ink placeholder:text-gray-400 outline-none"
+                    />
+                    {!email.includes('@') && (
+                      <span
+                        id="auth-email-domain"
+                        onClick={() => document.getElementById('auth-email')?.focus()}
+                        className="shrink-0 pr-3.5 text-[15px] text-gray-500 select-none cursor-text"
+                      >
+                        @{EMAIL_DOMAIN}
+                      </span>
+                    )}
+                  </div>
                 </Field>
               )}
 
