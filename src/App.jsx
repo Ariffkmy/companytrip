@@ -170,15 +170,20 @@ function ChecklistDayPanel({ day }) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        {day.activities.map((act, i) => {
-          const id = `act-${i}`;
-          return (
-            <ChecklistItem key={id} id={id} label={act.activity} sub={act.note}
-              checked={checked.has(id)} onToggle={toggle} />
-          );
-        })}
-      </div>
+      {[
+        { title: '🧳 Items to bring', list: day.activities },
+        { title: '📝 To do before you fly', list: day.todos ?? [] },
+      ].map(({ title, list }) => (
+        <section key={title}>
+          <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500 mb-2">{title}</h4>
+          <div className="space-y-2">
+            {list.map((act) => (
+              <ChecklistItem key={act.id} id={act.id} label={act.activity} sub={act.note}
+                checked={checked.has(act.id)} onToggle={toggle} />
+            ))}
+          </div>
+        </section>
+      ))}
 
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="bg-white border border-gray-200 rounded-lg p-4">
