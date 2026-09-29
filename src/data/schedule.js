@@ -25,18 +25,6 @@
       { id: 'todo-bank', activity: 'Call your bank / set your card to allow international transactions' },
       { id: 'act-9', activity: 'Download offline map for Yokohama, Atami and Kamakura' },
     ],
-    participantPrep: [
-      'Charge all devices and pack chargers + power bank.',
-      'Double-check passport and print all travel documents.',
-      'Buy food near the office on Day 1 — you can bring it to the airport.',
-      'Pack a small carry-on with essentials for the flight + first night.',
-    ],
-    committeePrep: [
-      'Confirm final headcount (26 + 1 pax) and check-in status.',
-      'Print master rooming list, team roster, and emergency contact sheet.',
-      'Prepare WhatsApp broadcast list for last-minute updates.',
-      'Ensure portable Wi-Fi / local SIM cards are ready for distribution.',
-    ],
   },
   {
     day: 'D1',
