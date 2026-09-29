@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase, supabaseConfigured, AUTH_STORAGE_KEY, arrivedViaInvite } from './supabase';
+import { supabase, supabaseConfigured, AUTH_STORAGE_KEY, arrivedViaInvite, arrivedViaMagicLink } from './supabase';
 
 /* The app is read offline on train platforms. An access token lasts an
    hour; if it expires with no signal, supabase-js cannot refresh it and
@@ -21,9 +21,10 @@ const EMPTY_MEMBER = { isAdmin: false, team: null, fullName: null, role: null };
 export function useAuth() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(supabaseConfigured);
-  /* 'invite' or 'recovery' after landing from an invite or password-reset
-     email, until the user has set a password. */
-  const [setup, setSetup] = useState(arrivedViaInvite ? 'invite' : null);
+  /* 'invite', 'magic' or 'recovery' after landing from an invite, a
+     sign-up magic link or a password-reset email, until the user has
+     set a password. */
+  const [setup, setSetup] = useState(arrivedViaInvite ? 'invite' : arrivedViaMagicLink ? 'magic' : null);
 
   useEffect(() => {
     if (!supabase) return undefined;
