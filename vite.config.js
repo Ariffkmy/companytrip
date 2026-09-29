@@ -91,6 +91,18 @@ export default defineConfig({
             },
           },
           {
+            // Nearby-place photos from Wikimedia Commons. Special:FilePath
+            // redirects to upload.wikimedia.org; keep both so a card seen
+            // once still has its photo on roaming data.
+            urlPattern: /^https:\/\/(commons|upload)\.wikimedia\.org\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'place-photos',
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Google Fonts stylesheet — small, changes rarely.
             urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
             handler: 'StaleWhileRevalidate',

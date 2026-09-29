@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import WeatherWidget from './Weather';
 import ForexWidget from './ForexWidget';
 import PhotoCarousel from './PhotoCarousel';
+import Nearby from './Nearby';
 import groupRoster from '../data/groupRoster';
 import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
 
@@ -219,6 +220,7 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut }) 
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       <ForexWidget />
+      <Nearby />
       <Insurance userEmail={userEmail} />
       {/* Last: who is on which team is looked up once or twice a trip,
           while the weather, the rate and your policy are daily reads. */}

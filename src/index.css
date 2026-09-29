@@ -10,6 +10,12 @@
 /* Class-based dark mode: <html class="dark"> */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Swipe rows (photo carousel, nearby places): scroll without a bar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
 @theme {
   --color-ink: #17232F;
   --color-ink-soft: #4A5A69;
