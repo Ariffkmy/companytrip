@@ -23,7 +23,7 @@ function useTheme() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#0A0A0C' : '#FFFFFF');
+    if (meta) meta.setAttribute('content', dark ? '#1C1C1E' : '#FFFFFF');
     try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) { /* silent */ }
   }, [dark]);
 

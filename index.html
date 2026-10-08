@@ -25,7 +25,7 @@
             : window.matchMedia('(prefers-color-scheme: dark)').matches;
           if (dark) document.documentElement.classList.add('dark');
           var meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', dark ? '#0A0A0C' : '#FFFFFF');
+          if (meta) meta.setAttribute('content', dark ? '#1C1C1E' : '#FFFFFF');
         } catch (e) { /* private mode — fall back to light */ }
       })();
     </script>

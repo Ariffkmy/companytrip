@@ -93,14 +93,14 @@
    flips without touching markup. Accents shift to flame. */
 .dark {
   /* surfaces */
-  --color-paper: #0A0A0C;
-  --color-white: #17171A;
-  --color-card: #17171A;
-  --color-card-hover: #1E1E22;
-  --color-gray-50: #1E1E22;
-  --color-gray-100: #2A2A30;
-  --color-gray-200: #33333B;
-  --color-gray-300: #45454F;
+  --color-paper: #1C1C1E;
+  --color-white: #262628;
+  --color-card: #262628;
+  --color-card-hover: #2E2E31;
+  --color-gray-50: #2E2E31;
+  --color-gray-100: #36363A;
+  --color-gray-200: #404045;
+  --color-gray-300: #525258;
 
   /* text */
   --color-ink: #F1F1F4;
@@ -118,14 +118,14 @@
   --color-sea: #4FC3DC;
   --color-green: #7BD35A;
 
-  --scrollbar-thumb: #3A3A44;
+  --scrollbar-thumb: #4A4A50;
 
-  --bg-scrim: rgba(10, 10, 12, .8);
+  --bg-scrim: rgba(28, 28, 30, .8);
 
-  --th-dash: #4A4A55;
-  --th-rule: #3A3A44;
-  --th-parchment: #1C1C21;
-  --th-slot: #26262C;
+  --th-dash: #5A5A62;
+  --th-rule: #48484E;
+  --th-parchment: #2C2C2F;
+  --th-slot: #343438;
   --th-label: #8A8A96;
   --th-body-alt: #C4C4CE;
   --th-stamp-glow: rgba(255, 122, 26, .22);
@@ -352,10 +352,10 @@
   border: 1px solid var(--color-gray-200); box-shadow: 0 1px 3px rgba(0,0,0,.2);
 }
 .leaflet-tooltip-top.hunt-tip::before { border-top-color: var(--color-card); }
-.dark .leaflet-container { background: #0E0E10; }
+.dark .leaflet-container { background: #202022; }
 .dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9); }
 .dark .leaflet-bar a { background: var(--color-card); color: var(--color-ink); border-color: var(--color-gray-200); }
-.dark .leaflet-control-attribution { background: rgba(23,23,26,.8); color: var(--color-gray-500); }
+.dark .leaflet-control-attribution { background: rgba(38,38,40,.8); color: var(--color-gray-500); }
 .dark .leaflet-control-attribution a { color: var(--color-gray-600); }
 
 ::-webkit-scrollbar { width: 4px; }

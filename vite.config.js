@@ -24,8 +24,8 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         // Matches the icon background so the splash does not flash white.
-        background_color: '#0A0A0C',
-        theme_color: '#0A0A0C',
+        background_color: '#1C1C1E',
+        theme_color: '#1C1C1E',
         categories: ['travel', 'utilities'],
         icons: [
           { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
