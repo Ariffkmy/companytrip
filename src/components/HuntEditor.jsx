@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import TreasureHunt from './TreasureHunt';
-import groupRoster from '../data/groupRoster';
+import huntGroups from '../data/huntGroups';
 import {
   BINGO_MAX, DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, setHuntOpen, uploadHuntPhoto, validate,
 } from '../lib/huntConfig';
+import {
+  buildWrongOptions, fetchColleagueAnswers, importFormAnswers, saveColleagueAnswers,
+} from '../lib/colleagueQuiz';
 
 /* ── The switch ──────────────────────────────────────
    Deliberately outside the accordions and above the content: it is the
@@ -264,6 +267,137 @@ function BingoTiles({ items, onChange }) {
   );
 }
 
+/* ── Know your colleagues answers ───────────────────
+   Rows of public.colleague_answers: one per person per assigned
+   question. They save on their own Save button, straight to the
+   database, not with the rest of the hunt content. */
+function ColleagueAnswers() {
+  const [rows, setRows] = useState(null);
+  const [saved, setSaved] = useState([]);
+  const [paste, setPaste] = useState('');
+  const [msg, setMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+  const pasteId = useFieldId();
+
+  useEffect(() => {
+    let live = true;
+    fetchColleagueAnswers().then((r) => { if (live) { setRows(r); setSaved(r); } });
+    return () => { live = false; };
+  }, []);
+
+  if (!rows) return <p className="note">Loading the answers…</p>;
+  if (!rows.length) {
+    return (
+      <p className="note text-red">
+        No questions found. Run the migration 20261010000000_colleague_quiz.sql in the Supabase SQL Editor first.
+      </p>
+    );
+  }
+
+  const dirty = JSON.stringify(rows) !== JSON.stringify(saved);
+  const edit = (id, patch) => { setMsg(''); setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r))); };
+
+  const doImport = () => {
+    const r = importFormAnswers(rows, paste);
+    if (r.error) { setMsg(r.error); return; }
+    setRows(buildWrongOptions(r.rows, { onlyEmpty: true }));
+    setPaste('');
+    setMsg(`Filled ${r.filled} answer${r.filled === 1 ? '' : 's'} for ${r.people} ${r.people === 1 ? 'person' : 'people'}, with wrong options for any that had none.`
+      + (r.unknown.length ? ` Nothing matched for: ${r.unknown.join(', ')}.` : '')
+      + ' Press Save answers to keep them.');
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMsg('');
+    try {
+      const n = await saveColleagueAnswers(rows, saved);
+      setSaved(rows);
+      setMsg(`Saved ${n} row${n === 1 ? '' : 's'}.`);
+    } catch (e) {
+      setMsg(e?.message || 'Could not save the answers.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* Grouped by person, in form order. */
+  const people = [];
+  rows.forEach((r) => {
+    const last = people[people.length - 1];
+    if (last && last.person === r.person) last.rows.push(r);
+    else people.push({ person: r.person, team: r.team, rows: [r] });
+  });
+  const filled = rows.filter((r) => r.answer.trim()).length;
+  const playable = rows.filter((r) => r.answer.trim() && r.wrong.some((w) => w.trim())).length;
+  const teamName = (id) => (id ? huntGroups.find((g) => g.id === id)?.name ?? id : 'Committee — never asked');
+
+  return (
+    <div className="space-y-3">
+      <Field label="Paste the form results" id={pasteId}
+        hint="Open the Microsoft Forms results in Excel, select everything including the header row, copy, and paste here. Answers already filled in are overwritten by the paste.">
+        <textarea id={pasteId} value={paste} onChange={(e) => setPaste(e.target.value)} rows={3}
+          placeholder="ID	Start time	…	Who are you?	What is my favourite food?	…"
+          className={`${inputCls} py-2 font-mono text-xs resize-y`} />
+      </Field>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" onClick={doImport} disabled={!paste.trim()}
+          className="h-9 px-3.5 rounded-lg border border-gray-300 bg-white text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          Fill in answers
+        </button>
+        <button type="button" onClick={() => { setMsg('Wrong options rebuilt for every answered question. Press Save answers to keep them.'); setRows(buildWrongOptions(rows)); }}
+          disabled={!filled}
+          className="h-9 px-3.5 rounded-lg border border-gray-300 bg-white text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          Rebuild all wrong options
+        </button>
+        <button type="button" onClick={save} disabled={!dirty || saving}
+          className="h-9 px-3.5 rounded-lg bg-ink text-white text-sm font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          {saving ? 'Saving…' : 'Save answers'}
+        </button>
+      </div>
+      {msg && <p role="status" className="note">{msg}</p>}
+      <p className="note">{filled} of {rows.length} answered · {playable} ready to ask{dirty ? ' · unsaved changes' : ''}</p>
+
+      <ul className="space-y-2">
+        {people.map(({ person, team, rows: mine }) => {
+          const done = mine.filter((r) => r.answer.trim()).length;
+          return (
+            <li key={person}>
+              <details className="rounded-lg border border-gray-200">
+                <summary className="px-3 py-2 cursor-pointer text-sm flex items-center gap-2">
+                  <b>{person}</b>
+                  <span className="text-gray-400 text-xs">{teamName(team)}</span>
+                  <span className={`ml-auto text-xs ${done === mine.length ? 'text-sea' : 'text-gray-400'}`}>{done}/{mine.length}</span>
+                </summary>
+                <div className="px-3 pb-3 space-y-3">
+                  {mine.map((r) => (
+                    <div key={r.id} className="space-y-1.5">
+                      <Text label={`${r.position}. ${r.question}`} value={r.answer} placeholder="Their answer"
+                        onChange={(v) => edit(r.id, { answer: v })} />
+                      <div className="grid sm:grid-cols-3 gap-2">
+                        {[0, 1, 2].map((d) => (
+                          <input key={d} aria-label={`Wrong option ${d + 1} for ${person}, question ${r.position}`}
+                            value={r.wrong[d] ?? ''} placeholder={`✕ Wrong option ${d + 1}`}
+                            onChange={(e) => {
+                              const wrong = [...r.wrong];
+                              wrong[d] = e.target.value;
+                              edit(r.id, { wrong: wrong.slice(0, 3) });
+                            }}
+                            className={`${inputCls} h-9 text-sm`} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /* Every section starts shut, like every other accordion in the app —
    the editor is a long page and an open section hides the rest of it. */
 function Section({ title, sub, children }) {
@@ -396,10 +530,10 @@ export default function HuntEditor() {
 
   /* Both halves are needed for the game to make sense, so the summary
      counts teams that have the place and the pose, not just a pose. */
-  const posePairCount = groupRoster.filter(
+  const posePairCount = huntGroups.filter(
     (g) => draft.teams[g.id]?.pose?.photo && draft.teams[g.id]?.pose?.place
   ).length;
-  const bingoReady = groupRoster.filter((g) => draft.teams[g.id]?.bingo?.length).length;
+  const bingoReady = huntGroups.filter((g) => draft.teams[g.id]?.bingo?.length).length;
   const set = (path) => (value) => { setSaveMsg(''); setDraft((d) => setIn(d, path, value)); };
   const val = (path) => getIn(draft, path);
   const cp = (key) => ['checkpoints', key];
@@ -422,10 +556,7 @@ export default function HuntEditor() {
 
   const commonFields = (key, { body = true, photo = true } = {}) => (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        <Text label="Title" value={val([...cp(key), 'title'])} onChange={set([...cp(key), 'title'])} />
-        <Text label="Japanese subtitle" value={val([...cp(key), 'kana'])} onChange={set([...cp(key), 'kana'])} />
-      </div>
+      <Text label="Title" value={val([...cp(key), 'title'])} onChange={set([...cp(key), 'title'])} />
       <Text label="Where to play it" hint="Shown as a 📍 tag that opens the area map, e.g. “Anywhere in Area 3”. Leave blank to hide."
         value={val([...cp(key), 'stop'])} onChange={set([...cp(key), 'stop'])} />
       {body && <Area label="Instructions" hint={TEXT_HINT} value={val([...cp(key), 'body'])} onChange={set([...cp(key), 'body'])} rows={4} />}
@@ -465,14 +596,14 @@ export default function HuntEditor() {
 
       <MapSection val={val} set={set} />
 
-      <Section title="1 · Photo bingo" sub={`${bingoReady} of ${groupRoster.length} teams have photos`}>
+      <Section title="1 · Photo bingo" sub={`${bingoReady} of ${huntGroups.length} groups have photos`}>
         <p className="note">Playable whenever the team likes, like every other game.</p>
         {commonFields('bingo', { body: false })}
         <div className="grid grid-cols-2 gap-3">
           <Num label="Points per photo" value={val([...cp('bingo'), 'tilePts'])} onChange={set([...cp('bingo'), 'tilePts'])} />
           <Num label="Bonus for the full card" value={val([...cp('bingo'), 'fullPts'])} onChange={set([...cp('bingo'), 'fullPts'])} />
         </div>
-        <Sub>Each team’s card</Sub>
+        <Sub>Each group’s card</Sub>
         <p className="note -mt-2">
           Each team’s card is the photos you add here (left to right, top to bottom, up to {BINGO_MAX}) of spots around the
           area — teams can have different counts. Players have to find each spot and take a selfie of the whole team there,
@@ -481,7 +612,7 @@ export default function HuntEditor() {
           it move up one, and shots already taken would land on the wrong tile.
         </p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
-          {groupRoster.map((g) => (
+          {huntGroups.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
               <BingoTiles items={val(['teams', g.id, 'bingo'])} onChange={set(['teams', g.id, 'bingo'])} />
@@ -490,16 +621,16 @@ export default function HuntEditor() {
         </div>
       </Section>
 
-      <Section title="2 · Copy the pose" sub={`${posePairCount} of ${groupRoster.length} teams have both photos`}>
+      <Section title="2 · Copy the pose" sub={`${posePairCount} of ${huntGroups.length} groups have both photos`}>
         <Sub>The game</Sub>
         {commonFields('cp1', { photo: false })}
-        <Sub>Each team’s place and pose</Sub>
+        <Sub>Each group’s place and pose</Sub>
         <p className="note -mt-2">
           Two photos per team: where to go, then the pose to copy once they are there. Both differ by team, so
           one team can’t just follow another to the spot — add both for every team.
         </p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
-          {groupRoster.map((g) => (
+          {huntGroups.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
               <Photo label="Place photo — where to go" value={val(['teams', g.id, 'pose', 'place'])} onChange={set(['teams', g.id, 'pose', 'place'])} />
@@ -516,7 +647,7 @@ export default function HuntEditor() {
         {commonFields('cp2a', { photo: false })}
         <p className="note">Each team gets its own place to find — only that team sees its photo.</p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
-          {groupRoster.map((g) => (
+          {huntGroups.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
               <Photo label="Place photo" value={val(['teams', g.id, 'spot', 'photo'])} onChange={set(['teams', g.id, 'spot', 'photo'])} />
@@ -603,45 +734,20 @@ export default function HuntEditor() {
           </div>
         ))}
       </Section>
-      <Section title="7 · General knowledge" sub={`${val([...cp('guess'), 'streak'])} in a row · ${val([...cp('guess'), 'bank']).length} questions`}>
+      <Section title="7 · Know your colleagues" sub={`Rival groups A ↔ B, C ↔ D · ${val([...cp('guess'), 'pointsPerRight'])} a right answer`}>
         <Sub>The game</Sub>
-        {commonFields('guess')}
+        {commonFields('guess', { body: false })}
         <div className="grid grid-cols-[minmax(0,10rem)] gap-3">
-          <Num label="Right in a row to pass" value={val([...cp('guess'), 'streak'])} onChange={set([...cp('guess'), 'streak'])} min={1} />
+          <Num label="Points per right answer" value={val([...cp('guess'), 'pointsPerRight'])} onChange={set([...cp('guess'), 'pointsPerRight'])} />
         </div>
-        <p className="note -mt-2">Questions are drawn at random with the four answers shuffled. A wrong answer resets the streak to zero.</p>
-        <details className="rounded-lg border border-gray-200">
-          <summary className="px-3 py-2.5 cursor-pointer text-sm font-medium">
-            Question bank ({val([...cp('guess'), 'bank']).length})
-          </summary>
-          <ol className="px-3 pb-3 space-y-3">
-            {val([...cp('guess'), 'bank']).map((t, i, all) => {
-              const path = [...cp('guess'), 'bank', i];
-              return (
-                <li key={i} className="rounded-lg border border-gray-200 p-3 space-y-2">
-                  <div className="flex gap-2 items-center">
-                    <span className="font-mono text-[11px] text-gray-400 w-6 shrink-0 text-right">{i + 1}</span>
-                    <input aria-label={`Question ${i + 1}`} value={t.q} placeholder="Question"
-                      onChange={(e) => set([...path, 'q'])(e.target.value)} className={`${inputCls} h-10`} />
-                    <button type="button" aria-label={`Remove question ${i + 1}`} disabled={all.length <= 4}
-                      onClick={() => set([...cp('guess'), 'bank'])(all.filter((_, j) => j !== i))}
-                      className="shrink-0 h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">×</button>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-2 pl-8 pr-12">
-                    <input aria-label={`Right answer for question ${i + 1}`} value={t.a} placeholder="✓ Right answer"
-                      onChange={(e) => set([...path, 'a'])(e.target.value)} className={`${inputCls} h-10 text-sm border-sea`} />
-                    {[0, 1, 2].map((d) => (
-                      <input key={d} aria-label={`Wrong answer ${d + 1} for question ${i + 1}`} value={t.decoys?.[d] ?? ''} placeholder={`✕ Wrong answer ${d + 1}`}
-                        onChange={(e) => set([...path, 'decoys', d])(e.target.value)} className={`${inputCls} h-10 text-sm`} />
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-          <button type="button" onClick={() => set([...cp('guess'), 'bank'])([...val([...cp('guess'), 'bank']), { q: '', a: '', decoys: ['', '', ''] }])}
-            className="mx-3 mb-3 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add question</button>
-        </details>
+        <p className="note -mt-2">
+          A group answers every question about its rival group&apos;s members (A ↔ B, C ↔ D), one at a time at its own
+          pace. A wrong pick just shows the right answer. The stamp lands after the last question. Wrong options are built
+          from what other people said to the same question, and saved so every group sees the same choices. A question with
+          no answer or no wrong options is never asked; the committee&apos;s answers never are.
+        </p>
+        <Sub>Answers</Sub>
+        <ColleagueAnswers />
       </Section>
 
 

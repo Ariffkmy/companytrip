@@ -16,7 +16,7 @@ function storedSession() {
   }
 }
 
-const EMPTY_MEMBER = { isAdmin: false, team: null, fullName: null, role: null };
+const EMPTY_MEMBER = { isAdmin: false, team: null, huntGroup: null, fullName: null, role: null };
 
 export function useAuth() {
   const [session, setSession] = useState(null);
@@ -60,14 +60,21 @@ export function useAuth() {
     } catch (e) { /* ignore a corrupt cache */ }
 
     let live = true;
+    /* hunt_group arrives with 20261011000000_hunt_groups.sql; until then
+       read the profile without it rather than not at all. */
+    const readProfile = async () => {
+      const full = await supabase.from('profiles').select('full_name, team, role, hunt_group').eq('id', userId).maybeSingle();
+      return full.error ? supabase.from('profiles').select('full_name, team, role').eq('id', userId).maybeSingle() : full;
+    };
     Promise.all([
       supabase.rpc('is_admin'),
-      supabase.from('profiles').select('full_name, team, role').eq('id', userId).maybeSingle(),
+      readProfile(),
     ]).then(([admin, profile]) => {
       if (!live || admin.error || profile.error) return;
       const next = {
         isAdmin: admin.data === true,
         team: profile.data?.team ?? null,
+        huntGroup: profile.data?.hunt_group ?? null,
         fullName: profile.data?.full_name ?? null,
         role: profile.data?.role ?? null,
       };

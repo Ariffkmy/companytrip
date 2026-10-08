@@ -15,22 +15,12 @@
 */
 
 import { supabase } from './supabase';
-import groupRoster from '../data/groupRoster';
-import TRIVIA_BANK from '../data/triviaBank';
+import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
 import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
 
 export const HUNT_ID = 'atami';
 export const MEDIA_BUCKET = 'hunt-media';
 const CACHE_KEY = 'olc-hunt-config';
-
-/* Team colours are part of the stamp-rally look, not content. */
-const TEAM_COLOURS = {
-  'team-ruby': 'var(--red)',
-  'team-sapphire': 'var(--sea)',
-  'team-emerald': '#E9A82C',
-  'team-diamond': '#5B7F3E',
-  'team-pearl': '#8A4B9E',
-};
 
 /* One team's bingo card is the reference photos the committee uploads,
    each with an optional caption — as many as they upload, so teams can
@@ -78,7 +68,8 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo too: anyone can snap a tile, but it’s a selfie of the whole team at the spot',
     '',
     '**No looking things up**',
-    '- Riddle and general knowledge: no searching, no asking anyone outside the team, no AI',
+    '- Riddle: no searching, no asking anyone outside the team, no AI',
+    '- Know your colleagues: no asking the person the question is about',
     '- Observation quiz: from what you noticed on the way, with no doubling back',
     '- Every photo taken today, by your team',
     '',
@@ -91,37 +82,16 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo: 1 a photo, 5 more for the full card',
     '- Observation quiz: 2 a right answer',
     '- Ask a stranger: 2 for a word, 3 for a recommendation, 5 for a photo',
-    '- General knowledge: 10 right in a row earns the stamp',
+    '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
     '- Judged at the finish: best pose photo, most interesting buy, first back — 5 each',
   ].join('\n'),
 
-  teams: {
-    'team-ruby': {
-      pose: { photo: null, place: null, placeHint: '' },
-      spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: [],
-    },
-    'team-sapphire': {
-      pose: { photo: null, place: null, placeHint: '' },
-      spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: [],
-    },
-    'team-emerald': {
-      pose: { photo: null, place: null, placeHint: '' },
-      spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: [],
-    },
-    'team-diamond': {
-      pose: { photo: null, place: null, placeHint: '' },
-      spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: [],
-    },
-    'team-pearl': {
-      pose: { photo: null, place: null, placeHint: '' },
-      spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: [],
-    },
-  },
+  /* Per hunt group (src/data/huntGroups.js), not per trip team. */
+  teams: Object.fromEntries(HUNT_GROUP_IDS.map((id) => [id, {
+    pose: { photo: null, place: null, placeHint: '' },
+    spot: { hint: 'Recce photo goes here.', photo: null },
+    bingo: [],
+  }])),
 
   /* Area map. The areas tile the playing field side by side, sharing
      borders and covering it completely, so a team is always inside
@@ -139,15 +109,15 @@ export const DEFAULT_HUNT_CONFIG = {
 
   checkpoints: {
     cp1: {
-      title: 'Copy the pose', kana: 'ポーズを真似ろ', photo: null, stop: '',
+      title: 'Copy the pose', photo: null, stop: '',
       body: 'Go to the place in the first photo, then copy the pose in the second.\n\nEveryone in the frame. Ask a stranger to hold the phone if you have to.',
     },
     cp2a: {
-      title: 'Find the place', kana: '現地で自撮り', photo: null, stop: '',
+      title: 'Find the place', photo: null, stop: '',
       body: 'Work out where this is, go there, and take a team selfie on the spot. The riddle unlocks when the selfie lands.',
     },
     cp2b: {
-      title: 'Three switches', kana: 'スイッチの謎', photo: null, stop: '',
+      title: 'Three switches', photo: null, stop: '',
       /* Optional intro above the riddles; every riddle must be answered. */
       body: '',
       riddles: [
@@ -155,13 +125,13 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     cp3: {
-      title: 'Buy it, try it', kana: '買って食べる', photo: null, stop: '',
+      title: 'Buy it, try it', photo: null, stop: '',
       budgetYen: 500,
       brief: 'Something Japanese that nobody on your team has tried before.',
       body: 'Every member has to taste it. Photo has to show all of you eating or drinking, mid-bite.',
     },
     cp4: {
-      title: 'Look around you', kana: '周りを見ろ', photo: null, stop: '',
+      title: 'Look around you', photo: null, stop: '',
       body: 'This one is played **on the walk from Checkpoint 3 to Checkpoint 4**. Every answer is somewhere along that stretch — shop signs, things in windows, what is on the street and above it.\n\nKeep your eyes up and notice everything as you go: once you reach Checkpoint 4 you can\'t walk back to check. Split the questions between you before you set off. Phones down — none of this is on the internet.',
       questions: [
         { q: 'Something that is red. Name the object.', accept: [] },
@@ -172,7 +142,7 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     ask: {
-      title: 'Ask a stranger', kana: '声かけ', photo: null, stop: '',
+      title: 'Ask a stranger', photo: null, stop: '',
       body: 'Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.\n\nAsk before you photograph anyone. If they say no, thank them and find someone else.',
       tasks: [
         { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
@@ -181,17 +151,18 @@ export const DEFAULT_HUNT_CONFIG = {
       ],
     },
     bingo: {
-      title: 'Photo bingo', kana: 'ビンゴ', photo: null, stop: '',
+      title: 'Photo bingo', photo: null, stop: '',
       tilePts: 1,
       fullPts: 5,
     },
-    /* Stamp 7. Keyed `guess` because it replaced the closest-guess game;
-       the key is what saved team progress is filed under. */
+    /* Stamp 7. Keyed `guess` because it replaced the closest-guess game
+       (and then general knowledge); the key is what saved team progress
+       is filed under. The questions, who answers which, the answers and
+       the wrong options are in the database (src/lib/colleagueQuiz.js);
+       a team is only asked about people on the other teams. */
     guess: {
-      title: 'Test your general knowledge', kana: '一般常識', photo: null, stop: '',
-      body: 'No phones, no googling — talk it through and answer as a team.',
-      streak: 10,
-      bank: TRIVIA_BANK,
+      title: 'Do you know your colleagues?', photo: null, stop: '',
+      pointsPerRight: 2,
     },
   },
 };
@@ -208,23 +179,45 @@ function deepMerge(base, over) {
   return out;
 }
 
+/* Saved while the hunt was played in the five trip teams: their pose,
+   spot and bingo content carries over to the four groups. Pearl's has
+   no group to go to. */
+const TEAM_TO_GROUP = {
+  'team-ruby': 'group-a', 'team-sapphire': 'group-b', 'team-emerald': 'group-c', 'team-diamond': 'group-d',
+};
+
+function teamsToGroups(stored) {
+  const teams = stored?.teams;
+  if (!teams || HUNT_GROUP_IDS.some((id) => teams[id])) return stored;
+  const moved = Object.fromEntries(Object.entries(TEAM_TO_GROUP).filter(([t]) => teams[t]).map(([t, g]) => [g, teams[t]]));
+  return { ...stored, teams: moved };
+}
+
 export function withDefaults(stored) {
-  const merged = deepMerge(structuredClone(DEFAULT_HUNT_CONFIG), stored || {});
+  const merged = deepMerge(structuredClone(DEFAULT_HUNT_CONFIG), teamsToGroups(stored) || {});
+  Object.keys(merged.teams).forEach((k) => { if (!HUNT_GROUP_IDS.includes(k)) delete merged.teams[k]; });
   /* Saved before riddles became a list: its one riddle lived in `body`. */
   const oldRiddle = stored?.checkpoints?.cp2b;
   if (oldRiddle && !Array.isArray(oldRiddle.riddles) && String(oldRiddle.body ?? '').trim()) {
     merged.checkpoints.cp2b.riddles = [oldRiddle.body];
     merged.checkpoints.cp2b.body = '';
   }
-  /* Saved while stamp 7 was still the closest-guess game: its title and
-     text describe a game that no longer exists. */
+  /* Saved while stamp 7 was the closest-guess or general knowledge game:
+     its title, text and questions describe a game that no longer exists. */
   const oldGuess = stored?.checkpoints?.guess;
-  if (oldGuess && !Array.isArray(oldGuess.bank)) {
+  if (oldGuess && (oldGuess.bank !== undefined
+    || (oldGuess.streak === undefined && oldGuess.questions === undefined && oldGuess.pointsPerRight === undefined))) {
     merged.checkpoints.guess = {
       ...structuredClone(DEFAULT_HUNT_CONFIG.checkpoints.guess),
       stop: oldGuess.stop ?? '', photo: oldGuess.photo ?? null,
     };
   }
+  /* The answers moved to their own tables (colleague_answers). */
+  delete merged.checkpoints.guess.facts;
+  /* Saved while it was won with a streak, then in rounds of a set size;
+     now a group answers every question about its rival group. */
+  delete merged.checkpoints.guess.streak;
+  delete merged.checkpoints.guess.questions;
   /* Saved while the hunt was a fixed route: the team cheer, the unlock
      interstitials and the walking line are all gone, and the numbered
      stops are now outlined areas. */
@@ -270,10 +263,11 @@ export function toRuntime(config) {
     finishPoint: config.finishPoint,
     helpNote: config.helpNote,
     rules: config.rules,
-    teams: groupRoster.map((g) => ({
+    teams: huntGroups.map((g) => ({
       id: g.id,
       name: g.name,
-      colour: TEAM_COLOURS[g.id] ?? 'var(--ink)',
+      colour: g.colour,
+      rival: g.rival,
       pose: { photo: null, place: null, placeHint: '', ...config.teams[g.id]?.pose },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
@@ -283,7 +277,7 @@ export function toRuntime(config) {
     ask: { tasks: cp.ask.tasks },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
     map: config.map,
-    trivia: { streak: Math.max(1, Number(cp.guess.streak) || 10), bank: cp.guess.bank },
+    trivia: { pts: Math.max(0, Number(cp.guess.pointsPerRight) || 0) },
     cp,
   };
 }
@@ -298,18 +292,13 @@ export function validate(config) {
   if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Stamp 5: every question needs text, and there must be at least one.');
   /* No minimum: photos go in when the committee has them, and a team
      with none yet sees "coming soon" instead of a card. */
-  groupRoster.forEach((g) => {
+  huntGroups.forEach((g) => {
     if (bingoTiles(config.teams[g.id]?.bingo).length > BINGO_MAX) errs.push(`Stamp 1: ${g.name} has more than ${BINGO_MAX} bingo photos.`);
   });
   if (!posInt(cp.bingo.tilePts) || !posInt(cp.bingo.fullPts)) errs.push('Stamp 1: bingo points must be 0 or more.');
-  const bank = cp.guess.bank ?? [];
-  if (!(Number(cp.guess.streak) >= 1)) errs.push('Stamp 7: the streak needed must be at least 1.');
-  if (bank.length < 4) errs.push('Stamp 7: add at least 4 general knowledge questions.');
-  bank.forEach((t, i) => {
-    const opts = [t.a, ...(t.decoys ?? [])].map((o) => String(o ?? '').trim().toLowerCase());
-    if (!String(t.q ?? '').trim() || opts.length !== 4 || opts.some((o) => !o)) errs.push(`Stamp 7: question ${i + 1} needs its text, the right answer and three wrong answers.`);
-    else if (new Set(opts).size !== 4) errs.push(`Stamp 7: question ${i + 1} has a wrong answer that matches another answer.`);
-  });
+  /* Answers go in as the form comes back, so blanks are fine: a blank
+     fact simply isn't asked. */
+  if (!posInt(cp.guess.pointsPerRight)) errs.push('Stamp 7: points per right answer must be 0 or more.');
   const coord = (p) => Math.abs(Number(p?.lat)) <= 90 && Math.abs(Number(p?.lng)) <= 180
     && String(p?.lat ?? '').trim() !== '' && String(p?.lng ?? '').trim() !== '';
   if (!coord(config.map.start)) errs.push('Area map: the start needs a latitude and longitude.');
@@ -379,6 +368,31 @@ export async function setHuntOpen(isOpen) {
   if (error) throw error;
   try { localStorage.setItem(OPEN_KEY, String(data.is_open === true)); } catch (e) { /* silent */ }
   return data.is_open === true;
+}
+
+/* When the committee last restarted the race clock, as epoch ms (0 if
+   never). Kept out of fetchHuntConfig so a missing column (migration
+   not run yet) only costs this feature. */
+export async function fetchClockReset() {
+  if (!supabase) return 0;
+  const { data, error } = await supabase
+    .from('hunt_config')
+    .select('clock_reset_at')
+    .eq('id', HUNT_ID)
+    .maybeSingle();
+  if (error || !data?.clock_reset_at) return 0;
+  return new Date(data.clock_reset_at).getTime();
+}
+
+/** Give every team a fresh race clock. Admin only — RLS refuses everyone else. */
+export async function restartClock() {
+  const { data, error } = await supabase
+    .from('hunt_config')
+    .upsert({ id: HUNT_ID, clock_reset_at: new Date().toISOString() })
+    .select('clock_reset_at')
+    .single();
+  if (error) throw error;
+  return new Date(data.clock_reset_at).getTime();
 }
 
 export async function saveHuntConfig(config) {

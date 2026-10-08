@@ -399,7 +399,7 @@ export default function App() {
         <div className="max-w-[640px] mx-auto px-4 pb-8">
           <TreasureHunt
             onClose={closeTreasureHunt}
-            teamId={auth.member.team}
+            teamId={auth.member.huntGroup}
             config={huntConfig}
             isOpen={huntOpen}
           />

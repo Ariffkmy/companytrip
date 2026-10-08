@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import groupRoster from '../data/groupRoster';
+import huntGroups from '../data/huntGroups';
 import rooms from '../data/rooms';
 import HuntEditor from './HuntEditor';
 import { HuntOrganiser } from './TreasureHunt';
@@ -31,6 +32,16 @@ function TeamSelect({ value, onChange, disabled, id }) {
     <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} disabled={disabled} className={selectCls}>
       <option value="">No team</option>
       {groupRoster.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+    </select>
+  );
+}
+
+/* The treasure hunt's groups, separate from the trip teams. */
+function HuntGroupSelect({ value, onChange, disabled, id }) {
+  return (
+    <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)} disabled={disabled} className={selectCls}>
+      <option value="">Not playing</option>
+      {huntGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
     </select>
   );
 }
@@ -140,6 +151,11 @@ function PersonRow({ person, joined, isSelf, onPatch, onRemove, selected, onSele
         <TeamSelect id={`${base}-team`} value={person.team} onChange={(v) => onPatch({ team: v })} />
       </td>
       <td className="px-2 py-2.5 min-w-[120px]">
+        <label htmlFor={`${base}-group`} className="sr-only">Hunt group for {who}</label>
+        <HuntGroupSelect id={`${base}-group`} value={person.hunt_group} onChange={(v) => onPatch({ hunt_group: v })}
+          disabled={person.hunt_group === undefined} />
+      </td>
+      <td className="px-2 py-2.5 min-w-[120px]">
         <label htmlFor={`${base}-role`} className="sr-only">Role for {who}</label>
         <RoleSelect id={`${base}-role`} value={person.role} onChange={(v) => onPatch({ role: v })} />
       </td>
@@ -188,9 +204,13 @@ function TripList({ currentEmail, onSelfChanged }) {
   const load = useCallback(async () => {
     const cols = 'email, full_name, team, role, is_admin, added_at';
     let [list, profiles] = await Promise.all([
-      supabase.from('allowed_emails').select(`${cols}, invited_at, invite_count`).order('added_at'),
+      supabase.from('allowed_emails').select(`${cols}, hunt_group, invited_at, invite_count`).order('added_at'),
       supabase.from('profiles').select('email'),
     ]);
+    /* Before the hunt-groups migration runs, hunt_group doesn't exist. */
+    if (list.error && /hunt_group/.test(list.error.message)) {
+      list = await supabase.from('allowed_emails').select(`${cols}, invited_at, invite_count`).order('added_at');
+    }
     /* Before the invite-tracking migration runs, those columns don't exist. */
     if (list.error && /invited_at|invite_count/.test(list.error.message)) {
       list = await supabase.from('allowed_emails').select(cols).order('added_at');
@@ -340,6 +360,7 @@ function TripList({ currentEmail, onSelfChanged }) {
             <th scope="col" className="px-2 py-2.5 font-normal">Name</th>
             <th scope="col" className="px-2 py-2.5 font-normal">Status</th>
             <th scope="col" className="px-2 py-2.5 font-normal">Team</th>
+            <th scope="col" className="px-2 py-2.5 font-normal">Hunt group</th>
             <th scope="col" className="px-2 py-2.5 font-normal">Role</th>
             <th scope="col" className="px-2 py-2.5 font-normal text-center">Admin</th>
             <th scope="col" className="pl-2 pr-3 py-2.5 font-normal"><span className="sr-only">Actions</span></th>
@@ -573,13 +594,14 @@ function RoomPairing() {
   return (
     <div>
       <p className="text-sm text-gray-500 mb-4">
-        {rooms.length} rooms, two to a room. Team is shown so you can see who’s rooming across teams.
+        {rooms.length} rooms, two to a room{rooms.some((r) => r.length === 1) ? ' unless marked single' : ''}. Team is shown so you can see who’s rooming across teams.
       </p>
       <ol className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {rooms.map((pair, i) => (
           <li key={i} className="bg-white border border-gray-200 rounded-lg p-3.5">
             <p className="font-mono text-[11px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2">
-              Room {i + 1}{i === rooms.length - 1 && <span className="text-gray-400 font-normal"> · last</span>}
+              Room {i + 1}{pair.length === 1 && <span className="text-gray-400 font-normal"> · single</span>}
+              {i === rooms.length - 1 && <span className="text-gray-400 font-normal"> · last</span>}
             </p>
             <ul className="space-y-1.5">
               {pair.map((name) => {
