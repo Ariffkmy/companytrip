@@ -32,11 +32,18 @@ const TEAM_COLOURS = {
   'team-pearl': '#8A4B9E',
 };
 
-/* One team's bingo card: nine photos the committee took around the
-   area, each with an optional caption. Teams find the spot and take the
-   same shot. The captions below are placeholders until the photos go in.
-   Who snaps each tile is drawn at random by the server, not set here. */
-const bingoCard = (prompts) => prompts.map((prompt) => ({ prompt, photo: null }));
+/* One team's bingo card is the reference photos the committee uploads,
+   each with an optional caption — as many as they upload, so teams can
+   have different counts. Teams find the spot and take a selfie of
+   the whole team there. A tile with no photo (a caption left over from
+   an older config) isn't part of the card. */
+export function bingoTiles(card) {
+  return (card ?? []).filter((t) => t?.photo);
+}
+
+/* The database accepts tiles 0 to BINGO_MAX - 1; keep the two in step
+   (20261008000000_bingo_any_count.sql). */
+export const BINGO_MAX = 30;
 
 export const DEFAULT_HUNT_CONFIG = {
   raceMinutes: 90,
@@ -68,7 +75,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '',
     '**Stay together**',
     '- One team — most photos need everyone in the frame',
-    '- Photo bingo is the exception: each tile belongs to one teammate, and the Team Lead can cover a dead phone',
+    '- Photo bingo too: anyone can snap a tile, but it’s a selfie of the whole team at the spot',
     '',
     '**No looking things up**',
     '- Riddle and general knowledge: no searching, no asking anyone outside the team, no AI',
@@ -81,7 +88,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '',
     '**What scores**',
     '- 10 a stamp',
-    '- Photo bingo: 1 a tile, 3 a line, 5 for all nine',
+    '- Photo bingo: 1 a photo, 5 more for the full card',
     '- Observation quiz: 2 a right answer',
     '- Ask a stranger: 2 for a word, 3 for a recommendation, 5 for a photo',
     '- General knowledge: 10 right in a row earns the stamp',
@@ -92,77 +99,27 @@ export const DEFAULT_HUNT_CONFIG = {
     'team-ruby': {
       pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: bingoCard([
-        'Something older than everyone here',
-        'A vending machine nobody has seen the like of',
-        'A cat (real or on a sign)',
-        'A sign you cannot read',
-        'A traffic cone',
-        'Something perfectly round',
-        'A door you want to open',
-        'The colour orange',
-        'A convenience store',
-      ]),
+      bingo: [],
     },
     'team-sapphire': {
       pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: bingoCard([
-        'Steam rising from anything',
-        'A taxi',
-        'A street light',
-        'A shop mascot or character',
-        'Something shaped like a fish',
-        'A bicycle with a basket',
-        'A tiny shrine or statue',
-        'An umbrella',
-        'Your shadow doing something silly',
-      ]),
+      bingo: [],
     },
     'team-emerald': {
       pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: bingoCard([
-        'A lantern',
-        'A plastic food display',
-        'A crosswalk with nobody breaking the rules',
-        'A parked car',
-        'A sign with an arrow',
-        'Something made of bamboo',
-        'A bird',
-        'A bus stop',
-        'A traffic light',
-      ]),
+      bingo: [],
     },
     'team-diamond': {
       pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: bingoCard([
-        'A torii gate',
-        'A souvenir shaped like food',
-        'A vending machine',
-        'Someone waving back at you',
-        'A clock showing the wrong time',
-        'A noren curtain in a doorway',
-        'Something striped',
-        'A bicycle',
-        'The colour purple',
-      ]),
+      bingo: [],
     },
     'team-pearl': {
       pose: { photo: null, place: null, placeHint: '' },
       spot: { hint: 'Recce photo goes here.', photo: null },
-      bingo: bingoCard([
-        'A hot spring sign (♨)',
-        'A drink you have never tried, in a can',
-        'A tree',
-        'A shop menu',
-        'Your selfie with a sad face',
-        'Your selfie with a happy face',
-        'A reflection in a window',
-        'A flower in a pot',
-        'The colour yellow',
-      ]),
+      bingo: [],
     },
   },
 
@@ -225,7 +182,7 @@ export const DEFAULT_HUNT_CONFIG = {
     },
     bingo: {
       title: 'Photo bingo', kana: 'ビンゴ', photo: null, stop: '',
-      linePts: 3,
+      tilePts: 1,
       fullPts: 5,
     },
     /* Stamp 7. Keyed `guess` because it replaced the closest-guess game;
@@ -272,6 +229,11 @@ export function withDefaults(stored) {
      interstitials and the walking line are all gone, and the numbered
      stops are now outlined areas. */
   delete merged.checkpoints.cheer;
+  /* Saved while bingo was a fixed 3×3 grid that scored rows and columns,
+     with placeholder captions on tiles that had no photo yet. */
+  delete merged.checkpoints.bingo.linePts;
+  delete merged.checkpoints.bingo.size;
+  Object.values(merged.teams).forEach((t) => { if (Array.isArray(t.bingo)) t.bingo = bingoTiles(t.bingo); });
   delete merged.unlocks;
   delete merged.map.checkpoints;
   delete merged.map.route;
@@ -314,12 +276,12 @@ export function toRuntime(config) {
       colour: TEAM_COLOURS[g.id] ?? 'var(--ink)',
       pose: { photo: null, place: null, placeHint: '', ...config.teams[g.id]?.pose },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
-      bingo: config.teams[g.id]?.bingo ?? [],
+      bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
     buy: { budgetYen: cp.cp3.budgetYen, brief: cp.cp3.brief },
     quiz: { questions: cp.cp4.questions },
     ask: { tasks: cp.ask.tasks },
-    bingo: { linePts: cp.bingo.linePts, fullPts: cp.bingo.fullPts, size: 9 },
+    bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
     map: config.map,
     trivia: { streak: Math.max(1, Number(cp.guess.streak) || 10), bank: cp.guess.bank },
     cp,
@@ -334,10 +296,12 @@ export function validate(config) {
   if (!(Number(config.raceMinutes) > 0)) errs.push('General: race length must be more than 0 minutes.');
   if (!cp.cp2b.riddles.length || cp.cp2b.riddles.some((r) => !String(r ?? '').trim())) errs.push('Stamp 3: every riddle needs text, and there must be at least one.');
   if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Stamp 5: every question needs text, and there must be at least one.');
+  /* No minimum: photos go in when the committee has them, and a team
+     with none yet sees "coming soon" instead of a card. */
   groupRoster.forEach((g) => {
-    const card = config.teams[g.id]?.bingo ?? [];
-    if (card.length !== 9 || card.some((t) => !t?.photo && !String(t?.prompt ?? '').trim())) errs.push(`Stamp 1: all nine of ${g.name}’s bingo tiles need a photo (or at least a caption).`);
+    if (bingoTiles(config.teams[g.id]?.bingo).length > BINGO_MAX) errs.push(`Stamp 1: ${g.name} has more than ${BINGO_MAX} bingo photos.`);
   });
+  if (!posInt(cp.bingo.tilePts) || !posInt(cp.bingo.fullPts)) errs.push('Stamp 1: bingo points must be 0 or more.');
   const bank = cp.guess.bank ?? [];
   if (!(Number(cp.guess.streak) >= 1)) errs.push('Stamp 7: the streak needed must be at least 1.');
   if (bank.length < 4) errs.push('Stamp 7: add at least 4 general knowledge questions.');

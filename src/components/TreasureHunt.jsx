@@ -1,6 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { toRuntime, withDefaults } from '../lib/huntConfig';
-import { tileAccess, fetchCard, previewCard, listShots, uploadShot, deleteShot } from '../lib/bingo';
+import { listShots, uploadShot, deleteShot } from '../lib/bingo';
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
 
@@ -10,9 +10,6 @@ import HuntMapLoader from './HuntMapLoader';
 
 
 const KANJI =['壱', '弐', '参', '肆', '伍', '陸', '漆', '捌'];
-
-/* 3x3 bingo card — rows, columns, diagonals */
-const BINGO_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
 /* ── Helper functions ──────────────────────────────── */
 
@@ -253,13 +250,10 @@ function askPoints(sub, CONFIG) {
   return CONFIG.ask.tasks.reduce((n, t) => n + (String(sub[t.key] || '').trim() ? t.pts : 0), 0);
 }
 
-function bingoPoints(tiles, CONFIG) {
+function bingoPoints(tiles, size, CONFIG) {
   const filled = (i) => !!(tiles || {})[i];
-  const n = Array.from({ length: CONFIG.bingo.size }).reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
-  let p = n;
-  p += BINGO_LINES.filter((line) => line.every(filled)).length * CONFIG.bingo.linePts;
-  if (n === CONFIG.bingo.size) p += CONFIG.bingo.fullPts;
-  return p;
+  const n = Array.from({ length: size }).reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
+  return n * CONFIG.bingo.tilePts + (size && n === size ? CONFIG.bingo.fullPts : 0);
 }
 
 /* A random question the team hasn't seen this round, with its four
@@ -444,11 +438,11 @@ export function HuntOrganiser({ config }) {
                 )}
                 {s.bingo && (
                   <div>
-                    <p className="note">BINGO — {s.bingo.tiles}/9 <span className="tag">+{s.bingo.points}</span></p>
+                    <p className="note">BINGO — {s.bingo.tiles} photos <span className="tag">+{s.bingo.points}</span></p>
                     {bingoShots.length > 0 && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(52px, 1fr))', gap: 5 }}>
                         {bingoShots.map((b) => (
-                          <img key={b.tile} src={b.src} alt="" title={`Tile ${b.tile + 1} · ${b.uploader_name}${b.on_behalf ? ' (on behalf)' : ''}`}
+                          <img key={b.tile} src={b.src} alt="" title={`Tile ${b.tile + 1} · ${b.uploader_name}`}
                             style={{ width: '100%', aspectRatio: 1, objectFit: 'cover', border: 'var(--line)', borderRadius: 5 }} />
                         ))}
                       </div>
@@ -496,13 +490,12 @@ export function HuntOrganiser({ config }) {
    Main Game Component
    ════════════════════════════════════════════════════════════ */
 
-/* `me` is the signed-in member: { email, team, role, isAdmin }. */
 /* `isOpen` is the committee's switch. It gates starting a run, not
    playing one: a team already out there keeps its progress if the
    switch is thrown, because losing a half-finished submission in a
    backstreet is worse than letting them finish. Defaults true so the
    admin preview plays regardless. */
-export default function TreasureHunt({ onClose, teamId, me, config, isOpen = true, preview = false }) {
+export default function TreasureHunt({ onClose, teamId, config, isOpen = true, preview = false }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const store = useMemo(() => makeStore(preview), [preview]);
   /* Preview only: which team the admin is playing as. */
@@ -514,11 +507,10 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
   const [tick, setTick] = useState(null);
   const [toast, setToast] = useState(null);
   /* Shared bingo card for the active team: { [tile]: shot }. Preview keeps
-     its shots in memory and plays as the team's lead. */
+     its shots in memory. */
   const [shots, setShots] = useState({});
-  const [assignees, setAssignees] = useState({});
   const [busyTile, setBusyTile] = useState(null);
-  /* The bingo tile opened full-size: its photo to find, and who snaps it. */
+  /* The bingo tile opened full-size: its photo to find, and the team's shot. */
   const [openTile, setOpenTile] = useState(null);
   const [bingoMissing, setBingoMissing] = useState(null);
   const [bingoChecking, setBingoChecking] = useState(false);
@@ -549,9 +541,6 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
       document.body.style.overflow = prev;
     };
   }, [openTile]);
-  /* Scores and times are for the committee only. */
-  const player = preview ? { email: '', team: activeTeamId, role: 'Team Lead', isAdmin: false } : me;
-
   const showToast = useCallback((msg) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
@@ -615,16 +604,15 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
   const refreshShots = useCallback(async () => {
     if (preview || !activeTeamId) return null;
     try {
-      const [card, rows] = await Promise.all([fetchCard(activeTeamId), listShots(activeTeamId)]);
+      const rows = await listShots(activeTeamId);
       const next = Object.fromEntries(rows.map((r) => [r.tile, r]));
-      setAssignees(card);
       setShots(next);
       return next;
     } catch { return null; /* offline — keep what is on screen */ }
   }, [preview, activeTeamId]);
 
   useEffect(() => {
-    if (preview) { setShots({}); setAssignees(previewCard(activeTeamId)); return undefined; }
+    if (preview) { setShots({}); return undefined; }
     if (view !== 'start' && view !== 'race') return undefined;
     refreshShots();
     const id = setInterval(() => { if (!document.hidden) refreshShots(); }, 20000);
@@ -1457,12 +1445,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
 
   /* ── Game 1 — photo bingo ────────────────────────────────
      Each tile is a photo the committee took around the area: the team
-     has to find that spot or thing and take the same shot. The tile
-     shows the photo to find until the team's own one replaces it; tap
-     it to see the original full-size next to theirs.
-     One shared card per team. Each tile belongs to one member; the Team
-     Lead can fill any tile, as backup for a member who can't upload.
-     All nine tiles are still needed for this stamp — that is this
+     has to find that spot and take a selfie of the whole team there.
+     The tile shows the photo to find until the team's own
+     one replaces it; tap it to see the original full-size next to theirs.
+     One shared card per team, and anyone on the team can fill any tile.
+     Every tile is still needed for this stamp — that is this
      game's own rule, not a gate on the rest of the hunt, which a team
      can go and play at any time. */
 
@@ -1471,7 +1458,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     try {
       if (preview) {
         const src = await compressImage(file, 420, 0.6);
-        setShots((prev) => ({ ...prev, [i]: { tile: i, src, uploader_name: 'You', on_behalf: true } }));
+        setShots((prev) => ({ ...prev, [i]: { tile: i, src, uploader_name: 'You' } }));
       } else {
         await uploadShot(activeTeamId, i, file);
         await refreshShots();
@@ -1479,7 +1466,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     } catch (e) {
       const msg = e?.message ?? '';
       showToast(/row-level|policy|unauthori[sz]ed|403/i.test(msg)
-        ? 'This tile isn’t yours to snap.'
+        ? 'Only your own team’s card can be filled in.'
         : /fetch|network/i.test(msg) ? 'No signal — try again in a moment.' : "That photo didn't upload. Try another.");
     } finally {
       setBusyTile(null);
@@ -1510,16 +1497,11 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     />
   );
 
-  const renderBingoGrid = (locked) => {
-    const lead = player?.role === 'Team Lead' && player?.team === activeTeamId;
-    return (
+  const renderBingoGrid = () => (
       <>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
           {bingoCard.map((tile, i) => {
             const shot = shots[i];
-            const assignee = assignees[i];
-            const access = tileAccess(assignee, player, activeTeamId);
-            const mine = access === 'mine';
             const img = shot?.src ?? tile.photo;
             return (
               <button
@@ -1530,9 +1512,8 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
                 style={{
                   position: 'relative', aspectRatio: 1, display: 'grid', placeItems: 'center',
                   textAlign: 'center', overflow: 'hidden', borderRadius: 8, padding: '0 0 16px',
-                  border: shot ? 'var(--line)' : mine ? '3px dashed var(--red)' : '3px dashed var(--th-dash)',
+                  border: shot ? 'var(--line)' : '3px dashed var(--th-dash)',
                   background: img ? 'var(--ink)' : 'var(--th-parchment)',
-                  opacity: !shot && access === 'no' && !locked ? 0.6 : 1,
                   cursor: 'pointer', color: 'inherit', font: 'inherit',
                 }}
               >
@@ -1551,41 +1532,37 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
                 }}>
                   {busyTile === i ? '…' : shot ? '✓' : 'FIND'}
                 </span>
-                <span style={{
-                  position: 'absolute', left: 3, right: 3, bottom: 3, zIndex: 1,
-                  fontFamily: '"DM Mono", monospace', fontSize: 9, fontWeight: 700, lineHeight: 1.2,
-                  padding: '2px 4px', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  background: mine ? 'var(--gold)' : 'var(--card)', color: 'var(--ink)', border: '1px solid var(--ink)',
-                }}>
-                  📷 {mine ? 'You' : assignee?.name ?? '…'}{shot?.on_behalf ? ` · by ${shot.uploader_name}` : ''}
-                </span>
+                {shot && (
+                  <span style={{
+                    position: 'absolute', left: 3, right: 3, bottom: 3, zIndex: 1,
+                    fontFamily: '"DM Mono", monospace', fontSize: 9, fontWeight: 700, lineHeight: 1.2,
+                    padding: '2px 4px', borderRadius: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--ink)',
+                  }}>
+                    📷 {shot.uploader_name}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
 
         <p className="note" style={{ margin: '10px 0 0' }}>
-          {lead
-            ? 'Tap a tile to see the photo full-size. The person named on it snaps it on their own phone. As Team Lead you can upload any tile, but only when its owner has a technical issue uploading.'
-            : 'Tap a tile to see the photo full-size. Only the person named on it can snap it — yours are marked 📷 You. Can’t upload? Ask your Team Lead to do it for you.'}
+          Tap a tile to see the photo full-size. Anyone on the team can snap any tile — a selfie of the whole team at the spot.
         </p>
       </>
-    );
-  };
+  );
 
   /* One tile, full-size: the photo to find, the team's shot under it to
-     compare, and the snap button for whoever may upload it. */
+     compare, and the snap button. */
   const renderBingoTile = () => {
     if (openTile == null) return null;
     const i = openTile;
     const tile = bingoCard[i] ?? {};
     const shot = shots[i];
-    const assignee = assignees[i];
-    const access = tileAccess(assignee, player, activeTeamId);
     const locked = !!S?.subs?.bingo;
     const busy = busyTile === i;
-    const name = assignee?.name ?? 'a teammate';
-    const canSnap = !locked && (access === 'mine' || access === 'cover');
+    const canSnap = !locked;
     const close = () => setOpenTile(null);
     const pic = {
       display: 'block', width: '100%', maxHeight: '42vh', objectFit: 'contain',
@@ -1619,16 +1596,14 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
             {shot?.src && (
               <>
                 <div className="eyebrow" style={{ margin: '14px 0 6px' }}>
-                  Your team’s shot{shot.on_behalf ? ` · uploaded by ${shot.uploader_name}` : ''}
+                  Your team’s shot{shot.uploader_name ? ` · by ${shot.uploader_name}` : ''}
                 </div>
                 <img src={shot.src} alt="Your team’s photo" style={pic} />
               </>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
               {locked ? 'Stamp collected — this card is final.'
-                : access === 'mine' ? 'Find it, then take the same shot — same spot, same angle.'
-                : access === 'cover' ? `This is ${name}’s tile. Only upload it for them if they have a technical problem — a dead phone, no signal, the upload won’t go through.`
-                : `${name} snaps this one — only they can upload it.`}
+                : 'Find it, then take a selfie of the whole team at the spot.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flex: 'none', flexWrap: 'wrap' }}>
@@ -1638,7 +1613,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
                 htmlFor={`bingo-snap-${i}`}
                 style={{ flex: '1 1 auto', justifyContent: 'center', cursor: busy ? 'wait' : 'pointer', opacity: busy ? 0.6 : 1 }}
               >
-                {busy ? 'Uploading…' : shot ? 'Retake' : access === 'cover' ? `Snap it for ${name}` : '📷 Take the photo'}
+                {busy ? 'Uploading…' : shot ? 'Retake' : '📷 Take the photo'}
               </label>
             )}
             {canSnap && !busy && bingoFileInput(i, `bingo-snap-${i}`)}
@@ -1661,24 +1636,33 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
     /* The warning shrinks as the missing photos land. */
     const stillMissing = (bingoMissing ?? []).filter((i) => !tiles[i]);
 
+    if (!bingoCard.length) {
+      return (
+        <div className="card flag">
+          {renderCpHead(STAMP_NO.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
+          <p className="note" style={{ margin: 0 }}>The committee hasn’t put your team’s photos up yet. Check back soon.</p>
+        </div>
+      );
+    }
+
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.kana, CONFIG.cp.bingo.stop)}
         <div className="task">
-          <p style={{ margin: 0 }}>Every tile is a photo of something around the area. Find it and take the same shot — same spot, same angle. Each tile is snapped by the teammate named on it. All nine earn the stamp — leave it part-filled and come back whenever you like.</p>
+          <p style={{ margin: 0 }}>Every tile is a photo of something around the area. Find the spot and take a selfie of the whole team there. Anyone on the team can snap any tile. All {bingoCard.length} earn the stamp — leave it part-filled and come back whenever you like.</p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.bingo.photo} />
-        {renderBingoGrid(locked)}
+        {renderBingoGrid()}
         {renderBingoTile()}
         {stillMissing.length > 0 && (
           <div role="alert" style={{
             marginTop: 14, padding: '10px 12px', borderRadius: 8,
             border: '2px solid var(--red)', background: 'var(--th-parchment)', fontSize: 13,
           }}>
-            <b>All nine photos are needed for this stamp.</b> Still missing {stillMissing.length}:
+            <b>All {bingoCard.length} photos are needed for this stamp.</b> Still missing {stillMissing.length}:
             <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
               {stillMissing.map((i) => (
-                <li key={i}>Tile {i + 1}{bingoCard[i]?.prompt ? ` · ${bingoCard[i].prompt}` : ''} — {assignees[i]?.name ?? 'teammate'}</li>
+                <li key={i}>Tile {i + 1}{bingoCard[i]?.prompt ? ` · ${bingoCard[i].prompt}` : ''}</li>
               ))}
             </ul>
           </div>
@@ -1701,7 +1685,7 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
             }
             setBingoMissing(null);
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(fresh, CONFIG), at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(fresh, bingoCard.length, CONFIG), at: Date.now() } };
             newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
@@ -1709,9 +1693,9 @@ export default function TreasureHunt({ onClose, teamId, me, config, isOpen = tru
           }}
           type="button"
         >
-          {bingoChecking ? 'Checking…' : `Collect the stamp · ${filled}/9`}
+          {bingoChecking ? 'Checking…' : `Collect the stamp · ${filled}/${bingoCard.length}`}
         </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>The stamp lands once all nine tiles have a photo.</p>
+        <p className="note" style={{ margin: '12px 0 0' }}>The stamp lands once every tile has a photo.</p>
       </div>
     );
   };

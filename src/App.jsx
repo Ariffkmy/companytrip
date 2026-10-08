@@ -400,7 +400,6 @@ export default function App() {
           <TreasureHunt
             onClose={closeTreasureHunt}
             teamId={auth.member.team}
-            me={{ email: auth.user?.email?.toLowerCase() ?? '', team: auth.member.team, role: auth.member.role, isAdmin: auth.isAdmin }}
             config={huntConfig}
             isOpen={huntOpen}
           />
