@@ -992,26 +992,10 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     </button>
   ) : null);
 
-  /* Every game carries its own way out: leaving one half-done and
-     picking another is normal play, not an escape hatch. */
-  const renderBack = () => (
-    <button
-      type="button"
-      onClick={backToHub}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 10,
-        padding: '5px 11px', borderRadius: 999, border: 'var(--line)',
-        background: 'var(--card)', color: 'var(--ink)',
-        font: '700 12px/1.2 var(--body)', cursor: 'pointer',
-      }}
-    >
-      ← All games
-    </button>
-  );
-
+  /* The way out of a game is the "Main menu" button in the sticky bar:
+     leaving one half-done and picking another is normal play. */
   const renderCpHead = (n, title, stop) => (
     <>
-      {renderBack()}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
         <div style={{
           flex: 'none', width: 42, height: 42, borderRadius: '50%',
@@ -1746,21 +1730,24 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
 
     return (
       <div className="card flag">
-        {/* No title block here: just the way out, and the score so far. */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-          {renderBack()}
-          <span aria-live="polite" aria-label={`${rightCount} right out of ${total}`} style={{
+        {/* No title block here: just the score so far — right answers,
+            and the points they have earned. */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+          <span aria-live="polite" aria-label={`${rightCount} right out of ${total}, ${rightCount * CONFIG.trivia.pts} points`} style={{
+            display: 'inline-flex', alignItems: 'baseline', gap: 8,
             padding: '4px 11px', borderRadius: 999, border: 'var(--line)', background: 'var(--card)',
             font: '700 14px/1.2 "DM Mono", monospace', color: 'var(--ink)',
           }}>
-            {rightCount}/{total}
+            <span><span style={{ color: 'var(--sea)' }}>✓</span> {rightCount}/{total}</span>
+            <span style={{ color: 'var(--ink-soft)' }}>·</span>
+            <span style={{ color: 'var(--red)' }}>{rightCount * CONFIG.trivia.pts} pts</span>
           </span>
         </div>
         <CheckpointPhoto src={CONFIG.cp.guess.photo} />
 
         {collected ? (
           <p style={{ margin: 0, fontWeight: 700 }}>
-            Stamp collected — {S.subs.guess.right ?? rightCount} of {S.subs.guess.answered ?? total} right.
+            Stamp collected — {S.subs.guess.right ?? rightCount} of {S.subs.guess.answered ?? total} right, {(S.subs.guess.right ?? rightCount) * CONFIG.trivia.pts} points.
           </p>
         ) : !cur ? (
           <p className="note">
@@ -1921,21 +1908,22 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
 
   return (
     <div className="relative min-h-[300px]">
-      {/* Close button */}
+      {/* Back on the left: from inside a game it goes to the games
+          overview; from the overview or start screen it leaves the hunt. */}
       <div className="sticky top-0 z-70 flex justify-between gap-2 py-1.5">
+        <button
+          onClick={view === 'race' && S?.open ? backToHub : onClose}
+          type="button"
+          className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card border-red transition-all duration-100 hover:opacity-90"
+        >
+          {view === 'race' && S?.open ? '← Main menu' : preview ? '← Back to editor' : '← Back to Day 4'}
+        </button>
         <button
           onClick={() => setMapOpen(true)}
           type="button"
           className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-card text-ink transition-all duration-100 hover:opacity-90"
         >
           🗺️ Area map
-        </button>
-        <button
-          onClick={onClose}
-          type="button"
-          className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card border-red transition-all duration-100 hover:opacity-90"
-        >
-          {preview ? '← Back to editor' : '← Back to Day 4'}
         </button>
       </div>
 
