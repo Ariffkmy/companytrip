@@ -5,12 +5,12 @@
 -- The sign-up page runs before anyone is signed in, and a client can't
 -- read auth.users, so it asks this instead. It answers one of:
 --
---   'not_listed' — not on the trip list; no email is sent
+--   'not_listed' — not on the trip list; no account is made
 --   'registered' — already has an account; sign in instead
---   'ok'         — send the magic link
+--   'ok'         — go ahead and create the account
 --
--- "Registered" means the account has been used: an address that asked
--- for a link but never opened it is still 'ok', so it can ask again.
+-- "Registered" means the account has been confirmed or used: one that
+-- was started but never confirmed is still 'ok', so it can try again.
 --
 -- It says yes or no about a single address and nothing else — the same
 -- fact the sign-up errors already reveal — so it is callable signed out.

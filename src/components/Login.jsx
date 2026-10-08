@@ -19,6 +19,7 @@ function friendlyError(error) {
      as a generic database error. */
   if (/database error|email_not_allowed/i.test(msg)) return 'That email isn’t on the trip list. Ask the committee to add you.';
   if (/signups? not allowed/i.test(msg)) return 'Sign-up is switched off right now. Ask the committee for an invite.';
+  if (/already registered|already exists/i.test(msg)) return 'You’ve already registered with this email. Sign in instead.';
   if (/email not confirmed/i.test(msg)) return 'Confirm your email first. The link is in your inbox.';
   if (/rate limit/i.test(msg)) return 'Too many attempts. Wait a few minutes and try again.';
   if (/same.*password|different from the old/i.test(msg)) return 'Pick a password you haven’t used here before.';
@@ -31,8 +32,7 @@ const COPY = {
   forgot: { title: 'Reset', accent: 'password', lede: 'We’ll email you a link to set a new one.', cta: 'Send reset link', busy: 'Sending…' },
   recovery: { title: 'New', accent: 'password', lede: 'Choose a new password for your account.', cta: 'Save password', busy: 'Saving…' },
   invite: { title: 'Welcome', accent: 'aboard', lede: 'You’re on the trip list. Set a password to finish your account.', cta: 'Set password', busy: 'Saving…' },
-  signup: { title: 'Sign', accent: 'up', lede: 'Enter your Orangeleaf email and we’ll send you a sign-in link.', cta: 'Email me a link', busy: 'Sending…' },
-  magic: { title: 'You’re', accent: 'in', lede: 'Set a password so you can sign in with it next time.', cta: 'Set password', busy: 'Saving…' },
+  signup: { title: 'Sign', accent: 'up', lede: 'Use your Orangeleaf email and choose a password.', cta: 'Create account', busy: 'Creating…' },
 };
 
 const domainOk = (addr) => SIGNUP_DOMAINS.includes(addr.split('@')[1] ?? '');
@@ -90,9 +90,9 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
   const [sent, setSent] = useState(null);
 
   const copy = COPY[mode];
-  const choosingPassword = mode === 'recovery' || mode === 'invite' || mode === 'magic';
+  const choosingPassword = mode === 'recovery' || mode === 'invite';
   const needsEmail = !choosingPassword;
-  const needsPassword = mode !== 'forgot' && mode !== 'signup';
+  const needsPassword = mode !== 'forgot';
 
   const switchTo = (next) => {
     setMode(next);
@@ -142,13 +142,17 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
           setError('That email isn’t on the trip list. Ask the committee to add you.');
           return;
         }
-        /* Creates the account on first use, then just signs in. */
-        const { error: err } = await supabase.auth.signInWithOtp({
+        /* Email and password, no email sent — as long as "Confirm email"
+           is off in Supabase. Then signUp returns a session and useAuth
+           swaps straight into the app. If it is on, there's no session
+           yet and the confirmation email is the next step. */
+        const { data, error: err } = await supabase.auth.signUp({
           email: addr,
-          options: { shouldCreateUser: true, emailRedirectTo: redirectTo },
+          password,
+          options: { emailRedirectTo: redirectTo },
         });
         if (err) throw err;
-        setSent({ to: addr, kind: 'link' });
+        if (!data.session) setSent({ to: addr, kind: 'confirm' });
       } else if (choosingPassword) {
         const { error: err } = await supabase.auth.updateUser({ password });
         if (err) throw err;
@@ -177,9 +181,9 @@ export default function Login({ setup = null, onPasswordSet, themeToggle }) {
               Check your <span className="text-red">inbox</span>
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed mt-3">
-              {sent.kind === 'link' ? 'A sign-in link is on its way to' : 'If that address has an account, a reset link is on its way to'}{' '}
-              <span className="font-medium text-ink break-all">{sent.to}</span>.
-              {sent.kind === 'link' && ' Open it on this phone — it signs you in and asks you to set a password.'}
+              {sent.kind === 'confirm' ? 'Your account is made. Confirm it from the email sent to' : 'If that address has an account, a reset link is on its way to'}{' '}
+              <span className="font-medium text-ink break-all">{sent.to}</span>
+              {sent.kind === 'confirm' ? ', then sign in with your password.' : '.'}
             </p>
             <p className="note mt-2">Not there after a minute? Check spam.</p>
             <button
