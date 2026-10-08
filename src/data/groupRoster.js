@@ -4,7 +4,7 @@
    Five teams, each with a Team Lead and a JP Speaker. The short
    names are the deck's own; `full` is the passport-style name
    already held in this app, matched where the pairing is
-   unambiguous. Two members have no full name on file yet.
+   unambiguous.
 
    Phone numbers are deliberately null — the previous values in
    this file were sequential dummies (012-555-01xx). A fake number
@@ -20,7 +20,6 @@ const groupRoster = [
       { name: 'Nicholas', full: 'NICHOLAS (YAP WEI CHOONG)', role: 'Team Lead', phone: null },
       { name: 'Chiew', full: 'CHIEW SOW DING', role: 'JP Speaker', phone: null },
       { name: 'Amir', full: 'AMIR ARSHAD ABD AZIZ', role: 'Member', phone: null },
-      { name: 'Rabiatul', full: null, role: 'Member', phone: null },
       { name: 'Ruby', full: 'RUBY BALASINGAM', role: 'Member', phone: null },
     ],
   },
@@ -40,7 +39,7 @@ const groupRoster = [
     name: 'Team Emerald',
     members: [
       { name: 'Eleora', full: 'ELEORA LINA SCHWARTZ', role: 'Team Lead', phone: null },
-      { name: 'Aidan', full: null, role: 'JP Speaker', phone: null },
+      { name: 'Aidan', full: 'LEE HOE JIN', role: 'JP Speaker', phone: null },
       { name: 'Ariff', full: 'ARIFF HAKIMI BIN CHIK', role: 'Member', phone: null },
       { name: 'Raf', full: 'RAF SWIGGERS', role: 'Member', phone: null },
       { name: 'Ashley', full: 'ASHLEY ANG', role: 'Member', phone: null },
@@ -53,7 +52,6 @@ const groupRoster = [
       { name: 'Hairul', full: 'MUHAMMAD HAIRULWAFIQ BIN HAIRUNIZAM', role: 'Team Lead', phone: null },
       { name: "Asma'", full: "ASMA' BINTI ZUBIR", role: 'JP Speaker', phone: null },
       { name: 'Aina', full: 'NUR AINA NAJWA BINTI NOR DAUMI', role: 'Member', phone: null },
-      { name: 'Zaire', full: 'MOHD ZAIRE BIN RAMLI', role: 'Member', phone: null },
       { name: 'Kevin', full: 'KEVIN LEE', role: 'Member', phone: null },
     ],
   },
