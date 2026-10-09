@@ -1368,11 +1368,10 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
             />
           </label>
         ))}
-        {renderShot(draft.photo, 'Add a team photo', 'Proof you walked the stretch and made it')}
         <button
           className="btn block"
           style={{ marginTop: 14 }}
-          disabled={answers.filter(Boolean).length !== CONFIG.quiz.questions.length || !draft.photo}
+          disabled={answers.filter(Boolean).length !== CONFIG.quiz.questions.length}
           onClick={() => {
             let correct = 0;
             CONFIG.quiz.questions.forEach((q, i) => {
@@ -1380,7 +1379,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
               if (q.accept.some((a) => norm(answers[i]).includes(norm(a)))) correct++;
             });
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cp4: { answers, photo: draft.photo, correct, at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), cp4: { answers, correct, at: Date.now() } };
             newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
