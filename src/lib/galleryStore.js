@@ -61,7 +61,9 @@ function urlFor(id, blob) {
 
 /* ── Treasure hunt photos ────────────────────────────
    Read-only. The hunt writes compressed data URLs into
-   localStorage under `treasure:<teamId>`. Teams play the games in any
+   localStorage under `treasure:<teamId>`, and a run the committee
+   restarted is kept under `treasure:<teamId>@<restart time>` so its
+   photos stay here. Teams play the games in any
    order, so these are labelled by the game, not by a position on a
    route. */
 
@@ -86,7 +88,7 @@ function readHuntPhotos() {
     Object.entries(run.subs).forEach(([cp, sub]) => {
       if (!sub || !sub.photo) return;
       out.push({
-        id: `hunt:${run.teamId}:${cp}`,
+        id: `hunt:${key.slice('treasure:'.length)}:${cp}`,
         kind: 'photo',
         src: sub.photo,
         name: `${run.teamName || run.teamId} — ${CP_LABELS[cp] || cp}`,

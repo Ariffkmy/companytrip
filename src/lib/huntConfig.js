@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════
 
    Everything an admin can change lives in one JSON document
-   (public.hunt_config, id 'atami'). The flow itself — seven stamps a
+   (public.hunt_config, id 'atami'). The flow itself — six stamps a
    team may collect in any order — and the scoring rules stay in
    TreasureHunt.jsx.
 
@@ -81,7 +81,6 @@ export const DEFAULT_HUNT_CONFIG = {
     '- 10 a stamp',
     '- Photo bingo: 1 a photo, 5 more for the full card',
     '- Observation quiz: 2 a right answer',
-    '- Ask a stranger: 2 for a word, 3 for a recommendation, 5 for a photo',
     '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
     '- Judged at the finish: best pose photo, most interesting buy, first back — 5 each',
   ].join('\n'),
@@ -110,7 +109,7 @@ export const DEFAULT_HUNT_CONFIG = {
   checkpoints: {
     cp1: {
       title: 'Copy the pose', photo: null, stop: '',
-      body: 'Go to the place in the first photo, then copy the pose in the second.\n\nEveryone in the frame. Ask a stranger to hold the phone if you have to.',
+      body: 'Go to the place in the first photo, then copy the pose in the second.\n\nEveryone in the frame. Ask a passer-by to hold the phone if you have to.',
     },
     cp2a: {
       title: 'Find the place', photo: null, stop: '',
@@ -141,21 +140,12 @@ export const DEFAULT_HUNT_CONFIG = {
         { q: 'The last shop you passed before reaching Checkpoint 4. Name it.', accept: [] },
       ],
     },
-    ask: {
-      title: 'Ask a stranger', photo: null, stop: '',
-      body: 'Find someone who is not on this trip and talk to them. Three things you can come back with — do one, do all three.\n\nAsk before you photograph anyone. If they say no, thank them and find someone else.',
-      tasks: [
-        { key: 'word', pts: 2, label: 'A word they taught you', hint: 'Romaji is fine. Write what it means too.' },
-        { key: 'rec', pts: 3, label: 'Something they recommended', hint: 'Food, a spot, anything at all.' },
-        { key: 'photo', pts: 5, label: 'A photo with them and the whole team', hint: 'Ask first. If they say no, that is a no.' },
-      ],
-    },
     bingo: {
       title: 'Photo bingo', photo: null, stop: '',
       tilePts: 1,
       fullPts: 5,
     },
-    /* Stamp 7. Keyed `guess` because it replaced the closest-guess game
+    /* Stamp 6. Keyed `guess` because it replaced the closest-guess game
        (and then general knowledge); the key is what saved team progress
        is filed under. The questions, who answers which, the answers and
        the wrong options are in the database (src/lib/colleagueQuiz.js);
@@ -202,7 +192,7 @@ export function withDefaults(stored) {
     merged.checkpoints.cp2b.riddles = [oldRiddle.body];
     merged.checkpoints.cp2b.body = '';
   }
-  /* Saved while stamp 7 was the closest-guess or general knowledge game:
+  /* Saved while stamp 6 was the closest-guess or general knowledge game:
      its title, text and questions describe a game that no longer exists. */
   const oldGuess = stored?.checkpoints?.guess;
   if (oldGuess && (oldGuess.bank !== undefined
@@ -222,6 +212,9 @@ export function withDefaults(stored) {
      interstitials and the walking line are all gone, and the numbered
      stops are now outlined areas. */
   delete merged.checkpoints.cheer;
+  /* Saved while Ask a stranger was one of the games. */
+  delete merged.checkpoints.ask;
+  merged.rules = String(merged.rules ?? '').split('\n').filter((l) => !/^- Ask a stranger/.test(l)).join('\n');
   /* Saved while bingo was a fixed 3×3 grid that scored rows and columns,
      with placeholder captions on tiles that had no photo yet. */
   delete merged.checkpoints.bingo.linePts;
@@ -258,7 +251,7 @@ export function toRuntime(config) {
   const cp = config.checkpoints;
   return {
     raceMinutes: Number(config.raceMinutes) || 90,
-    stamps: 7,
+    stamps: 6,
     points: config.points,
     finishPoint: config.finishPoint,
     helpNote: config.helpNote,
@@ -274,7 +267,6 @@ export function toRuntime(config) {
     })),
     buy: { budgetYen: cp.cp3.budgetYen, brief: cp.cp3.brief },
     quiz: { questions: cp.cp4.questions },
-    ask: { tasks: cp.ask.tasks },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
     map: config.map,
     trivia: { pts: Math.max(0, Number(cp.guess.pointsPerRight) || 0) },
@@ -298,7 +290,7 @@ export function validate(config) {
   if (!posInt(cp.bingo.tilePts) || !posInt(cp.bingo.fullPts)) errs.push('Stamp 1: bingo points must be 0 or more.');
   /* Answers go in as the form comes back, so blanks are fine: a blank
      fact simply isn't asked. */
-  if (!posInt(cp.guess.pointsPerRight)) errs.push('Stamp 7: points per right answer must be 0 or more.');
+  if (!posInt(cp.guess.pointsPerRight)) errs.push('Stamp 6: points per right answer must be 0 or more.');
   const coord = (p) => Math.abs(Number(p?.lat)) <= 90 && Math.abs(Number(p?.lng)) <= 180
     && String(p?.lat ?? '').trim() !== '' && String(p?.lng ?? '').trim() !== '';
   if (!coord(config.map.start)) errs.push('Area map: the start needs a latitude and longitude.');
@@ -307,7 +299,6 @@ export function validate(config) {
       errs.push(`Area map: area ${i + 1} needs an outline of at least three points.`);
     }
   });
-  if (cp.ask.tasks.some((t) => !t.label.trim() || !posInt(t.pts))) errs.push('Stamp 6: each task needs a label and a points value.');
   return errs;
 }
 

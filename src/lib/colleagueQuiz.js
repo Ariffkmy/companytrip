@@ -2,7 +2,7 @@
    Know your colleagues — questions, answers and options
    ═══════════════════════════════════════════════════
 
-   Stamp 7 of the treasure hunt. The allocation (who answers which five
+   Stamp 6 of the treasure hunt. The allocation (who answers which five
    questions), each person's answer and the wrong options shown beside it
    live in public.colleague_answers, joined to public.colleague_questions
    (20261010000000_colleague_quiz.sql). Everyone signed in reads them;

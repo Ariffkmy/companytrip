@@ -718,23 +718,7 @@ export default function HuntEditor() {
         </div>
       </Section>
 
-      <Section title="6 · Ask a stranger" sub={val([...cp('ask'), 'title'])}>
-        <Sub>The game</Sub>
-        {commonFields('ask')}
-        {val([...cp('ask'), 'tasks']).map((t, i) => (
-          <div key={t.key} className="rounded-lg border border-gray-200 p-3 space-y-2">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
-              {t.key === 'photo' ? 'Photo task' : t.key === 'word' ? 'Text task 1' : 'Text task 2'}
-            </p>
-            <div className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2">
-              <Text label="Task" value={t.label} onChange={set([...cp('ask'), 'tasks', i, 'label'])} />
-              <Num label="Points" value={t.pts} onChange={set([...cp('ask'), 'tasks', i, 'pts'])} />
-            </div>
-            <Text label={t.key === 'photo' ? 'Hint under the photo box' : 'Hint in the answer box'} value={t.hint} onChange={set([...cp('ask'), 'tasks', i, 'hint'])} />
-          </div>
-        ))}
-      </Section>
-      <Section title="7 · Know your colleagues" sub={`Rival groups A ↔ B, C ↔ D · ${val([...cp('guess'), 'pointsPerRight'])} a right answer`}>
+      <Section title="6 · Know your colleagues" sub={`Rival groups A ↔ B, C ↔ D · ${val([...cp('guess'), 'pointsPerRight'])} a right answer`}>
         <Sub>The game</Sub>
         {commonFields('guess', { body: false })}
         <div className="grid grid-cols-[minmax(0,10rem)] gap-3">

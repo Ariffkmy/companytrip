@@ -254,7 +254,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
       {index === 4 && (
         <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
           <p className="font-display text-base tracking-wide">Atami Treasure Hunt</p>
-          <p className="text-sm text-gray-500 mt-1">7 games, any order · 14:10–17:30 · All downhill</p>
+          <p className="text-sm text-gray-500 mt-1">6 games, any order · 14:10–17:30 · All downhill</p>
           <div className="flex gap-2 justify-center mt-3">
             {[0, 1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="w-8 h-8 rounded-full border border-dashed border-gray-300 grid place-items-center font-mono text-xs text-gray-400">

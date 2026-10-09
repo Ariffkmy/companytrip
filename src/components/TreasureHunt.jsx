@@ -199,7 +199,7 @@ function CheckpointPhoto({ src }) {
   );
 }
 
-/* ── The seven games ────────────────────────────────
+/* ── The six games ────────────────────────────────
    Teams choose what to play and in what order, and may skip anything —
    the numbering below is only how the games are listed and stamped, not
    a sequence. Nothing here gates anything else. */
@@ -209,7 +209,6 @@ const GAMES = [
   { key: 'cp2', short: 'Selfie + riddle' },
   { key: 'cp3', short: 'Buy & try' },
   { key: 'cp4', short: 'Observation quiz' },
-  { key: 'ask', short: 'Ask a stranger' },
   { key: 'guess', short: 'Know your colleagues' },
 ];
 
@@ -218,13 +217,13 @@ const SLOTS = GAMES.map((_, i) => i);
 /* Which rally slot a saved submission fills. cp2 is a two-parter — the
    selfie opens the riddle, and the riddle is what earns the stamp — so
    cp2a deliberately has no slot of its own. */
-const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, ask: 5, guess: 6 };
+const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, guess: 5 };
 
 /* The number printed on each game's header. cp2a and cp2b share one. */
-const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, ask: 6, guess: 7 };
+const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, guess: 6 };
 
 /* A game counts as collected once its stamping submission is in. */
-const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', ask: 'ask', guess: 'guess' };
+const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', guess: 'guess' };
 
 /* Title for a game in the hub and the preview menu. cp2 is titled by
    its first screen. */
@@ -243,11 +242,6 @@ function blankState(team) {
     subs: {},
     bonus: {},
   };
-}
-
-function askPoints(sub, CONFIG) {
-  if (!sub) return 0;
-  return CONFIG.ask.tasks.reduce((n, t) => n + (String(sub[t.key] || '').trim() ? t.pts : 0), 0);
 }
 
 function bingoPoints(tiles, size, CONFIG) {
@@ -292,10 +286,10 @@ function drawColleague(rows, teamId, seen = []) {
 function scoreOf(run, CONFIG) {
   let p = 0;
   Object.keys(run.subs).forEach((k) => {
+    if (k === 'ask') return; // the dropped Ask a stranger game, on an old run
     const sub = run.subs[k];
     p += CONFIG.points.checkpoint;
     if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
-    else if (k === 'ask') p += askPoints(sub, CONFIG);
     else if (k === 'bingo') p += sub.points || 0;
     else if (k === 'guess') p += (sub.right || 0) * CONFIG.trivia.pts;
   });
@@ -342,8 +336,8 @@ export function HuntOrganiser({ config }) {
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <p className="note" style={{ margin: 0, flex: '1 1 220px' }}>
-          Gives every team a fresh {CONFIG.raceMinutes} minutes and reopens the game for anyone whose time
-          ran out. Stamps are kept.
+          Starts the hunt again from the beginning for every team, with a fresh {CONFIG.raceMinutes} minutes.
+          Stamps, answers and points go back to zero on every phone; nothing is deleted.
           {resetAt > 0 && ` Last restarted ${new Date(resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`}
         </p>
         <button
@@ -467,6 +461,9 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   /* Shared bingo card for the active team: { [tile]: shot }. Preview keeps
      its shots in memory. */
   const [shots, setShots] = useState({});
+  /* When the committee last restarted the hunt (epoch ms, 0 = never).
+     Bingo shots from before it don't count any more. */
+  const [huntResetAt, setHuntResetAt] = useState(0);
   const [busyTile, setBusyTile] = useState(null);
   /* The bingo tile opened full-size: its photo to find, and the team's shot. */
   const [openTile, setOpenTile] = useState(null);
@@ -557,7 +554,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   }, [onTrivia]);
   useEffect(() => {
     if (!onTrivia) return;
-    /* A question left over from the general knowledge game that stamp 7
+    /* A question left over from the general knowledge game that this stamp
        used to be (no row id) is thrown away, along with its old streak. */
     const leftover = S.trivia?.current && S.trivia.current.id == null;
     if (!leftover && (S.trivia?.current || !colleaguePool(colleague, S.teamId).length)) return;
@@ -577,11 +574,12 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     if (preview || !activeTeamId) return null;
     try {
       const rows = await listShots(activeTeamId);
-      const next = Object.fromEntries(rows.map((r) => [r.tile, r]));
+      const current = rows.filter((r) => !huntResetAt || new Date(r.created_at).getTime() > huntResetAt);
+      const next = Object.fromEntries(current.map((r) => [r.tile, r]));
       setShots(next);
       return next;
     } catch { return null; /* offline — keep what is on screen */ }
-  }, [preview, activeTeamId]);
+  }, [preview, activeTeamId, huntResetAt]);
 
   useEffect(() => {
     if (preview) { setShots({}); return undefined; }
@@ -593,23 +591,33 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
 
   /* ── Committee clock restart ─────────────────────────
      The committee can give every team a fresh race clock from Admin →
-     Organiser, typically after time ran out. Stamps are kept; only the
-     clock starts again, timed from when this phone hears about it so a
-     skewed laptop clock can't eat into it. */
+     Organiser. Every team starts the hunt again from the beginning: no
+     stamps, answers or points, timed from when this phone hears about it
+     so a skewed laptop clock can't eat into it. Nothing is deleted —
+     bingo photos taken before the restart stay in storage, they just
+     no longer fill the card (see `shots` below). */
   const checkClockReset = useCallback(async () => {
     if (preview || !activeTeamId) return;
     const at = await fetchClockReset();
+    setHuntResetAt(at);
     const run = store.load(activeTeamId);
     if (!at || !run?.startedAt || at <= run.startedAt || at === run.clockReset) return;
+    /* The old run is kept beside the new one (its photos still show in
+       the album). If the phone is too full to keep both, the restart
+       waits rather than lose it. */
+    if (!store.save(`${run.teamId}@${at}`, run)) return;
     const next = {
-      ...run, startedAt: Date.now(), finishedAt: null,
-      open: run.finishedAt ? null : run.open, clockReset: at,
+      ...blankState({ id: run.teamId, name: run.teamName }),
+      members: run.members, startedAt: Date.now(), clockReset: at,
     };
     store.save(next.teamId, next);
     setTick(null);
+    setDraft({});
+    setOpenTile(null);
+    setBingoMissing(null);
     setS((cur) => (cur ? next : cur));
     setView((v) => (v === 'done' ? 'race' : v));
-    showToast('The committee restarted your clock — keep playing');
+    showToast('The committee restarted the hunt — start again from the beginning');
   }, [preview, activeTeamId, store, showToast]);
 
   useEffect(() => {
@@ -1188,9 +1196,20 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   /* Every configured riddle needs an answer before the stamp. */
   const renderCp2b = () => {
     const riddles = CONFIG.cp.cp2b.riddles;
-    const answers = draft.riddleAnswers || [];
+    /* What's typed lives in the draft until Save writes it to the run,
+       so the team can leave and come back to it later. */
+    const saved = S.riddleDraft || [];
+    const answers = draft.riddleAnswers || saved;
     const answered = riddles.filter((_, i) => String(answers[i] || '').trim()).length;
     const many = riddles.length > 1;
+    const unsaved = riddles.some((_, i) => String(answers[i] || '') !== String(saved[i] || ''));
+    const saveDraft = () => {
+      const next = { ...S, riddleDraft: riddles.map((_, i) => answers[i] || '') };
+      store.save(next.teamId, next);
+      setS(next);
+      setDraft((d) => ({ ...d, riddleAnswers: undefined }));
+      showToast('Answers saved. Come back to them any time.');
+    };
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.stop)}
@@ -1214,7 +1233,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                 placeholder="Write the answer your team agreed on."
                 value={answers[i] || ''}
                 onChange={(e) => setDraft((d) => {
-                  const next = [...(d.riddleAnswers || [])];
+                  const next = [...(d.riddleAnswers || saved)];
                   next[i] = e.target.value;
                   return { ...d, riddleAnswers: next };
                 })}
@@ -1234,6 +1253,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
             const list = riddles.map((_, i) => String(answers[i] || '').trim());
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp2b: { answers: list, answer: list.join('\n\n'), at: Date.now() } };
+            delete newS.riddleDraft;
             newS.open = null;
             store.save(newS.teamId, newS);
             setS(newS);
@@ -1244,7 +1264,19 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
         >
           {many ? `Send answers · ${answered}/${riddles.length}` : 'Send answer'}
         </button>
-        {many && <p className="note" style={{ margin: '12px 0 0' }}>Answer all {riddles.length} riddles to collect the stamp.</p>}
+        <button
+          className="btn block sea"
+          style={{ marginTop: 10 }}
+          disabled={!unsaved}
+          onClick={saveDraft}
+          type="button"
+        >
+          {unsaved ? 'Save answers for later' : 'Answers saved'}
+        </button>
+        <p className="note" style={{ margin: '12px 0 0' }}>
+          {many ? `Answer all ${riddles.length} riddles to collect the stamp. ` : ''}
+          Not done yet? Save what you have and come back to it from the main menu.
+        </p>
       </div>
     );
   };
@@ -1363,72 +1395,6 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     );
   };
 
-  /* ── CP6 — ask a stranger ─────────────────────────── */
-
-  const renderAsk = () => {
-    const done = CONFIG.ask.tasks.filter((t) => String(draft[t.key] || '').trim()).length;
-    const photoTask = CONFIG.ask.tasks.find((t) => t.key === 'photo');
-    return (
-      <div className="card flag">
-        {renderCpHead(STAMP_NO.ask, CONFIG.cp.ask.title, CONFIG.cp.ask.stop)}
-        <div className="task">
-          <Rich text={CONFIG.cp.ask.body} />
-        </div>
-        <CheckpointPhoto src={CONFIG.cp.ask.photo} />
-        {CONFIG.ask.tasks.filter((t) => t.key !== 'photo').map((t) => (
-          <label key={t.key} className="f" style={{ display: 'block', marginBottom: 12 }}>
-            <span style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
-              {t.label}
-            </span>
-            <input
-              type="text"
-              placeholder={t.hint}
-              value={draft[t.key] || ''}
-              onChange={(e) => setDraft((d) => ({ ...d, [t.key]: e.target.value }))}
-              style={{
-                width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-                border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-              }}
-            />
-          </label>
-        ))}
-        {photoTask && (
-          <>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
-              {photoTask.label}
-            </div>
-            {renderShot(draft.photo, 'Add the photo', photoTask.hint ? `${photoTask.hint} · optional` : 'Optional')}
-          </>
-        )}
-        <button
-          className="btn block"
-          style={{ marginTop: 14 }}
-          disabled={done === 0}
-          onClick={() => {
-            const newS = { ...S };
-            newS.subs = {
-              ...(newS.subs || {}),
-              ask: { word: draft.word || '', rec: draft.rec || '', photo: draft.photo || null, at: Date.now() },
-            };
-            newS.open = null;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            setDraft({});
-            showToast('Stamp collected.');
-          }}
-          type="button"
-        >
-          Send it
-        </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>
-          {done === 0
-            ? 'One of the three is enough for the stamp.'
-            : `${done} of ${CONFIG.ask.tasks.length} done.`}
-        </p>
-      </div>
-    );
-  };
-
   /* ── Game 1 — photo bingo ────────────────────────────────
      Each tile is a photo the committee took around the area: the team
      has to find that spot and take a selfie of the whole team there.
@@ -1446,7 +1412,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
         const src = await compressImage(file, 420, 0.6);
         setShots((prev) => ({ ...prev, [i]: { tile: i, src, uploader_name: 'You' } }));
       } else {
-        await uploadShot(activeTeamId, i, file);
+        await uploadShot(activeTeamId, i, file, huntResetAt);
         await refreshShots();
       }
     } catch (e) {
@@ -1686,7 +1652,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     );
   };
 
-  /* ── Stamp 7 — know your colleagues ─────────────────
+  /* ── Stamp 6 — know your colleagues ─────────────────
      Multiple choice about people on the other teams, one question at a
      time and at the team's own pace. A round is a fixed number of
      questions; each right answer scores, a wrong one just shows the
@@ -1826,7 +1792,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     if (!S.open) return renderHub();
     const renderers = {
       cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
-      ask: renderAsk, bingo: renderBingo, guess: renderTrivia,
+      bingo: renderBingo, guess: renderTrivia,
       cp2: () => (S.subs?.cp2a ? renderCp2b() : renderCp2a()),
     };
     const fn = renderers[S.open];
@@ -1866,7 +1832,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           </ul>
           <p className="note" style={{ margin: '12px 0 0' }}>
             The committee tallies the results at the finish point.
-            {ranOut && ' Need more time? Ask the committee — if they restart your clock, this screen picks it up by itself.'}
+            {ranOut && ' If the committee restarts the clock, the hunt starts again from the beginning on this screen by itself.'}
           </p>
         </div>
         {/* Finishing is the team's own call, so leave a way back in for

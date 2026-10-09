@@ -45,8 +45,10 @@ export async function listShots(teamId = null) {
   return data.map((r) => ({ ...r, src: byPath[r.path] ?? null }));
 }
 
-/** Put a photo on a tile, replacing any photo already there. */
-export async function uploadShot(teamId, tile, file) {
+/** Put a photo on a tile, replacing any photo already there. A photo
+    taken before `keepBefore` (epoch ms — the last hunt restart) loses
+    its tile but its file stays in the bucket. */
+export async function uploadShot(teamId, tile, file, keepBefore = 0) {
   const blob = await toJpeg(file);
   const path = `${teamId}/${tile}/${crypto.randomUUID()}.jpg`;
   const store = supabase.storage.from(BUCKET);
@@ -54,7 +56,7 @@ export async function uploadShot(teamId, tile, file) {
   const up = await store.upload(path, blob, { contentType: 'image/jpeg' });
   if (up.error) throw up.error;
 
-  const { data: old } = await supabase.from('bingo_shots').select('path').eq('team', teamId).eq('tile', tile);
+  const { data: old } = await supabase.from('bingo_shots').select('path, created_at').eq('team', teamId).eq('tile', tile);
   if (old?.length) {
     const del = await supabase.from('bingo_shots').delete().eq('team', teamId).eq('tile', tile);
     if (del.error) { await store.remove([path]); throw del.error; }
@@ -62,7 +64,8 @@ export async function uploadShot(teamId, tile, file) {
 
   const { error } = await supabase.from('bingo_shots').insert({ team: teamId, tile, path });
   if (error) { await store.remove([path]); throw error; }
-  if (old?.length) await store.remove(old.map((r) => r.path));
+  const stale = (old ?? []).filter((r) => new Date(r.created_at).getTime() > keepBefore);
+  if (stale.length) await store.remove(stale.map((r) => r.path));
 }
 
 /** Clear a tile. Throws if RLS refused. */
