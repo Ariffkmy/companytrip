@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import TreasureHunt from './TreasureHunt';
+import { FrameDialog, framedImgStyle, samePhotos } from './FramedPhoto';
 import huntGroups from '../data/huntGroups';
 import {
   BINGO_MAX, DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, setHuntOpen, uploadHuntPhoto, validate,
@@ -184,9 +185,12 @@ function Photo({ label, hint, value, onChange }) {
 /* A team's bingo tiles, three to a row, laid out as players see them:
    the photo to find, and an optional caption under it. The card is
    however many photos are added here; the last slot adds more. */
-function BingoTiles({ items, onChange }) {
+function BingoTiles({ items, onChange, onFrame, frameOfSame }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState('');
+  const [frameNote, setFrameNote] = useState('');
+  const [framing, setFraming] = useState(null); // index of the tile being framed
+  const closeFraming = () => setFraming(null);
   const baseId = useFieldId();
   const tiles = items ?? [];
   const patch = (i, next) => onChange(tiles.map((t, j) => (j === i ? { ...t, ...next } : t)));
@@ -198,7 +202,8 @@ function BingoTiles({ items, onChange }) {
     setBusy(i);
     setError('');
     try {
-      patch(i, { photo: await uploadHuntPhoto(file) });
+      const photo = await uploadHuntPhoto(file);
+      patch(i, { photo, frame: await frameOfSame(photo) });
     } catch (e) {
       failed(e);
     } finally {
@@ -216,7 +221,9 @@ function BingoTiles({ items, onChange }) {
     let next = tiles;
     try {
       for (const file of picked) {
-        next = [...next, { prompt: '', photo: await uploadHuntPhoto(file) }];
+        const photo = await uploadHuntPhoto(file);
+        const frame = await frameOfSame(photo);
+        next = [...next, { prompt: '', photo, ...(frame ? { frame } : {}) }];
         onChange(next);
       }
     } catch (e) {
@@ -234,8 +241,9 @@ function BingoTiles({ items, onChange }) {
           return (
             <li key={i} className="min-w-0">
               <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
-                <img src={t.photo} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <img src={t.photo} alt="" style={framedImgStyle(t.frame)} />
                 <div className="absolute inset-x-1 bottom-1 flex gap-1">
+                  <button type="button" onClick={() => setFraming(i)} className="flex-1 h-6 rounded bg-white/95 border border-gray-200 text-[10px] font-medium cursor-pointer">Adjust</button>
                   <label htmlFor={id} className="flex-1 h-6 grid place-items-center rounded bg-white/95 border border-gray-200 text-[10px] font-medium cursor-pointer">Replace</label>
                   <button type="button" onClick={() => onChange(tiles.filter((_, j) => j !== i))} aria-label={`Remove photo ${i + 1}`}
                     className="h-6 w-6 rounded bg-white/95 border border-gray-200 text-[11px] text-red cursor-pointer">×</button>
@@ -261,8 +269,26 @@ function BingoTiles({ items, onChange }) {
           </li>
         )}
       </ol>
-      <p className="note mt-1">{tiles.length} photo{tiles.length === 1 ? '' : 's'}{room > 0 ? '' : ` · the most a card can hold`}</p>
+      <p className="note mt-1">{tiles.length} photo{tiles.length === 1 ? '' : 's'}{room > 0 ? '' : ` · the most a card can hold`} · Adjust zooms and moves a photo to point players at the spot</p>
       {error && <p role="alert" className="text-xs text-red mt-1">{error}</p>}
+      {frameNote && <p className="note mt-1">{frameNote}</p>}
+      {framing != null && tiles[framing] && (
+        <FrameDialog
+          title={`Frame photo ${framing + 1}`}
+          note="Applies to this photo on every group’s card."
+          src={tiles[framing].photo}
+          frame={tiles[framing].frame}
+          onCancel={closeFraming}
+          onDone={async (frame) => {
+            const src = tiles[framing].photo;
+            patch(framing, { frame });
+            setFraming(null);
+            setFrameNote('');
+            const groups = await onFrame(src, frame);
+            if (groups.length > 1) setFrameNote(`Framing applied to the same photo in ${groups.join(', ')}.`);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -494,6 +520,8 @@ export default function HuntEditor() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [previewing, setPreviewing] = useState(false);
+  const draftRef = useRef(null); // for the async bingo framing, which outlives a render
+  draftRef.current = draft;
 
   useEffect(() => {
     let live = true;
@@ -537,6 +565,31 @@ export default function HuntEditor() {
   const set = (path) => (value) => { setSaveMsg(''); setDraft((d) => setIn(d, path, value)); };
   const val = (path) => getIn(draft, path);
   const cp = (key) => ['checkpoints', key];
+
+  /* A bingo framing follows the photo, not the group: framing a picture
+     once frames the same picture on every group's card, and a picture
+     uploaded later that is already framed elsewhere takes that framing.
+     Returns the names of the groups that have it. */
+  const bingoTilesOf = (d) => huntGroups.flatMap((g) => d.teams[g.id]?.bingo ?? []).filter((t) => t?.photo);
+  async function frameEverywhere(src, frame) {
+    const same = new Set(await samePhotos(src, bingoTilesOf(draftRef.current).map((t) => t.photo)));
+    setSaveMsg('');
+    setDraft((d) => huntGroups.reduce((acc, g) => {
+      const card = acc.teams[g.id]?.bingo;
+      return Array.isArray(card) && card.some((t) => same.has(t?.photo))
+        ? setIn(acc, ['teams', g.id, 'bingo'], card.map((t) => (same.has(t?.photo) ? { ...t, frame } : t)))
+        : acc;
+    }, d));
+    return huntGroups
+      .filter((g) => (draftRef.current.teams[g.id]?.bingo ?? []).some((t) => same.has(t?.photo)))
+      .map((g) => g.name);
+  }
+  async function frameOfSame(src) {
+    const framed = bingoTilesOf(draftRef.current).filter((t) => t.frame && t.photo !== src);
+    if (!framed.length) return null;
+    const same = new Set(await samePhotos(src, framed.map((t) => t.photo)));
+    return framed.find((t) => same.has(t.photo))?.frame ?? null;
+  }
 
   async function onSave() {
     if (errors.length) return;
@@ -615,7 +668,8 @@ export default function HuntEditor() {
           {huntGroups.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
-              <BingoTiles items={val(['teams', g.id, 'bingo'])} onChange={set(['teams', g.id, 'bingo'])} />
+              <BingoTiles items={val(['teams', g.id, 'bingo'])} onChange={set(['teams', g.id, 'bingo'])}
+                onFrame={frameEverywhere} frameOfSame={frameOfSame} />
             </div>
           ))}
         </div>

@@ -5,6 +5,7 @@ import { huntGroupOf } from '../data/huntGroups';
 import { listShots, uploadShot, deleteShot } from '../lib/bingo';
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
+import { framedImgStyle } from './FramedPhoto';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
@@ -1468,7 +1469,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                   cursor: 'pointer', color: 'inherit', font: 'inherit',
                 }}
               >
-                {img && <img src={img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+                {img && <img src={img} alt="" style={shot?.src ? { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } : framedImgStyle(tile.frame)} />}
                 {!img && (
                   <span style={{
                     position: 'relative', zIndex: 1, fontFamily: '"DM Mono", monospace',
@@ -1542,7 +1543,16 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           <div className="eyebrow" style={{ color: 'var(--red)' }}>Tile {i + 1} of {bingoCard.length}</div>
           <h2 className="display" style={{ fontSize: 25, margin: '4px 0 10px' }}>{shot ? 'Found it' : 'Find this'}</h2>
           <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-            {tile.photo && <img src={tile.photo} alt="The photo to find" style={pic} />}
+            {/* Framed by the committee: the same crop as the grid tile, bigger. */}
+            {tile.photo && tile.frame && (
+              <div style={{
+                position: 'relative', aspectRatio: 1, width: 'min(100%, 42vh)', margin: '0 auto',
+                overflow: 'hidden', background: 'var(--ink)', border: 'var(--line)', borderRadius: 8,
+              }}>
+                <img src={tile.photo} alt="The photo to find" style={framedImgStyle(tile.frame)} />
+              </div>
+            )}
+            {tile.photo && !tile.frame && <img src={tile.photo} alt="The photo to find" style={pic} />}
             {tile.prompt && <p style={{ margin: tile.photo ? '8px 0 0' : 0 }}>{tile.prompt}</p>}
             {shot?.src && (
               <>
