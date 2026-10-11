@@ -16,7 +16,7 @@ function storedSession() {
   }
 }
 
-const EMPTY_MEMBER = { isAdmin: false, team: null, huntGroup: null, fullName: null, role: null };
+const EMPTY_MEMBER = { isAdmin: false, team: null, huntGroup: null, fullName: null, role: null, huntLeader: null };
 
 export function useAuth() {
   const [session, setSession] = useState(null);
@@ -60,11 +60,14 @@ export function useAuth() {
     } catch (e) { /* ignore a corrupt cache */ }
 
     let live = true;
-    /* hunt_group arrives with 20261011000000_hunt_groups.sql; until then
-       read the profile without it rather than not at all. */
+    /* hunt_group arrives with 20261011000000_hunt_groups.sql, and
+       hunt_leader with 20261012000000_hunt_leader.sql; until then read
+       the profile without them rather than not at all. */
     const readProfile = async () => {
-      const full = await supabase.from('profiles').select('full_name, team, role, hunt_group').eq('id', userId).maybeSingle();
-      return full.error ? supabase.from('profiles').select('full_name, team, role').eq('id', userId).maybeSingle() : full;
+      const full = await supabase.from('profiles').select('full_name, team, role, hunt_group, hunt_leader').eq('id', userId).maybeSingle();
+      if (!full.error) return full;
+      const noLeader = await supabase.from('profiles').select('full_name, team, role, hunt_group').eq('id', userId).maybeSingle();
+      return noLeader.error ? supabase.from('profiles').select('full_name, team, role').eq('id', userId).maybeSingle() : noLeader;
     };
     Promise.all([
       supabase.rpc('is_admin'),
@@ -77,6 +80,9 @@ export function useAuth() {
         huntGroup: profile.data?.hunt_group ?? null,
         fullName: profile.data?.full_name ?? null,
         role: profile.data?.role ?? null,
+        /* true / false once the hunt-leader flag exists; null while the
+           column is not there yet, which the hunt reads as "not set up". */
+        huntLeader: profile.data?.hunt_leader ?? null,
       };
       setMember(next);
       try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch (e) { /* silent */ }

@@ -501,12 +501,20 @@ export function HuntOrganiser({ config }) {
    switch is thrown, because losing a half-finished submission in a
    backstreet is worse than letting them finish. Defaults true so the
    admin preview plays regardless. */
-export default function TreasureHunt({ onClose, teamId, config, isOpen = true, preview = false }) {
+export default function TreasureHunt({ onClose, teamId, config, isOpen = true, preview = false, huntLeader = null }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const store = useMemo(() => makeStore(preview), [preview]);
   /* Preview only: which team the admin is playing as. */
   const [previewTeam, setPreviewTeam] = useState(teamId ?? 'group-a');
   const activeTeamId = preview ? previewTeam : teamId;
+  /* Only the group's hunt leader runs its games
+     (20261012000000_hunt_leader.sql). The hunt leader is a different
+     person from the trip Team Lead: the Team Lead plays like anyone
+     else. `huntLeader === false` means the flag is set and this member
+     is not the leader; null means the flag is not set up yet, so
+     nothing is locked. Admins and the editor's preview never lock out. */
+  const canPlay = preview || huntLeader !== false;
+  const leaderName = huntGroupOf(activeTeamId)?.leader ?? null;
   const [view, setView] = useState('start'); // start | race | done
   const [S, setS] = useState(null);
   const [draft, setDraft] = useState({});
@@ -900,8 +908,8 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
               </div>
               <button
                 className="btn block"
-                style={{ marginTop: 14, ...(shut ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
-                disabled={shut}
+                style={{ marginTop: 14, ...(shut || !canPlay ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+                disabled={shut || !canPlay}
                 onClick={() => {
                   if (underway) {
                     setS(existing);
@@ -917,11 +925,14 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                 }}
                 type="button"
               >
-                {shut ? 'Waiting for the committee' : underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
+                {!canPlay ? 'Only your group leader plays'
+                  : shut ? 'Waiting for the committee'
+                  : underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
               </button>
               <div style={{ marginTop: 12 }}>{rulesButton()}</div>
               <p className="note" style={{ margin: '12px 0 0' }}>
-                {shut ? 'This opens when the committee starts the game.'
+                {!canPlay ? `Only your group leader${leaderName ? ` (${leaderName})` : ''} runs the games for ${team.name}. You can watch, but not start or submit.`
+                  : shut ? 'This opens when the committee starts the game.'
                   : underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
               </p>
             </>
@@ -2166,12 +2177,21 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
       {renderHeader()}
 
       {view === 'start' && renderStartScreen()}
-      {view === 'race' && (
+      {view === 'race' && (canPlay ? (
         <div>
           {!S?.open && renderStampRally()}
           {renderStage()}
         </div>
-      )}
+      ) : (
+        <div className="card flag">
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Leader only</div>
+          <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>Your group leader runs the hunt</h2>
+          <p style={{ margin: 0 }}>
+            Only the leader{leaderName ? ` (${leaderName})` : ''} can play and submit the games for {S?.teamName ?? 'your group'}.
+            Ask them to run it, or come back when they do.
+          </p>
+        </div>
+      ))}
       {view === 'done' && renderDoneScreen()}
 
       {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}

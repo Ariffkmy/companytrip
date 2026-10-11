@@ -403,6 +403,7 @@ export default function App() {
             teamId={auth.member.huntGroup}
             config={huntConfig}
             isOpen={huntOpen}
+            huntLeader={auth.member.huntLeader}
           />
         </div>
       </>
