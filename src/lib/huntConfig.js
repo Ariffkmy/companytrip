@@ -84,7 +84,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Observation quiz: 2 a right answer',
     '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question',
     '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
-    '- Judged at the finish: best pose photo, most interesting buy, first back — 5 each',
+    '- Judged at the finish: best pose photo, most interesting buy, funniest boss photo, first back — 5 each',
   ].join('\n'),
 
   /* Per hunt group (src/data/huntGroups.js), not per trip team. */
@@ -160,6 +160,12 @@ export const DEFAULT_HUNT_CONFIG = {
     guess: {
       title: 'Do you know your colleagues?', photo: null, stop: '',
       pointsPerRight: 2,
+    },
+    /* Stamp 7. Tim and Ellice roam the field; one photo of the team
+       with them, in a funny pose. */
+    boss: {
+      title: 'Find the boss', photo: null, stop: '',
+      body: 'Tim and Ellice are hiding somewhere in the hunt area. Find them both, then take **one photo of your whole team with them, pulling your funniest pose**.\n\nEveryone in the frame — Tim and Ellice too.',
     },
   },
 };
@@ -298,7 +304,7 @@ export function toRuntime(config) {
   const cp = config.checkpoints;
   return {
     raceMinutes: Number(config.raceMinutes) || 90,
-    stamps: 6,
+    stamps: 7,
     points: config.points,
     finishPoint: config.finishPoint,
     helpNote: config.helpNote,

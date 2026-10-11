@@ -200,7 +200,7 @@ function CheckpointPhoto({ src }) {
   );
 }
 
-/* ── The six games ────────────────────────────────
+/* ── The seven games ────────────────────────────────
    Teams choose what to play and in what order, and may skip anything —
    the numbering below is only how the games are listed and stamped, not
    a sequence. Nothing here gates anything else. */
@@ -211,6 +211,7 @@ const GAMES = [
   { key: 'cp3', short: 'Buy & try' },
   { key: 'cp4', short: 'Observation quiz' },
   { key: 'guess', short: 'Know your colleagues' },
+  { key: 'boss', short: 'Find the boss' },
 ];
 
 const SLOTS = GAMES.map((_, i) => i);
@@ -218,13 +219,13 @@ const SLOTS = GAMES.map((_, i) => i);
 /* Which rally slot a saved submission fills. cp2 is a two-parter — the
    selfie opens the Atami quiz, and the quiz is what earns the stamp — so
    cp2a deliberately has no slot of its own. */
-const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, guess: 5 };
+const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, guess: 5, boss: 6 };
 
 /* The number printed on each game's header. cp2a and cp2b share one. */
-const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, guess: 6 };
+const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, guess: 6, boss: 7 };
 
 /* A game counts as collected once its stamping submission is in. */
-const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', guess: 'guess' };
+const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', guess: 'guess', boss: 'boss' };
 
 /* Title for a game in the hub and the preview menu. cp2 is titled by
    its first screen. */
@@ -1190,6 +1191,37 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     );
   };
 
+  /* ── Stamp 7 — Find the boss ───────────────────────
+     Tim and Ellice are somewhere in the field. Find them, and send one
+     photo of the whole team pulling a funny pose with them. */
+  const renderBoss = () => (
+    <div className="card flag">
+      {renderCpHead(STAMP_NO.boss, CONFIG.cp.boss.title, CONFIG.cp.boss.stop)}
+      <div className="task">
+        <Rich text={CONFIG.cp.boss.body} />
+      </div>
+      <CheckpointPhoto src={CONFIG.cp.boss.photo} />
+      {renderShot(draft.photo, 'Add your photo with the bosses', 'Tim, Ellice and all of you · funny pose')}
+      <button
+        className="btn block"
+        style={{ marginTop: 14 }}
+        disabled={!draft.photo}
+        onClick={() => {
+          const newS = { ...S };
+          newS.subs = { ...(newS.subs || {}), boss: { photo: draft.photo, at: Date.now() } };
+          newS.open = null;
+          store.save(newS.teamId, newS);
+          setS(newS);
+          setDraft({});
+          showToast('Stamp collected.');
+        }}
+        type="button"
+      >
+        Send photo
+      </button>
+    </div>
+  );
+
   const renderCp2a = () => {
     const t = currentTeam;
     if (!t) return null;
@@ -2029,7 +2061,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     if (!S.open) return renderHub();
     const renderers = {
       cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
-      bingo: renderBingo, guess: renderTrivia,
+      bingo: renderBingo, guess: renderTrivia, boss: renderBoss,
       cp2: () => (S.subs?.cp2a ? renderCp2b() : renderCp2a()),
     };
     const fn = renderers[S.open];

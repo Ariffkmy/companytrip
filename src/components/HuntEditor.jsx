@@ -840,6 +840,12 @@ export default function HuntEditor() {
         <ColleagueAnswers />
       </Section>
 
+      <Section title="7 · Find the boss" sub={val([...cp('boss'), 'title'])}>
+        <Sub>The game</Sub>
+        {commonFields('boss')}
+        <p className="note -mt-1">Teams find Tim and Ellice and send one photo of the whole team with them in a funny pose.</p>
+      </Section>
+
 
       <button type="button"
         onClick={() => { setSaveMsg(''); setDraft(structuredClone(DEFAULT_HUNT_CONFIG)); }}
