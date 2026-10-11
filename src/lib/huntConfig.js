@@ -17,6 +17,7 @@
 import { supabase } from './supabase';
 import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
 import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
+import ATAMI_QUIZ from '../data/atamiQuiz';
 
 export const HUNT_ID = 'atami';
 export const MEDIA_BUCKET = 'hunt-media';
@@ -68,19 +69,20 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo too: anyone can snap a tile, but it’s a selfie of the whole team at the spot',
     '',
     '**No looking things up**',
-    '- Riddle: no searching, no asking anyone outside the team, no AI',
+    '- Atami quiz: no searching, no asking anyone outside the team, no AI',
     '- Know your colleagues: no asking the person the question is about',
     '- Observation quiz: from what you noticed on the way, with no doubling back',
     '- Every photo taken today, by your team',
     '',
-    '**Money**',
-    '- ¥500 for the whole team on Buy it, try it',
-    '- Everyone tastes it; spending more earns nothing extra',
+    '**Buy it, try it**',
+    '- Spend any amount you like',
+    '- Every member takes a photo with what you bought',
     '',
     '**What scores**',
     '- 10 a stamp',
     '- Photo bingo: 1 a photo, 5 more for the full card',
     '- Observation quiz: 2 a right answer',
+    '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question',
     '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
     '- Judged at the finish: best pose photo, most interesting buy, first back — 5 each',
   ].join('\n'),
@@ -112,22 +114,27 @@ export const DEFAULT_HUNT_CONFIG = {
       body: 'Go to the place in the first photo, then copy the pose in the second.\n\nEveryone in the frame. Ask a passer-by to hold the phone if you have to.',
     },
     cp2a: {
-      title: 'Find the place', photo: null, stop: '',
-      body: 'Work out where this is, go there, and take a team selfie on the spot. The riddle unlocks when the selfie lands.',
+      title: 'Atami quiz', photo: null, stop: '',
+      body: 'Work out where this is, go there, and take a team selfie on the spot. The Atami quiz unlocks when the selfie lands.',
     },
+    /* Multiple choice about Atami. Each round deals `perRound` random
+       questions from the bank; the stamp needs `passMark` of them right,
+       and a round short of it is played again with a fresh deal. Each
+       question has `secondsPerQuestion` (0 = no limit); running out
+       restarts the round from question 1 with a fresh deal. */
     cp2b: {
-      title: 'Three switches', photo: null, stop: '',
-      /* Optional intro above the riddles; every riddle must be answered. */
-      body: '',
-      riddles: [
-        'You\'re outside a room with the door shut. On the wall next to you are **three switches**. Inside the room are **three light bulbs**, one per switch.\n\nYou may flip the switches as much as you like. You may open the door and go in **once** — and once you\'re in, you can\'t touch the switches again. How do you tell which switch controls which bulb?',
-      ],
+      title: 'How Well Do You Know Atami?', photo: null, stop: '',
+      body: 'Answer as a team. You have **10 seconds** for each question — run out of time and you start again from the beginning with new questions. Get at least **10 of 15** right to collect the stamp; fall short and you get 15 new questions to try again. No searching, no asking anyone outside the team, no AI.',
+      perRound: 15,
+      secondsPerQuestion: 10,
+      passMark: 10,
+      pointsPerRight: 2,
+      questions: ATAMI_QUIZ,
     },
     cp3: {
       title: 'Buy it, try it', photo: null, stop: '',
-      budgetYen: 500,
       brief: 'Something Japanese that nobody on your team has tried before.',
-      body: 'Every member has to taste it. Photo has to show all of you eating or drinking, mid-bite.',
+      body: 'Spend any amount you like. Every member takes a photo with what you bought — tap each name below to add their photo. Line-up changed? Edit the names, remove someone or add a member.',
     },
     cp4: {
       title: 'Look around you', photo: null, stop: '',
@@ -186,12 +193,36 @@ function teamsToGroups(stored) {
 export function withDefaults(stored) {
   const merged = deepMerge(structuredClone(DEFAULT_HUNT_CONFIG), teamsToGroups(stored) || {});
   Object.keys(merged.teams).forEach((k) => { if (!HUNT_GROUP_IDS.includes(k)) delete merged.teams[k]; });
-  /* Saved before riddles became a list: its one riddle lived in `body`. */
-  const oldRiddle = stored?.checkpoints?.cp2b;
-  if (oldRiddle && !Array.isArray(oldRiddle.riddles) && String(oldRiddle.body ?? '').trim()) {
-    merged.checkpoints.cp2b.riddles = [oldRiddle.body];
-    merged.checkpoints.cp2b.body = '';
+  /* Saved while the second half of stamp 3 was a riddle: it is the Atami
+     quiz now. The committee's photo and play area carry over. */
+  const oldCp2b = stored?.checkpoints?.cp2b;
+  if (oldCp2b && !Array.isArray(oldCp2b.questions)) {
+    merged.checkpoints.cp2b = {
+      ...structuredClone(DEFAULT_HUNT_CONFIG.checkpoints.cp2b),
+      photo: oldCp2b.photo ?? null,
+      stop: oldCp2b.stop ?? '',
+    };
+    merged.checkpoints.cp2a.body = String(merged.checkpoints.cp2a.body ?? '').replace(/The riddle unlocks/, 'The Atami quiz unlocks');
+    merged.rules = String(merged.rules ?? '')
+      .replace(/^- Riddle: /m, '- Atami quiz: ')
+      .replace(/^(- Observation quiz: .*)$/m, '$1\n- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question');
   }
+  delete merged.checkpoints.cp2b.riddles;
+  /* Saved while Buy it, try it had a budget and one team photo: any
+     amount now, and a photo of every member with what they bought. */
+  if (merged.checkpoints.cp3.budgetYen !== undefined) {
+    delete merged.checkpoints.cp3.budgetYen;
+    if (/^Every member has to taste it\./.test(merged.checkpoints.cp3.body ?? '')) {
+      merged.checkpoints.cp3.body = DEFAULT_HUNT_CONFIG.checkpoints.cp3.body;
+    }
+    merged.rules = String(merged.rules ?? '')
+      .replace(/^\*\*Money\*\*$/m, '**Buy it, try it**')
+      .replace(/^- ¥\d+ for the whole team on Buy it, try it$/m, '- Spend any amount you like')
+      .replace(/^- Everyone tastes it; spending more earns nothing extra$/m, '- Every member takes a photo with what you bought');
+  }
+  /* Game 3 was called Find the place; it is the Atami quiz now. A title
+     the committee changed to something else is left alone. */
+  if (merged.checkpoints.cp2a.title === 'Find the place') merged.checkpoints.cp2a.title = 'Atami quiz';
   /* Saved while stamp 6 was the closest-guess or general knowledge game:
      its title, text and questions describe a game that no longer exists. */
   const oldGuess = stored?.checkpoints?.guess;
@@ -246,6 +277,22 @@ export function withDefaults(stored) {
   return merged;
 }
 
+/* The Atami quiz as played: only complete questions, a round no bigger
+   than the bank, and a pass mark no bigger than the round. */
+export function atamiRules(c) {
+  const questions = (c?.questions ?? []).filter((x) => String(x?.q ?? '').trim()
+    && (x.options ?? []).filter((o) => String(o ?? '').trim()).length >= 2
+    && String(x.options?.[x.a] ?? '').trim());
+  const perRound = Math.min(questions.length, Math.max(1, Number(c?.perRound) || 15));
+  return {
+    questions,
+    perRound,
+    passMark: Math.min(perRound, Math.max(0, Number(c?.passMark) || 0)),
+    pts: Math.max(0, Number(c?.pointsPerRight) || 0),
+    secs: Math.max(0, Number(c?.secondsPerQuestion) || 0),
+  };
+}
+
 /* The shape TreasureHunt was written against, derived from the config. */
 export function toRuntime(config) {
   const cp = config.checkpoints;
@@ -265,11 +312,12 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { budgetYen: cp.cp3.budgetYen, brief: cp.cp3.brief },
+    buy: { brief: cp.cp3.brief },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
     map: config.map,
     trivia: { pts: Math.max(0, Number(cp.guess.pointsPerRight) || 0) },
+    atami: atamiRules(cp.cp2b),
     cp,
   };
 }
@@ -280,7 +328,18 @@ export function validate(config) {
   const cp = config.checkpoints;
   const posInt = (v) => Number.isFinite(Number(v)) && Number(v) >= 0;
   if (!(Number(config.raceMinutes) > 0)) errs.push('General: race length must be more than 0 minutes.');
-  if (!cp.cp2b.riddles.length || cp.cp2b.riddles.some((r) => !String(r ?? '').trim())) errs.push('Stamp 3: every riddle needs text, and there must be at least one.');
+  {
+    const qs = cp.cp2b.questions ?? [];
+    const bad = qs.findIndex((x) => !String(x?.q ?? '').trim()
+      || (x.options ?? []).filter((o) => String(o ?? '').trim()).length < 2
+      || !String(x.options?.[x.a] ?? '').trim());
+    if (bad >= 0) errs.push(`Stamp 3: Atami question ${bad + 1} needs its text, at least two options and a right answer.`);
+    if (!(Number(cp.cp2b.perRound) >= 1)) errs.push('Stamp 3: questions per round must be at least 1.');
+    if (Number(cp.cp2b.perRound) > qs.length) errs.push(`Stamp 3: ${cp.cp2b.perRound} questions per round, but there are only ${qs.length} questions.`);
+    if (!posInt(cp.cp2b.passMark) || Number(cp.cp2b.passMark) > Number(cp.cp2b.perRound)) errs.push('Stamp 3: the pass mark must be between 0 and the questions per round.');
+    if (!posInt(cp.cp2b.pointsPerRight)) errs.push('Stamp 3: points per right answer must be 0 or more.');
+    if (!posInt(cp.cp2b.secondsPerQuestion)) errs.push('Stamp 3: seconds per question must be 0 (no limit) or more.');
+  }
   if (!cp.cp4.questions.length || cp.cp4.questions.some((q) => !q.q.trim())) errs.push('Stamp 5: every question needs text, and there must be at least one.');
   /* No minimum: photos go in when the committee has them, and a team
      with none yet sees "coming soon" instead of a card. */

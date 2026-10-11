@@ -207,7 +207,7 @@ function CheckpointPhoto({ src }) {
 const GAMES = [
   { key: 'bingo', short: 'Photo bingo' },
   { key: 'cp1', short: 'Pose photo' },
-  { key: 'cp2', short: 'Selfie + riddle' },
+  { key: 'cp2', short: 'Selfie + Atami quiz' },
   { key: 'cp3', short: 'Buy & try' },
   { key: 'cp4', short: 'Observation quiz' },
   { key: 'guess', short: 'Know your colleagues' },
@@ -216,7 +216,7 @@ const GAMES = [
 const SLOTS = GAMES.map((_, i) => i);
 
 /* Which rally slot a saved submission fills. cp2 is a two-parter — the
-   selfie opens the riddle, and the riddle is what earns the stamp — so
+   selfie opens the Atami quiz, and the quiz is what earns the stamp — so
    cp2a deliberately has no slot of its own. */
 const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, guess: 5 };
 
@@ -284,6 +284,57 @@ function drawColleague(rows, teamId, seen = []) {
   };
 }
 
+/* A round of the Atami quiz: `perRound` questions, ones the team hasn't
+   been dealt yet first, then a top-up from the rest. `seen` holds the
+   question texts dealt in earlier rounds; it starts over once every
+   question has been seen. */
+function drawAtami(rules, seen = []) {
+  const all = rules.questions;
+  let used = seen.filter((q) => all.some((x) => x.q === q));
+  if (used.length >= all.length) used = [];
+  const fresh = shuffled(all.filter((x) => !used.includes(x.q)));
+  const round = [...fresh, ...shuffled(all.filter((x) => used.includes(x.q)))].slice(0, rules.perRound)
+    .map(({ q, options, a, why }) => ({ q, options: [...options], a, why }));
+  return { round, picks: [], i: 0, seen: [...new Set([...used, ...round.map((x) => x.q)])] };
+}
+
+/* Seconds left on an Atami question, as a draining bar. The deadline is
+   stored in the run, so leaving the screen doesn't stop the clock;
+   `onExpire` fires once when it runs out (straight away if it already
+   has). */
+function Countdown({ deadline, total, onExpire }) {
+  const [now, setNow] = useState(() => Date.now());
+  const fire = useRef(onExpire);
+  fire.current = onExpire;
+  useEffect(() => {
+    let done = false;
+    const tick = () => {
+      const t = Date.now();
+      setNow(t);
+      if (!done && t >= deadline) { done = true; fire.current(); }
+    };
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [deadline]);
+  const left = Math.max(0, deadline - now);
+  const secs = Math.ceil(left / 1000);
+  const urgent = secs <= 3;
+  return (
+    <div role="timer" aria-label={`${secs} seconds left`} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 12px' }}>
+      <div style={{ flex: 1, height: 10, borderRadius: 999, border: 'var(--line)', background: 'var(--card)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${(left / (total * 1000)) * 100}%`,
+          background: urgent ? 'var(--red)' : 'var(--sea)', transition: 'width 100ms linear',
+        }} />
+      </div>
+      <span style={{ font: '700 16px/1 "DM Mono", monospace', minWidth: 30, textAlign: 'right', color: urgent ? 'var(--red)' : 'var(--ink)' }}>
+        {secs}s
+      </span>
+    </div>
+  );
+}
+
 function scoreOf(run, CONFIG) {
   let p = 0;
   Object.keys(run.subs).forEach((k) => {
@@ -293,6 +344,7 @@ function scoreOf(run, CONFIG) {
     if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
     else if (k === 'bingo') p += sub.points || 0;
     else if (k === 'guess') p += (sub.right || 0) * CONFIG.trivia.pts;
+    else if (k === 'cp2b') p += (sub.right || 0) * CONFIG.atami.pts;
   });
   Object.values(run.bonus || {}).forEach((v) => (p += v));
   return p;
@@ -783,7 +835,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                         {gameTitle(g.key, CONFIG.cp)}
                       </b>
                       <span className="note">
-                        {isDone ? 'Stamp collected' : started ? 'Selfie in — riddle waiting' : g.short}
+                        {isDone ? 'Stamp collected' : started ? 'Selfie in — quiz waiting' : g.short}
                       </span>
                     </span>
                     <span aria-hidden="true" style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
@@ -1171,12 +1223,12 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           onClick={() => {
             const newS = { ...S };
             newS.subs = { ...(newS.subs || {}), cp2a: { photo: draft.photo, at: Date.now() } };
-            /* Stays open on purpose: the selfie reveals the riddle, which
-               is the half that earns the stamp. */
+            /* Stays open on purpose: the selfie reveals the Atami quiz,
+               which is the half that earns the stamp. */
             store.save(newS.teamId, newS);
             setS(newS);
             setDraft({});
-            showToast('Selfie in. Riddle unlocked.');
+            showToast('Selfie in. Atami quiz unlocked.');
           }}
           type="button"
         >
@@ -1187,159 +1239,335 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           borderRadius: 10, background: 'var(--th-parchment)', marginTop: 14,
         }}>
           <div style={{ fontSize: 30 }}>🔒</div>
-          <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, marginTop: 6 }}>Riddle sealed</b>
+          <b style={{ display: 'block', fontFamily: 'var(--display)', fontSize: 17, marginTop: 6 }}>Atami quiz sealed</b>
           <small style={{ fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>Opens after the selfie</small>
         </div>
       </div>
     );
   };
 
-  /* Every configured riddle needs an answer before the stamp. */
+  /* ── Stamp 3, part B — How Well Do You Know Atami? ──
+     A round is a random deal of questions from the bank, answered one at
+     a time. Each pick shows right or wrong and why. The stamp needs the
+     pass mark; a round short of it is dealt again, fresh questions first.
+     The round is kept in the run, so a team can leave and come back. */
   const renderCp2b = () => {
-    const riddles = CONFIG.cp.cp2b.riddles;
-    /* What's typed lives in the draft until Save writes it to the run,
-       so the team can leave and come back to it later. */
-    const saved = S.riddleDraft || [];
-    const answers = draft.riddleAnswers || saved;
-    const answered = riddles.filter((_, i) => String(answers[i] || '').trim()).length;
-    const many = riddles.length > 1;
-    const unsaved = riddles.some((_, i) => String(answers[i] || '') !== String(saved[i] || ''));
-    const saveDraft = () => {
-      const next = { ...S, riddleDraft: riddles.map((_, i) => answers[i] || '') };
+    const rules = CONFIG.atami;
+    const run = S.atami;
+    const round = run?.round ?? [];
+    const picks = run?.picks ?? [];
+    const i = run?.i ?? 0;
+    const cur = round[i];
+    const rightCount = picks.filter((p, k) => p === round[k]?.a).length;
+    const collected = Boolean(S.subs?.cp2b);
+    const commit = (atami) => {
+      const next = { ...S, atami };
       store.save(next.teamId, next);
       setS(next);
-      setDraft((d) => ({ ...d, riddleAnswers: undefined }));
-      showToast('Answers saved. Come back to them any time.');
     };
+    /* Each question's clock starts when it comes on screen. */
+    const deadline = () => (rules.secs ? Date.now() + rules.secs * 1000 : null);
+    const deal = () => {
+      commit({
+        ...drawAtami(rules, run?.seen),
+        attempt: (run?.attempt ?? 0) + 1,
+        deadline: deadline(),
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    /* Out of time: the round is lost and starts again from question 1. */
+    const expire = () => {
+      if (picks[i] != null || run?.timedOut) return;
+      commit({ ...run, timedOut: true });
+    };
+    const pick = (opt) => {
+      if (!cur || picks[i] != null || collected || run?.timedOut) return;
+      if (run?.deadline && Date.now() >= run.deadline) { expire(); return; }
+      const next = [...picks];
+      next[i] = opt;
+      commit({ ...run, picks: next });
+      if (opt === cur.a) confetti();
+    };
+    const answered = cur && picks[i] != null;
+    const last = i >= round.length - 1;
+    const roundOver = round.length > 0 && last && answered;
+    const passed = rightCount >= rules.passMark;
+    /* Even all right from here wouldn't reach the pass mark: no point
+       playing on, so the round ends now and is dealt again. */
+    const left = round.length - 1 - i;
+    const outOfReach = answered && !passed && rightCount + left < rules.passMark;
+    const collect = () => {
+      const newS = { ...S };
+      newS.subs = { ...(newS.subs || {}), cp2b: { right: rightCount, answered: round.length, attempts: run.attempt ?? 1, at: Date.now() } };
+      newS.open = null;
+      store.save(newS.teamId, newS);
+      setS(newS);
+      confetti({ count: 220, duration: 2600 });
+      showToast(`Stamp ${STAMP_NO.cp2b} collected.`);
+    };
+
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.stop)}
-        {String(CONFIG.cp.cp2b.body || '').trim() && (
-          <div className="task">
-            <Rich text={CONFIG.cp.cp2b.body} />
+        {round.length > 0 && !collected && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <span aria-live="polite" aria-label={`${rightCount} right, ${rules.passMark} needed`} style={{
+              display: 'inline-flex', alignItems: 'baseline', gap: 8,
+              padding: '4px 11px', borderRadius: 999, border: 'var(--line)', background: 'var(--card)',
+              font: '700 14px/1.2 "DM Mono", monospace', color: 'var(--ink)',
+            }}>
+              <span><span style={{ color: 'var(--sea)' }}>✓</span> {rightCount}/{rules.passMark} needed</span>
+              <span style={{ color: 'var(--ink-soft)' }}>·</span>
+              <span style={{ color: 'var(--red)' }}>{rightCount * rules.pts} pts</span>
+            </span>
           </div>
         )}
         <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />
-        {riddles.map((riddle, i) => (
-          <div key={i} style={{ marginBottom: 16 }}>
-            <div className="task">
-              {many && <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 6 }}>Riddle {i + 1} of {riddles.length}</div>}
-              <Rich text={riddle} />
-            </div>
-            <label className="f" style={{ display: 'block' }}>
-              <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>
-                {many ? `Your answer to riddle ${i + 1}` : 'Your answer'}
-              </span>
-              <textarea
-                placeholder="Write the answer your team agreed on."
-                value={answers[i] || ''}
-                onChange={(e) => setDraft((d) => {
-                  const next = [...(d.riddleAnswers || saved)];
-                  next[i] = e.target.value;
-                  return { ...d, riddleAnswers: next };
-                })}
-                style={{
-                  width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-                  border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-                  minHeight: 90, resize: 'vertical', lineHeight: 1.5,
-                }}
-              />
-            </label>
+
+        {collected ? (
+          <p style={{ margin: 0, fontWeight: 700 }}>
+            Stamp collected{S.subs.cp2b.right != null
+              ? ` — ${S.subs.cp2b.right} of ${S.subs.cp2b.answered} right, ${S.subs.cp2b.right * rules.pts} points.`
+              : '.'}
+          </p>
+        ) : !rules.questions.length ? (
+          <p className="note">The committee hasn’t put the questions in yet. Check back soon.</p>
+        ) : !cur ? (
+          <>
+            {String(CONFIG.cp.cp2b.body || '').trim() && (
+              <div className="task"><Rich text={CONFIG.cp.cp2b.body} /></div>
+            )}
+            <button className="btn block" type="button" onClick={deal}>
+              Start · {rules.perRound} questions
+            </button>
+          </>
+        ) : run.timedOut ? (
+          <div role="alert">
+            <p className="display" style={{ fontSize: 26, margin: '6px 0 6px', color: 'var(--red)' }}>Time’s up!</p>
+            <p style={{ margin: '0 0 4px' }}>
+              Question {i + 1}: <b>{cur.q}</b>
+            </p>
+            <p className="note" style={{ margin: '0 0 12px' }}>
+              It was <b>{cur.options[cur.a]}</b>. Back to the start — {rules.perRound} new questions, {rules.secs} seconds each.
+            </p>
+            <button className="btn block" type="button" onClick={deal}>Start again · {rules.perRound} new questions</button>
           </div>
-        ))}
-        <button
-          className="btn block"
-          disabled={answered < riddles.length}
-          onClick={() => {
-            const list = riddles.map((_, i) => String(answers[i] || '').trim());
-            const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cp2b: { answers: list, answer: list.join('\n\n'), at: Date.now() } };
-            delete newS.riddleDraft;
-            newS.open = null;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            setDraft({});
-            showToast(`${many ? 'Answers' : 'Answer'} sent. Stamp ${STAMP_NO.cp2b} collected.`);
-          }}
-          type="button"
-        >
-          {many ? `Send answers · ${answered}/${riddles.length}` : 'Send answer'}
-        </button>
-        <button
-          className="btn block sea"
-          style={{ marginTop: 10 }}
-          disabled={!unsaved}
-          onClick={saveDraft}
-          type="button"
-        >
-          {unsaved ? 'Save answers for later' : 'Answers saved'}
-        </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>
-          {many ? `Answer all ${riddles.length} riddles to collect the stamp. ` : ''}
-          Not done yet? Save what you have and come back to it from the main menu.
-        </p>
+        ) : (
+          <>
+            <div className="eyebrow" style={{ color: 'var(--red)', margin: '4px 0 6px' }}>
+              Question {i + 1} of {round.length}
+            </div>
+            <p style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.35, margin: '0 0 12px' }}>{cur.q}</p>
+            {run.deadline && !answered && (
+              <Countdown key={`${run.attempt}-${i}`} deadline={run.deadline} total={rules.secs} onExpire={expire} />
+            )}
+            <div style={{ display: 'grid', gap: 8 }}>
+              {cur.options.map((opt, k) => {
+                const isAnswer = k === cur.a;
+                const isPicked = k === picks[i];
+                const bg = !answered ? 'var(--card)' : isAnswer ? 'var(--sea)' : isPicked ? 'var(--red)' : 'var(--card)';
+                const fg = answered && (isAnswer || isPicked) ? '#fff' : 'var(--ink)';
+                return (
+                  <button key={k} type="button" onClick={() => pick(k)} disabled={answered}
+                    aria-pressed={isPicked}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
+                      minHeight: 50, padding: '10px 14px', borderRadius: 8, border: 'var(--line)',
+                      background: bg, color: fg, font: '600 15px/1.3 var(--body)',
+                      cursor: answered ? 'default' : 'pointer',
+                      opacity: answered && !isAnswer && !isPicked ? 0.55 : 1,
+                      boxShadow: answered ? 'none' : 'var(--hard-sm)',
+                    }}>
+                    <span style={{ flex: 1 }}>{opt}</span>
+                    {answered && isAnswer && <span aria-label="Correct answer">✓</span>}
+                    {answered && isPicked && !isAnswer && <span aria-label="Your answer, wrong">✕</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {answered && (
+              <div role="status" style={{ marginTop: 14 }}>
+                <p style={{ margin: '0 0 4px', fontWeight: 700, color: picks[i] === cur.a ? 'var(--sea)' : 'var(--red)' }}>
+                  {picks[i] === cur.a ? `Correct! +${rules.pts}` : `Not quite — it was ${cur.options[cur.a]}.`}
+                </p>
+                {cur.why && <p className="note" style={{ margin: '0 0 12px' }}>{cur.why}</p>}
+                {outOfReach ? null : !roundOver ? (
+                  <button className="btn block" type="button" onClick={() => commit({ ...run, i: i + 1, deadline: deadline() })}>Next question</button>
+                ) : (
+                  <>
+                    <p style={{ margin: '0 0 10px', fontWeight: 700 }}>
+                      {rightCount} of {round.length} right — you passed!
+                    </p>
+                    <button className="btn block" type="button" onClick={collect}>Collect the stamp</button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {outOfReach && (
+              <div role="alertdialog" aria-modal="true" aria-labelledby="atami-out-title" style={{
+                position: 'fixed', inset: 0, zIndex: 95, background: 'rgba(10,10,12,.55)',
+                padding: '24px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div className="card" style={{ maxWidth: 420, width: '100%', margin: 0, textAlign: 'center' }}>
+                  <img src="/cat-scuba.webp" alt="" width={112} height={113} style={{
+                    display: 'block', margin: '0 auto', width: 112, height: 113,
+                    borderRadius: 14, border: 'var(--line)', background: '#000',
+                  }} />
+                  <h2 id="atami-out-title" className="display" style={{ fontSize: 25, margin: '10px 0 8px', color: 'var(--red)' }}>
+                    Oops, can’t pass this time
+                  </h2>
+                  <p style={{ margin: '0 0 14px', lineHeight: 1.45 }}>
+                    {left ? (
+                      <>You got <b>{rightCount} correct</b>. Only <b>{left} question{left === 1 ? '' : 's'}</b> left.<br />
+                        You need <b>{rules.passMark} correct</b> to pass. Let’s try again!</>
+                    ) : (
+                      <>You got <b>{rightCount} correct</b>.<br />
+                        You need <b>{rules.passMark} correct</b> to pass. Let’s try again!</>
+                    )}
+                  </p>
+                  <button className="btn block" type="button" onClick={deal} autoFocus>Start again</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   };
 
-  const renderCp3 = () => (
-    <div className="card flag">
-      {renderCpHead(STAMP_NO.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.stop)}
-      <div className="task">
-        <p><b>Budget: ¥{CONFIG.buy.budgetYen} for the whole team.</b> {CONFIG.buy.brief}</p>
-        <Rich text={CONFIG.cp.cp3.body} />
-      </div>
-      <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-        <label className="f" style={{ flex: 1, display: 'block' }}>
+  /* ── Stamp 4 — Buy it, try it ──────────────────────
+     Any amount. Every member of the group has a photo taken with what
+     they bought. The list starts as the group's line-up
+     (src/data/huntGroups.js); line-ups change at the last minute, so the
+     team can rename, remove and add people here. Everything is kept in
+     the run as it goes, so leaving the screen loses nothing. */
+  const renderCp3 = () => {
+    const lineUp = () => (huntGroupOf(S.teamId)?.members ?? []).map((name) => ({ name, photo: null }));
+    const blankBuy = () => ({ item: '', people: lineUp() });
+    const buy = { ...blankBuy(), ...S.buy };
+    const people = buy.people;
+    /* From the latest run, not this render's: a photo lands after it has
+       been compressed, by which time a name may have been changed. */
+    const updateBuy = (fn) => setS((prev) => {
+      const next = { ...prev, buy: fn({ ...blankBuy(), ...prev.buy }) };
+      store.save(next.teamId, next);
+      return next;
+    });
+    const setPerson = (k, patch) => updateBuy((b) => ({
+      ...b, people: b.people.map((p, j) => (j === k ? { ...p, ...patch } : p)),
+    }));
+    const onPhoto = async (k, file) => {
+      if (!file) return;
+      try {
+        setPerson(k, { photo: await compressImage(file) });
+      } catch {
+        showToast('That photo didn’t load. Try again.');
+      }
+    };
+    const ready = people.filter((p) => p.name.trim() && p.photo).length;
+    const canSend = Boolean(buy.item.trim()) && people.length > 0 && ready === people.length;
+    const input = {
+      width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
+      border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
+    };
+    const tile = {
+      position: 'relative', display: 'grid', placeItems: 'center', aspectRatio: 1,
+      borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+    };
+
+    return (
+      <div className="card flag">
+        {renderCpHead(STAMP_NO.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.stop)}
+        <div className="task">
+          {CONFIG.buy.brief && <p><b>{CONFIG.buy.brief}</b></p>}
+          <Rich text={CONFIG.cp.cp3.body} />
+        </div>
+        <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
+
+        <label className="f" style={{ display: 'block', marginBottom: 14 }}>
           <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>What did you buy?</span>
-          <input
-            type="text"
-            placeholder="e.g. ume soft serve"
-            value={draft.item || ''}
-            onChange={(e) => setDraft((d) => ({ ...d, item: e.target.value }))}
-            style={{
-              width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-              border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-            }}
-          />
+          <input type="text" placeholder="e.g. ume soft serve" value={buy.item}
+            onChange={(e) => { const item = e.target.value; updateBuy((b) => ({ ...b, item })); }}
+            style={input} />
         </label>
-        <label className="f" style={{ flex: 'none', maxWidth: 120, display: 'block' }}>
-          <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>Price ¥</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            placeholder="380"
-            value={draft.price || ''}
-            onChange={(e) => setDraft((d) => ({ ...d, price: e.target.value }))}
+
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
+          Everyone’s photo with it · {ready}/{people.length}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+          {people.map((p, k) => {
+            const fileId = `buy-photo-${k}`;
+            return (
+              <div key={k} style={{ minWidth: 0 }}>
+                <div style={{ position: 'relative' }}>
+                  <label htmlFor={fileId} aria-label={p.photo ? `Retake ${p.name || 'this'} photo` : `Take ${p.name || 'this'} photo`}
+                    style={{
+                      ...tile,
+                      border: p.photo ? 'var(--line)' : '3px dashed var(--th-dash)',
+                      background: p.photo ? '#0E1720' : 'var(--th-parchment)',
+                    }}>
+                    {p.photo
+                      ? <img src={p.photo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <span style={{ fontSize: 22 }}>📷</span>}
+                    {p.photo && (
+                      <span style={{
+                        position: 'absolute', top: 4, left: 4, padding: '1px 6px', borderRadius: 999,
+                        background: 'var(--sea)', color: '#fff', font: '700 11px/1.4 var(--body)',
+                      }}>✓</span>
+                    )}
+                  </label>
+                  <button type="button" aria-label={`Remove ${p.name || `member ${k + 1}`}`}
+                    onClick={() => updateBuy((b) => ({ ...b, people: b.people.filter((_, j) => j !== k) }))}
+                    style={{
+                      position: 'absolute', top: 4, right: 4, width: 26, height: 26, borderRadius: 999,
+                      border: 'var(--line)', background: 'var(--card)', color: 'var(--ink)',
+                      font: '700 14px/1 var(--body)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+                    }}>×</button>
+                </div>
+                <input id={fileId} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                  onChange={(e) => { onPhoto(k, e.target.files[0]); e.target.value = ''; }} />
+                <input type="text" placeholder="Name" aria-label={`Member ${k + 1} name`} value={p.name}
+                  onChange={(e) => { const name = e.target.value; setPerson(k, { name }); }}
+                  style={{ ...input, marginTop: 5, padding: '7px 8px', fontSize: 15, fontWeight: 700, textAlign: 'center' }} />
+              </div>
+            );
+          })}
+          <button type="button" onClick={() => updateBuy((b) => ({ ...b, people: [...b.people, { name: '', photo: null }] }))}
             style={{
-              width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-              border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-            }}
-          />
-        </label>
+              ...tile, border: '3px dashed var(--th-dash)', background: 'transparent', color: 'var(--ink-soft)',
+              font: '700 13px/1.3 var(--body)', padding: 6,
+            }}>
+            + Add a member
+          </button>
+        </div>
+
+        <button
+          className="btn block"
+          style={{ marginTop: 14 }}
+          disabled={!canSend}
+          onClick={() => {
+            const done = people.map((p) => ({ name: p.name.trim(), photo: p.photo }));
+            const newS = { ...S };
+            newS.subs = { ...(newS.subs || {}), cp3: { item: buy.item.trim(), people: done, photo: done[0].photo, at: Date.now() } };
+            delete newS.buy;
+            newS.open = null;
+            store.save(newS.teamId, newS);
+            setS(newS);
+            showToast('Stamp collected.');
+          }}
+          type="button"
+        >
+          Send it
+        </button>
+        <p className="note" style={{ margin: '12px 0 0' }}>
+          {canSend ? 'Most interesting find takes a bonus stamp at the finish.'
+            : 'Tap each box to take that person’s photo. Someone not here? Remove them, or change the name.'}
+        </p>
       </div>
-      {renderShot(draft.photo, 'Add the tasting photo', 'Everyone eating or drinking')}
-      <button
-        className="btn block"
-        style={{ marginTop: 14 }}
-        disabled={!draft.photo || !draft.item}
-        onClick={() => {
-          const newS = { ...S };
-          newS.subs = { ...(newS.subs || {}), cp3: { photo: draft.photo, item: draft.item, price: draft.price, at: Date.now() } };
-          newS.open = null;
-          store.save(newS.teamId, newS);
-          setS(newS);
-          setDraft({});
-          showToast('Stamp collected.');
-        }}
-        type="button"
-      >
-        Send it
-      </button>
-      <p className="note" style={{ margin: '12px 0 0' }}>Most interesting find takes a bonus stamp at the finish.</p>
-    </div>
-  );
+    );
+  };
 
   const renderCp4 = () => {
     const answers = draft.answers || [];
@@ -1795,7 +2023,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   };
 
   /* Whichever game the team has open, or the hub if none. The only
-     gate left is inside game 3, where the selfie reveals the riddle. */
+     gate left is inside game 3, where the selfie reveals the Atami quiz. */
   const renderStage = () => {
     if (!S) return null;
     if (!S.open) return renderHub();

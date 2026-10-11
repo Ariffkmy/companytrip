@@ -85,20 +85,28 @@ function readHuntPhotos() {
     try { run = JSON.parse(localStorage.getItem(key)); } catch { continue; }
     if (!run || !run.subs) continue;
 
+    const add = (id, src, label, at, cp) => out.push({
+      id: `hunt:${key.slice('treasure:'.length)}:${id}`,
+      kind: 'photo',
+      src,
+      name: `${run.teamName || run.teamId} — ${label}`,
+      size: Math.round((src.length * 3) / 4), // approx bytes behind the base64
+      at: at || 0,
+      source: 'hunt',
+      team: run.teamName || run.teamId,
+      checkpoint: CP_LABELS[cp] || cp,
+      readOnly: true,
+    });
     Object.entries(run.subs).forEach(([cp, sub]) => {
-      if (!sub || !sub.photo) return;
-      out.push({
-        id: `hunt:${key.slice('treasure:'.length)}:${cp}`,
-        kind: 'photo',
-        src: sub.photo,
-        name: `${run.teamName || run.teamId} — ${CP_LABELS[cp] || cp}`,
-        size: Math.round((sub.photo.length * 3) / 4), // approx bytes behind the base64
-        at: sub.at || 0,
-        source: 'hunt',
-        team: run.teamName || run.teamId,
-        checkpoint: CP_LABELS[cp] || cp,
-        readOnly: true,
-      });
+      if (!sub) return;
+      /* Buy it, try it: one photo per member, under their name. */
+      if (Array.isArray(sub.people)) {
+        sub.people.forEach((p, k) => {
+          if (p?.photo) add(`${cp}:${k}`, p.photo, `${CP_LABELS[cp] || cp} · ${p.name}`, sub.at, cp);
+        });
+        return;
+      }
+      if (sub.photo) add(cp, sub.photo, CP_LABELS[cp] || cp, sub.at, cp);
     });
   }
   return out;

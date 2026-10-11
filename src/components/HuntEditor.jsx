@@ -293,6 +293,67 @@ function BingoTiles({ items, onChange, onFrame, frameOfSame }) {
   );
 }
 
+/* The Atami quiz bank: each question folded to one line until opened,
+   since there are dozens. The radio beside an option marks it right. */
+function AtamiQuestions({ items, onChange }) {
+  const baseId = useFieldId();
+  const list = items ?? [];
+  const patch = (i, next) => onChange(list.map((x, j) => (j === i ? { ...x, ...next } : x)));
+  const smallBtn = 'shrink-0 h-9 w-9 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed';
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-600 mb-1">Questions · {list.length}</p>
+      <ol className="space-y-1.5">
+        {list.map((x, i) => {
+          const options = x.options ?? [];
+          return (
+            <li key={i}>
+              <details className="rounded-lg border border-gray-200 bg-white">
+                <summary className="flex gap-2 px-3 py-2 cursor-pointer text-sm">
+                  <span className="font-mono text-[11px] text-gray-400 w-5 shrink-0 text-right pt-0.5">{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate">{x.q || <i className="text-gray-400">New question</i>}</span>
+                  <span className="shrink-0 text-xs text-gray-400 truncate max-w-[40%]">✓ {options[x.a] ?? '—'}</span>
+                </summary>
+                <div className="px-3 pb-3 pt-1 space-y-3">
+                  <Area label="Question" value={x.q} onChange={(q) => patch(i, { q })} rows={2} />
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 mb-1">Options — pick the right one</p>
+                    <ul className="space-y-1.5">
+                      {options.map((o, k) => (
+                        <li key={k} className="flex gap-2 items-center">
+                          <input type="radio" name={`${baseId}-${i}`} checked={x.a === k} aria-label={`Option ${k + 1} is right`}
+                            onChange={() => patch(i, { a: k })} className="w-4 h-4 accent-red shrink-0 cursor-pointer" />
+                          <input value={o} aria-label={`Option ${k + 1}`} className={`${inputCls} h-9`}
+                            onChange={(e) => patch(i, { options: options.map((v, j) => (j === k ? e.target.value : v)) })} />
+                          <button type="button" aria-label={`Remove option ${k + 1}`} disabled={options.length <= 2} className={smallBtn}
+                            onClick={() => patch(i, {
+                              options: options.filter((_, j) => j !== k),
+                              a: x.a === k ? 0 : x.a > k ? x.a - 1 : x.a,
+                            })}>×</button>
+                        </li>
+                      ))}
+                    </ul>
+                    {options.length < 6 && (
+                      <button type="button" onClick={() => patch(i, { options: [...options, ''] })}
+                        className="mt-1.5 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add option</button>
+                    )}
+                  </div>
+                  <Text label="Why (shown after they pick)" value={x.why} onChange={(why) => patch(i, { why })} />
+                  <button type="button" onClick={() => onChange(list.filter((_, j) => j !== i))}
+                    className="text-sm font-medium text-red cursor-pointer">Remove this question</button>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ol>
+      <button type="button" onClick={() => onChange([...list, { q: '', options: ['', '', '', ''], a: 0, why: '' }])}
+        className="mt-2 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add question</button>
+    </div>
+  );
+}
+
 /* ── Know your colleagues answers ───────────────────
    Rows of public.colleague_answers: one per person per assigned
    question. They save on their own Save button, straight to the
@@ -696,8 +757,8 @@ export default function HuntEditor() {
         </div>
       </Section>
 
-      <Section title="3 · Find the place + riddle" sub={`${val([...cp('cp2a'), 'title'])} · ${val([...cp('cp2b'), 'title'])}`}>
-        <Sub>Part A — find the place</Sub>
+      <Section title="3 · Atami quiz" sub={`${val([...cp('cp2a'), 'title'])} · ${val([...cp('cp2b'), 'title'])}`}>
+        <Sub>Part A — find the place (selfie)</Sub>
         {commonFields('cp2a', { photo: false })}
         <p className="note">Each team gets its own place to find — only that team sees its photo.</p>
         <div className="space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3 lg:items-start">
@@ -709,36 +770,27 @@ export default function HuntEditor() {
             </div>
           ))}
         </div>
-        <Sub>Part B — riddles</Sub>
+        <Sub>Part B — Atami quiz</Sub>
         {commonFields('cp2b', { body: false })}
-        <Area label="Intro above the riddles (optional)" hint={TEXT_HINT} value={val([...cp('cp2b'), 'body'])} onChange={set([...cp('cp2b'), 'body'])} rows={2} />
-        <div>
-          <p className="text-xs font-semibold text-gray-600 mb-1">Riddles</p>
-          <ol className="space-y-3">
-            {val([...cp('cp2b'), 'riddles']).map((r, i, all) => (
-              <li key={i} className="flex gap-2 items-start">
-                <span className="font-mono text-[11px] text-gray-400 w-5 shrink-0 text-right pt-3">{i + 1}</span>
-                <textarea aria-label={`Riddle ${i + 1}`} value={r} rows={4}
-                  onChange={(e) => set([...cp('cp2b'), 'riddles', i])(e.target.value)}
-                  className={`${inputCls} py-2 leading-relaxed resize-y`} />
-                <button type="button" aria-label={`Remove riddle ${i + 1}`} disabled={all.length <= 1}
-                  onClick={() => set([...cp('cp2b'), 'riddles'])(all.filter((_, j) => j !== i))}
-                  className="shrink-0 h-10 w-10 rounded-lg border border-gray-200 bg-white text-gray-400 hover:text-red cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">×</button>
-              </li>
-            ))}
-          </ol>
-          <button type="button" onClick={() => set([...cp('cp2b'), 'riddles'])([...val([...cp('cp2b'), 'riddles']), ''])}
-            className="mt-2 text-sm font-medium text-ink underline underline-offset-2 decoration-red cursor-pointer">+ Add riddle</button>
-          <p className="note mt-1">{TEXT_HINT} Teams must answer every riddle to collect the stamp.</p>
+        <Area label="Intro before the quiz starts (optional)" hint={TEXT_HINT} value={val([...cp('cp2b'), 'body'])} onChange={set([...cp('cp2b'), 'body'])} rows={3} />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Num label="Questions per round" min={1} value={val([...cp('cp2b'), 'perRound'])} onChange={set([...cp('cp2b'), 'perRound'])} />
+          <Num label="Seconds a question" value={val([...cp('cp2b'), 'secondsPerQuestion'])} onChange={set([...cp('cp2b'), 'secondsPerQuestion'])} />
+          <Num label="Right to pass" value={val([...cp('cp2b'), 'passMark'])} onChange={set([...cp('cp2b'), 'passMark'])} />
+          <Num label="Points per right" value={val([...cp('cp2b'), 'pointsPerRight'])} onChange={set([...cp('cp2b'), 'pointsPerRight'])} />
         </div>
+        <p className="note -mt-1">
+          Each round deals a random set from the questions below — questions a team hasn’t had yet come first. A round
+          short of the pass mark is played again with a fresh deal. Running out of time on any question also sends the
+          team back to question 1 with a fresh deal. 0 seconds means no time limit.
+        </p>
+        <AtamiQuestions items={val([...cp('cp2b'), 'questions'])} onChange={set([...cp('cp2b'), 'questions'])} />
       </Section>
 
       <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
         <Sub>The game</Sub>
-        <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-3">
-          <Num label="Budget ¥" value={val([...cp('cp3'), 'budgetYen'])} onChange={set([...cp('cp3'), 'budgetYen'])} />
-          <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
-        </div>
+        <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
+        <p className="note -mt-1">No budget — teams spend what they like. Every member of the group needs a photo with what they bought; the list starts as the group line-up, and teams can rename, remove or add people during the game.</p>
         {commonFields('cp3')}
       </Section>
 

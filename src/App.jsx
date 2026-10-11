@@ -392,10 +392,11 @@ export default function App() {
     );
   }
 
+  /* The hunt is full screen: it has its own sticky bar and way out, and
+     the app header above it only ate space on a phone mid-game. */
   if (treasureOpen) {
     return (
       <>
-        <Header />
         <div className="max-w-[640px] mx-auto px-4 pb-8">
           <TreasureHunt
             onClose={closeTreasureHunt}
