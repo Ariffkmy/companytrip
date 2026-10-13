@@ -15,6 +15,7 @@
 */
 
 import { supabase } from './supabase';
+import { PHOTO_PRESETS, compressPhoto } from './photos';
 import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
 import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
 import ATAMI_QUIZ from '../data/atamiQuiz';
@@ -38,7 +39,11 @@ export const BINGO_MAX = 30;
 
 export const DEFAULT_HUNT_CONFIG = {
   raceMinutes: 90,
-  points: { checkpoint: 10, quizPerAnswer: 2 },
+  /* checkpoint: each stamp of games 1–6. quizPerAnswer: Look around
+     you. judged: each award the committee gives at the finish. boss:
+     the Find the boss selfie (no stamp points). first: the first group
+     to complete all seven games. See src/lib/huntScores.js. */
+  points: { checkpoint: 10, quizPerAnswer: 2, judged: 5, boss: 20, first: 15 },
   finishPoint: 'The committee will point you to the finish at the briefing.',
   helpNote: 'Stuck? The committee is in the WhatsApp group.',
 
@@ -79,12 +84,15 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Every member takes a photo with what you bought',
     '',
     '**What scores**',
-    '- 10 a stamp',
+    '- 10 a stamp, games 1 to 6',
     '- Photo bingo: 1 a photo, 5 more for the full card',
-    '- Observation quiz: 2 a right answer',
+    '- Copy the pose: best pose photo, 5 more',
     '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question',
+    '- Buy it, try it: most interesting buy, 5 more',
+    '- Look around you: 2 a right answer',
     '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
-    '- Judged at the finish: best pose photo, most interesting buy, funniest boss photo, first back — 5 each',
+    '- Find the boss: 20 for the selfie with Tim and Ellice',
+    '- First team to complete all 7 games: 15 more',
   ].join('\n'),
 
   /* Per hunt group (src/data/huntGroups.js), not per trip team. */
@@ -229,6 +237,17 @@ export function withDefaults(stored) {
   /* Game 3 was called Find the place; it is the Atami quiz now. A title
      the committee changed to something else is left alone. */
   if (merged.checkpoints.cp2a.title === 'Find the place') merged.checkpoints.cp2a.title = 'Atami quiz';
+  /* Saved while every award was 5 at the finish, first back included,
+     and Find the boss earned a stamp: the points table changed, so the
+     "What scores" section is replaced with the current one. */
+  {
+    const rules = String(merged.rules ?? '');
+    if (/^- Judged at the finish: .*first back/m.test(rules)) {
+      const block = (s) => s.match(/\*\*What scores\*\*[\s\S]*?(?=\n\s*\n|$)/);
+      const fresh = block(DEFAULT_HUNT_CONFIG.rules)[0];
+      merged.rules = block(rules) ? rules.replace(block(rules)[0], fresh) : `${rules.trimEnd()}\n\n${fresh}`;
+    }
+  }
   /* Saved while stamp 6 was the closest-guess or general knowledge game:
      its title, text and questions describe a game that no longer exists. */
   const oldGuess = stored?.checkpoints?.guess;
@@ -462,28 +481,10 @@ export async function saveHuntConfig(config) {
   return data.updated_at;
 }
 
-/* Phone photos are 3–10 MB. Reference shots only need to be legible on
-   a phone screen, so downscale before they cost anyone's roaming data. */
-function toJpeg(file, max = 1600, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      c.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
-    img.src = url;
-  });
-}
-
+/* Reference shots only need to be legible on a phone screen, so they
+   are shrunk before they cost anyone's roaming data (src/lib/photos.js). */
 export async function uploadHuntPhoto(file) {
-  const blob = await toJpeg(file);
+  const { blob } = await compressPhoto(file, PHOTO_PRESETS.reference);
   const path = `${HUNT_ID}/${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage.from(MEDIA_BUCKET).upload(path, blob, {
     contentType: 'image/jpeg',

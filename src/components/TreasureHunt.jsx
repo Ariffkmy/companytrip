@@ -3,9 +3,15 @@ import { toRuntime, withDefaults, fetchClockReset, restartClock } from '../lib/h
 import { cachedColleagueAnswers, fetchColleagueAnswers } from '../lib/colleagueQuiz';
 import { huntGroupOf } from '../data/huntGroups';
 import { listShots, uploadShot, deleteShot } from '../lib/bingo';
+import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhotoToDataUrl, photoErrorMessage } from '../lib/photos';
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
 import { framedImgStyle } from './FramedPhoto';
+import {
+  AWARDS, SCORED_GAMES, completedAt, cp4Verdicts, fetchResultsPublished, fetchRun, photoPathsOf, pushRun, runSummary,
+  saveJudging, setResultsPublished, signPhotos,
+} from '../lib/huntScores';
+import { GroupDetails, GroupDot, PointsTable, QaList, TD, TH, clockTime, linkBtn, useGroupJump, useHuntBoard } from './HuntResults';
 
 /* ═══════════════════════════════════════════════════
    Atami Treasure Hunt — Embedded Stamp Rally Game
@@ -18,24 +24,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9faf]/g, '');
 
-/* Downscale to a JPEG data URL. Preview bingo tiles pass a smaller max/quality. */
-function compressImage(file, max = 760, quality = 0.72) {
-  return new Promise((res, rej) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      res(c.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('bad image')); };
-    img.src = url;
-  });
-}
+/* Downscale to a JPEG data URL (src/lib/photos.js). Preview bingo tiles
+   pass the smaller preview preset. */
+const compressImage = (file, preset = PHOTO_PRESETS.game) => compressPhotoToDataUrl(file, preset);
 
 const mmss = (s) => {
   const m = Math.floor(s / 60);
@@ -336,41 +327,46 @@ function Countdown({ deadline, total, onExpire }) {
   );
 }
 
-function scoreOf(run, CONFIG) {
-  let p = 0;
-  Object.keys(run.subs).forEach((k) => {
-    if (k === 'ask') return; // the dropped Ask a stranger game, on an old run
-    const sub = run.subs[k];
-    p += CONFIG.points.checkpoint;
-    if (k === 'cp4') p += (sub.correct || 0) * CONFIG.points.quizPerAnswer;
-    else if (k === 'bingo') p += sub.points || 0;
-    else if (k === 'guess') p += (sub.right || 0) * CONFIG.trivia.pts;
-    else if (k === 'cp2b') p += (sub.right || 0) * CONFIG.atami.pts;
-  });
-  Object.values(run.bonus || {}).forEach((v) => (p += v));
-  return p;
-}
-
 /* ════════════════════════════════════════════════════════════
    Organiser view — lives on the Admin page, not in the game.
-   Team runs are read from this device's storage, the same place the
-   game writes them, so it shows the teams that played on this phone.
+   Every group's run comes from hunt_scores, where its leader's phone
+   copies it as they play (src/lib/huntScores.js); a group that hasn't
+   synced falls back to a run played on this device, if there is one.
+   Points are worked out from the live config, so they always match
+   what the rules say. The board, points table and group details are
+   shared with the members' results on Home (./HuntResults).
    ════════════════════════════════════════════════════════════ */
 export function HuntOrganiser({ config }) {
-  const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const store = useMemo(() => makeStore(false), []);
-  const allRuns = CONFIG.teams
-    .map((t) => store.load(t.id))
-    .filter(Boolean)
-    .sort((a, b) => scoreOf(b, CONFIG) - scoreOf(a, CONFIG));
+  const loadLocal = useCallback((id) => store.load(id), [store]);
+  const {
+    CONFIG, remote, judging, setJudging, resetAt, setResetAt, loadedAt, refresh,
+    rows, ranked, autoFirst, firstTeam,
+  } = useHuntBoard(config, { loadLocal });
+  const { sel, setSel, target, jump } = useGroupJump();
+  const [judgeError, setJudgeError] = useState('');
 
-  /* One restart for every team. It reaches every phone, unlike the
-     board below, which only knows the runs played on this device. */
-  const [resetAt, setResetAt] = useState(0);
+  /* One restart for every team. */
   const [confirming, setConfirming] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const [clockError, setClockError] = useState('');
-  useEffect(() => { fetchClockReset().then(setResetAt); }, []);
+
+  /* Publishing the results to every member's Home. */
+  const [published, setPublished] = useState(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
+  useEffect(() => { fetchResultsPublished().then(setPublished); }, []);
+  const togglePublished = async () => {
+    setPublishing(true);
+    setPublishError('');
+    try {
+      setPublished(await setResultsPublished(!published));
+    } catch (e) {
+      setPublishError(e?.message || 'Could not change that. Try again.');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const handleRestart = async () => {
     if (!confirming) { setConfirming(true); return; }
@@ -386,13 +382,54 @@ export function HuntOrganiser({ config }) {
     }
   };
 
+  /* Saved straight away; the board re-scores as soon as it changes. */
+  const judge = async (next) => {
+    setJudging(next);
+    setJudgeError('');
+    try {
+      setJudging(await saveJudging(next));
+    } catch (e) {
+      setJudgeError(e?.message || 'Could not save that. Try again.');
+      refresh();
+    }
+  };
+
+  const judgedEach = Number(CONFIG.points?.judged ?? 5) || 0;
+  const firstPts = Number(CONFIG.points?.first ?? 15) || 0;
+
+  const renderPublish = () => (
+    <div className="card" style={published ? { borderColor: 'var(--red)' } : {}}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 220px' }}>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>
+            {published == null ? 'Results' : published ? 'Results published' : 'Results not published'}
+          </div>
+          <p className="note" style={{ margin: '4px 0 0' }}>
+            {published
+              ? 'Every member sees the standings, points by game, and every group’s answers and photos on Home.'
+              : 'Only admins can see these results. Publish to show them to every member on Home — standings, points, answers and photos for all groups.'}
+          </p>
+        </div>
+        <button
+          className={published ? 'mini' : 'btn'}
+          type="button"
+          disabled={publishing || published == null}
+          onClick={togglePublished}
+        >
+          {publishing ? 'Saving…' : published ? 'Unpublish' : 'Publish results'}
+        </button>
+      </div>
+      {publishError && <p className="note" style={{ color: 'var(--red)', margin: '10px 0 0' }}>{publishError}</p>}
+    </div>
+  );
+
   const renderClock = () => (
     <div className="card">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <p className="note" style={{ margin: 0, flex: '1 1 220px' }}>
           Starts the hunt again from the beginning for every team, with a fresh {CONFIG.raceMinutes} minutes.
           Stamps, answers and points go back to zero on every phone; nothing is deleted.
-          {resetAt > 0 && ` Last restarted ${new Date(resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`}
+          {resetAt > 0 && ` Last restarted ${clockTime(resetAt)}.`}
         </p>
         <button
           className="mini"
@@ -408,85 +445,219 @@ export function HuntOrganiser({ config }) {
     </div>
   );
 
+  /* ── Ranking ───────────────────────────────────────── */
+  const renderBoard = () => (
+    <div className="card flag">
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 8 }}>
+        <div className="eyebrow" style={{ color: 'var(--red)', flex: 1 }}>Scoreboard</div>
+        <button className="mini" type="button" onClick={refresh}>Refresh</button>
+      </div>
+      {remote === null && (
+        <p className="note" style={{ color: 'var(--red)', margin: '0 0 10px' }}>
+          Can’t reach the shared scoreboard, so only runs played on this device show. If the
+          hunt_scores migration hasn’t been run yet, run it in Supabase.
+        </p>
+      )}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr>
+              <th style={TH}>#</th>
+              <th style={TH}>Group</th>
+              <th style={TH}>Stamps</th>
+              <th style={TH}>Time</th>
+              <th style={{ ...TH, textAlign: 'right' }}>Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranked.map(({ team, leader, run, stale, fromPhone, score }, i) => {
+              const done = new Set(SCORED_GAMES.map((g, si) => (score?.games[g.key] != null ? si : null)).filter((v) => v != null));
+              const left = run?.startedAt
+                ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
+                : 0;
+              return (
+                <tr key={team.id}>
+                  <td style={{ ...TD, fontFamily: 'var(--display)', fontSize: 18 }}>{run ? i + 1 : '–'}</td>
+                  <td style={TD}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <GroupDot colour={team.colour} />
+                      <button type="button" onClick={() => jump(team.id)} aria-label={`See ${team.name}’s answers and photos`}
+                        style={{ ...linkBtn, fontWeight: 700, fontSize: 13, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                        {team.name}
+                      </button>
+                    </span>
+                    <br /><span className="note">
+                      {leader ? `Leader ${leader}` : '—'}
+                      {stale ? ' · before the restart' : fromPhone ? ' · this device only' : ''}
+                    </span>
+                  </td>
+                  <td style={{ ...TD, whiteSpace: 'nowrap' }}>
+                    {SLOTS.map((si) => (
+                      <span key={si} style={{
+                        display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
+                        border: '2px solid var(--ink)', marginRight: 3,
+                        background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
+                      }} />
+                    ))}
+                  </td>
+                  <td style={{ ...TD, fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)', whiteSpace: 'nowrap' }}>
+                    {!run ? 'NOT STARTED' : run.finishedAt ? `DONE ${clockTime(run.finishedAt)}` : mmss(left)}
+                  </td>
+                  <td style={{ ...TD, textAlign: 'right' }}>
+                    <b className="display" style={{ fontSize: 20 }}>{score ? score.total : '–'}</b>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {loadedAt > 0 && (
+        <p className="note" style={{ margin: '10px 0 0' }}>
+          Updates every 15 seconds · last {new Date(loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </p>
+      )}
+    </div>
+  );
+
+  /* ── Judged at the finish ──────────────────────────── */
+  const renderAwards = () => {
+    const completed = rows.map((r) => ({ ...r, at: completedAt(r.run) }))
+      .filter((r) => r.at != null && Number.isFinite(r.at)).sort((a, b) => a.at - b.at);
+    const pill = (on) => ({
+      padding: '5px 10px', borderRadius: 999, border: '2px solid var(--ink)', cursor: 'pointer',
+      font: '700 12px/1.2 var(--body)', background: on ? 'var(--red)' : 'var(--card)', color: on ? '#fff' : 'var(--ink)',
+    });
+    return (
+      <div className="card">
+        <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 4 }}>Judged awards · {judgedEach} pts each</div>
+        <p className="note" style={{ margin: '0 0 10px' }}>Tap the winning group. Tap it again to take the award back.</p>
+        {AWARDS.map((a) => {
+          const winner = judging.awards?.[a.key] ?? null;
+          return (
+            <div key={a.key} style={{ padding: '8px 0', borderBottom: '1px dashed var(--th-rule)' }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{a.label}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {rows.map(({ team }) => (
+                  <button key={team.id} type="button" aria-pressed={winner === team.id} style={pill(winner === team.id)}
+                    onClick={() => judge({
+                      ...judging,
+                      awards: { ...(judging.awards ?? {}), [a.key]: winner === team.id ? null : team.id },
+                    })}>
+                    {team.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* First to complete: worked out from when each group collected
+            its seventh game. A pick here overrides it. */}
+        <div style={{ padding: '12px 0 0' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>First team to complete · {firstPts} pts</div>
+          <p className="note" style={{ margin: '0 0 6px' }}>
+            {completed.length
+              ? `All 7 games: ${completed.map((r) => `${r.team.name} ${clockTime(r.at)}`).join(' · ')}.`
+              : 'No group has completed all 7 games yet.'}
+            {judging.first ? ' Set by hand.' : autoFirst ? ' Given automatically.' : ''}
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button type="button" aria-pressed={!judging.first} style={pill(!judging.first)}
+              onClick={() => judge({ ...judging, first: null })}>
+              Automatic{autoFirst ? ` (${CONFIG.teams.find((t) => t.id === autoFirst)?.name ?? autoFirst})` : ''}
+            </button>
+            {rows.map(({ team }) => (
+              <button key={team.id} type="button" aria-pressed={judging.first === team.id} style={pill(judging.first === team.id)}
+                onClick={() => judge({ ...judging, first: judging.first === team.id ? null : team.id })}>
+                {team.name}
+              </button>
+            ))}
+          </div>
+        </div>
+        {judgeError && <p className="note" style={{ color: 'var(--red)', margin: '10px 0 0' }}>{judgeError}</p>}
+      </div>
+    );
+  };
+
+  /* ── Look around you: typed answers, marked here ───── */
+  const renderMarking = () => {
+    const sent = rows.filter((r) => Array.isArray(r.run?.subs?.cp4?.answers));
+    const questions = CONFIG.quiz.questions;
+    const mark = (teamId, i, value) => {
+      const mine = { ...(judging.cp4?.[teamId] ?? {}) };
+      if (value === null) delete mine[i]; else mine[i] = value;
+      judge({ ...judging, cp4: { ...(judging.cp4 ?? {}), [teamId]: mine } });
+    };
+    const btn = (on, colour) => ({
+      width: 34, height: 30, borderRadius: 7, border: '2px solid var(--ink)', cursor: 'pointer', flex: 'none',
+      font: '700 14px/1 var(--body)', background: on ? colour : 'var(--card)', color: on ? '#fff' : 'var(--ink)',
+    });
+    return (
+      <div className="card">
+        <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 4 }}>
+          Mark {gameTitle('cp4', CONFIG.cp)} · {CONFIG.points.quizPerAnswer} pts a right answer
+        </div>
+        <p className="note" style={{ margin: '0 0 10px' }}>
+          Answers that match the accepted list are marked for you; mark the rest. Tap ✓ or ✗ again to undo.
+        </p>
+        {sent.length === 0 ? (
+          <p className="note" style={{ margin: 0 }}>No group has sent its answers yet.</p>
+        ) : sent.map(({ team, run }) => {
+          const verdicts = cp4Verdicts(run.subs.cp4, questions, judging.cp4?.[team.id]);
+          const open = verdicts.filter((v) => v.mark === null).length;
+          return (
+            <details key={team.id} open style={{ padding: '8px 0', borderBottom: '1px dashed var(--th-rule)' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                <GroupDot colour={team.colour} /> {team.name} · {verdicts.filter((v) => v.mark === true).length}/{questions.length} right
+                {open > 0 && <span style={{ color: 'var(--red)' }}> · {open} to mark</span>}
+              </summary>
+              {questions.map((q, i) => {
+                const v = verdicts[i];
+                const set = judging.cp4?.[team.id]?.[i];
+                return (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 0' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="note" style={{ margin: 0 }}>{i + 1}. {q.q}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, overflowWrap: 'anywhere' }}>
+                        {String(run.subs.cp4.answers[i] ?? '').trim() || '—'}
+                        {v.auto && <span className="note" style={{ fontWeight: 400 }}> · auto</span>}
+                      </div>
+                    </div>
+                    <button type="button" aria-label={`Right: ${team.name} question ${i + 1}`} aria-pressed={v.mark === true}
+                      style={btn(v.mark === true, 'var(--sea)')} onClick={() => mark(team.id, i, set === true ? null : true)}>✓</button>
+                    <button type="button" aria-label={`Wrong: ${team.name} question ${i + 1}`} aria-pressed={v.mark === false}
+                      style={btn(v.mark === false, 'var(--red)')} onClick={() => mark(team.id, i, set === false ? null : false)}>✗</button>
+                  </div>
+                );
+              })}
+            </details>
+          );
+        })}
+        {judgeError && <p className="note" style={{ color: 'var(--red)', margin: '10px 0 0' }}>{judgeError}</p>}
+      </div>
+    );
+  };
+
   return (
     <div>
       <div className="hero" style={{ padding: '10px 0' }}>
         <div className="big" style={{ fontSize: 'clamp(36px, 12vw, 54px)' }}>Organiser</div>
         <div className="rule" />
       </div>
+      {renderPublish()}
       {renderClock()}
-      {allRuns.length === 0 ? (
-        <div className="card">
-          <p style={{ margin: 0 }}>No teams have started yet. Once a team taps <b>Start the hunt</b>, they show up here.</p>
-        </div>
+      {remote === undefined ? (
+        <div className="card"><p className="note" style={{ margin: 0 }}>Loading the scoreboard…</p></div>
       ) : (
-        <div>
-          {/* Leaderboard */}
-          <div className="card flag">
-            <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Live board</div>
-            <table style={{
-              width: '100%', borderCollapse: 'collapse', fontSize: 13,
-            }}>
-              <thead>
-                <tr>
-                  <th style={{
-                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                    borderBottom: 'var(--line)',
-                  }}>Team</th>
-                  <th style={{
-                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                    borderBottom: 'var(--line)',
-                  }}>Stamps</th>
-                  <th style={{
-                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                    textTransform: 'uppercase', textAlign: 'left', padding: '6px 4px',
-                    borderBottom: 'var(--line)',
-                  }}>Time</th>
-                  <th style={{
-                    fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
-                    textTransform: 'uppercase', textAlign: 'right', padding: '6px 4px',
-                    borderBottom: 'var(--line)',
-                  }}>Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allRuns.map((run, i) => {
-                  const done = new Set(
-                    Object.keys(run.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null)
-                  );
-                  const left = run.startedAt
-                    ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
-                    : 0;
-                  return (
-                    <tr key={i}>
-                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
-                        <b style={{ fontFamily: 'var(--body)', fontSize: 13 }}>{run.teamName}</b>
-                        <br /><span className="note">{run.members || '—'}</span>
-                      </td>
-                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle' }}>
-                        {SLOTS.map((si) => (
-                          <span key={si} style={{
-                            display: 'inline-block', width: 11, height: 11, borderRadius: '50%',
-                            border: '2px solid var(--ink)', marginRight: 3,
-                            background: done.has(si) ? 'var(--red)' : 'var(--th-slot)',
-                          }} />
-                        ))}
-                      </td>
-                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--ink-soft)' }}>
-                        {run.finishedAt ? 'DONE' : mmss(left)}
-                      </td>
-                      <td style={{ padding: '8px 4px', borderBottom: '1px dashed var(--th-rule)', verticalAlign: 'middle', textAlign: 'right' }}>
-                        <b className="display" style={{ fontSize: 20 }}>{scoreOf(run, CONFIG)}</b>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <>
+          {renderBoard()}
+          <PointsTable CONFIG={CONFIG} rows={rows} onPick={jump} />
+          {renderAwards()}
+          {renderMarking()}
+          <GroupDetails CONFIG={CONFIG} rows={rows} judging={judging} resetAt={resetAt} firstTeam={firstTeam}
+            title="Every group’s answers and photos" sel={sel} onSel={setSel} target={target} />
+        </>
       )}
     </div>
   );
@@ -500,13 +671,39 @@ export function HuntOrganiser({ config }) {
    playing one: a team already out there keeps its progress if the
    switch is thrown, because losing a half-finished submission in a
    backstreet is worse than letting them finish. Defaults true so the
-   admin preview plays regardless. */
-export default function TreasureHunt({ onClose, teamId, config, isOpen = true, preview = false, huntLeader = null }) {
+   admin preview plays regardless.
+
+   Read only: `viewTeamId` opens another group's game page from the
+   published results (at `viewGame`, if given), and `ended` — the
+   results are published — turns the member's own page read only too.
+   Nothing is saved, synced or uploaded from a read-only page, and RLS
+   (20261014000000_hunt_results_lock.sql) refuses it anyway. */
+export default function TreasureHunt({
+  onClose, teamId, config, isOpen = true, preview = false, huntLeader = null,
+  viewTeamId = null, viewGame = null, ended = false,
+}) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
-  const store = useMemo(() => makeStore(preview), [preview]);
+  const readOnly = !preview && (ended || viewTeamId != null);
+  /* Set once showToast exists: says so when the phone is too full to
+     keep the run (its photos are most of it). */
+  const onDeviceFull = useRef(null);
+  const store = useMemo(() => {
+    const s = makeStore(preview);
+    /* Reads the phone's copy; never writes it. */
+    if (readOnly) return { load: s.load, save: () => true, remove: () => {} };
+    return {
+      ...s,
+      save: (id, state) => {
+        const ok = s.save(id, state);
+        if (!ok) onDeviceFull.current?.();
+        return ok;
+      },
+    };
+  }, [preview, readOnly]);
   /* Preview only: which team the admin is playing as. */
   const [previewTeam, setPreviewTeam] = useState(teamId ?? 'group-a');
-  const activeTeamId = preview ? previewTeam : teamId;
+  const activeTeamId = preview ? previewTeam : (viewTeamId ?? teamId);
+  const ownTeam = activeTeamId === teamId;
   /* Only the group's hunt leader runs its games
      (20261012000000_hunt_leader.sql). The hunt leader is a different
      person from the trip Team Lead: the Team Lead plays like anyone
@@ -515,6 +712,15 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
      nothing is locked. Admins and the editor's preview never lock out. */
   const canPlay = preview || huntLeader !== false;
   const leaderName = huntGroupOf(activeTeamId)?.leader ?? null;
+  /* Tells the leader it's them who runs the games. */
+  const leaderBadge = (style) => (huntLeader === true && !preview && ownTeam ? (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, flex: 'none',
+      padding: '2px 9px', borderRadius: 999, border: '2px solid var(--ink)',
+      background: 'var(--red)', color: '#fff', font: '700 11px/1.3 var(--body)',
+      letterSpacing: '.02em', whiteSpace: 'nowrap', ...style,
+    }}>★ Group leader</span>
+  ) : null);
   const [view, setView] = useState('start'); // start | race | done
   const [S, setS] = useState(null);
   const [draft, setDraft] = useState({});
@@ -558,10 +764,11 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
       document.body.style.overflow = prev;
     };
   }, [openTile]);
-  const showToast = useCallback((msg) => {
+  const showToast = useCallback((msg, ms = 2600) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2600);
+    setTimeout(() => setToast((cur) => (cur === msg ? null : cur)), ms);
   }, []);
+  onDeviceFull.current = () => showToast(DEVICE_FULL_MESSAGE, 6000);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -597,9 +804,9 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   }, [store]);
 
   useEffect(() => {
-    if (view !== 'race' || !S?.startedAt || S.finishedAt || secondsLeft === null) return;
+    if (readOnly || view !== 'race' || !S?.startedAt || S.finishedAt || secondsLeft === null) return;
     if (secondsLeft <= 0) finishRun(S);
-  }, [view, S, secondsLeft, finishRun]);
+  }, [readOnly, view, S, secondsLeft, finishRun]);
 
   /* Deal the first colleague question when the team opens it.
      The question and any answer picked are saved with the run, so a
@@ -615,7 +822,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     return () => { live = false; };
   }, [onTrivia]);
   useEffect(() => {
-    if (!onTrivia) return;
+    if (!onTrivia || readOnly) return;
     /* A question left over from the general knowledge game that this stamp
        used to be (no row id) is thrown away, along with its old streak. */
     const leftover = S.trivia?.current && S.trivia.current.id == null;
@@ -624,7 +831,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     const next = { ...S, trivia: { results: leftover ? [] : (S.trivia?.results ?? []), ...drawColleague(colleague, S.teamId, seen) } };
     store.save(next.teamId, next);
     setS(next);
-  }, [onTrivia, S, colleague, store]);
+  }, [onTrivia, readOnly, S, colleague, store]);
 
   const currentTeam = S ? CONFIG.teams.find((t) => t.id === S.teamId) : null;
   const bingoCard = CONFIG.teams.find((t) => t.id === activeTeamId)?.bingo ?? [];
@@ -683,11 +890,74 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   }, [preview, activeTeamId, store, showToast]);
 
   useEffect(() => {
-    if (preview) return undefined;
+    if (preview || readOnly) return undefined;
     checkClockReset();
     const id = setInterval(() => { if (!document.hidden) checkClockReset(); }, 20000);
     return () => clearInterval(id);
-  }, [preview, checkClockReset]);
+  }, [preview, readOnly, checkClockReset]);
+
+  /* ── Read only ───────────────────────────────────────
+     The group's run as it stands: this phone's own copy for the
+     member's own group (it has the photos), otherwise what the leader's
+     phone synced. Straight to the games list — or the game asked for. */
+  const [signed, setSigned] = useState({});
+  const [roState, setRoState] = useState(readOnly ? 'loading' : null); // loading · ready · none
+  useEffect(() => {
+    if (!readOnly || !activeTeamId) return undefined;
+    let live = true;
+    (async () => {
+      const at = await fetchClockReset();
+      const local = ownTeam ? store.load(activeTeamId) : null;
+      const mine = local?.startedAt && (!at || local.startedAt >= at) ? local : null;
+      const run = mine ?? await fetchRun(activeTeamId);
+      if (!live) return;
+      /* Nothing synced: still show the group's pages — its games, places,
+         poses and questions — just with nothing sent in. */
+      const team = CONFIG.teams.find((t) => t.id === activeTeamId) ?? { id: activeTeamId, name: activeTeamId };
+      setHuntResetAt(at);
+      setS({ ...(run?.startedAt ? run : blankState(team)), open: viewGame ?? null });
+      setRoState('ready');
+      setView('race');
+    })();
+    return () => { live = false; };
+  }, [readOnly, activeTeamId, ownTeam, viewGame, store, CONFIG]);
+
+  /* Synced photos are storage paths; sign them to show. */
+  const photoKey = readOnly ? photoPathsOf(S).join('|') : '';
+  useEffect(() => {
+    if (!photoKey) return undefined;
+    let live = true;
+    signPhotos(photoKey.split('|')).then((u) => { if (live) setSigned(u); });
+    return () => { live = false; };
+  }, [photoKey]);
+  const srcOf = (p) => (typeof p === 'string' ? p : p?.path ? signed[p.path] ?? null : null);
+
+  /* ── Scoreboard sync ─────────────────────────────────
+     Copies the run (without photos) to hunt_scores so Admin → Organiser
+     sees every group. Shortly after each change, and again every 30 s
+     until it lands — Atami's signal comes and goes. Only the leader's
+     phone plays, so only it writes; RLS refuses anyone else anyway. */
+  const syncedRef = useRef('');
+  /* Said once per visit: it retries every 30 s, and once is enough. */
+  const warnedFullRef = useRef(false);
+  const onStorageFull = useCallback(() => {
+    if (warnedFullRef.current) return;
+    warnedFullRef.current = true;
+    showToast(`Your answers and points are saved, but the photos can’t upload yet. ${STORAGE_FULL_MESSAGE}`, 8000);
+  }, [showToast]);
+  useEffect(() => {
+    if (preview || readOnly || !canPlay || !S?.teamId || !S.startedAt) return undefined;
+    const body = JSON.stringify(runSummary(S));
+    if (body === syncedRef.current) return undefined;
+    const run = S;
+    const push = async () => {
+      if (syncedRef.current === body) return;
+      if (await pushRun(run, { onStorageFull })) syncedRef.current = body;
+    };
+    const t = setTimeout(push, 1500);
+    const id = setInterval(() => { if (!document.hidden) push(); }, 30000);
+    return () => { clearTimeout(t); clearInterval(id); };
+  }, [preview, readOnly, canPlay, S, onStorageFull]);
 
   /* ── Render views ──────────────────────────────────── */
 
@@ -808,13 +1078,15 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     return (
       <div>
         <div className="card">
-          <div className="eyebrow" style={{ color: 'var(--red)' }}>Pick any one</div>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>{readOnly ? 'Read only · the hunt has ended' : 'Pick any one'}</div>
           <h2 className="display" style={{ fontSize: 22, margin: '4px 0 6px' }}>
-            {left === 0 ? 'Every stamp collected' : `${left} still to play`}
+            {readOnly ? `${done.size} of ${CONFIG.stamps} stamps collected`
+              : left === 0 ? 'Every stamp collected' : `${left} still to play`}
           </h2>
           <p style={{ margin: '0 0 10px' }}>
-            Play them in whatever order suits where you are. Skip anything you don’t fancy — an
-            unplayed game just scores nothing.
+            {readOnly
+              ? `Open any game to see what ${esc(S.teamName)} sent in — the photos and the answers. Nothing can be changed any more.`
+              : 'Play them in whatever order suits where you are. Skip anything you don’t fancy — an unplayed game just scores nothing.'}
           </p>
           {rulesButton()}
           <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0' }}>
@@ -844,21 +1116,23 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                         {gameTitle(g.key, CONFIG.cp)}
                       </b>
                       <span className="note">
-                        {isDone ? 'Stamp collected' : started ? 'Selfie in — quiz waiting' : g.short}
+                        {isDone ? 'Stamp collected'
+                          : started ? (readOnly ? 'Selfie in — quiz not passed' : 'Selfie in — quiz waiting')
+                          : readOnly ? 'Not played' : g.short}
                       </span>
                     </span>
                     <span aria-hidden="true" style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-                      {isDone ? 'Review' : 'Open'} →
+                      {isDone || readOnly ? 'View' : 'Open'} →
                     </span>
                   </button>
                 </li>
               );
             })}
           </ul>
-          {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
+          {CONFIG.helpNote && !readOnly && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
         </div>
 
-        <div style={{
+        {!readOnly && <div style={{
           background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
           padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
         }}>
@@ -870,7 +1144,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           <button className="btn block sea" type="button" onClick={() => finishRun(S)}>
             Finish the hunt{left > 0 ? ` · ${left} unplayed` : ''}
           </button>
-        </div>
+        </div>}
       </div>
     );
   };
@@ -905,6 +1179,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
                   background: team.colour, flex: 'none',
                 }} />
                 <b className="display" style={{ fontSize: 24 }}>{team.name}</b>
+                {leaderBadge()}
               </div>
               <button
                 className="btn block"
@@ -1016,7 +1291,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
   );
 
   const renderHeader = () => {
-    if (view !== 'race' && view !== 'done') return null;
+    if ((view !== 'race' && view !== 'done') || !S) return null;
     const doneCount = Object.keys(S.subs || {}).filter((k) => k !== 'cp2a').length;
     return (
       <div style={{
@@ -1033,11 +1308,20 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
               fontFamily: 'var(--display)', fontSize: 19, textTransform: 'uppercase',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>{S.teamName}</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--th-label)', letterSpacing: '.1em' }}>
-              {doneCount}/{CONFIG.stamps} STAMPS
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--th-label)', letterSpacing: '.1em' }}>
+                {doneCount}/{CONFIG.stamps} STAMPS
+              </span>
+              {leaderBadge({ border: 'none', fontSize: 10, padding: '1px 7px' })}
             </div>
           </div>
-          {view === 'race' && secondsLeft !== null && (
+          {readOnly && (
+            <span style={{
+              flex: 'none', padding: '3px 9px', borderRadius: 999, border: '2px solid var(--gold)',
+              color: 'var(--gold)', font: '700 10px/1.3 var(--mono)', letterSpacing: '.1em',
+            }}>READ ONLY</span>
+          )}
+          {view === 'race' && !readOnly && secondsLeft !== null && (
             <div style={{ textAlign: 'right', flex: 'none' }} aria-live="off">
               <div style={{
                 fontFamily: 'var(--mono)', fontSize: 18, lineHeight: 1,
@@ -1118,7 +1402,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           style={{ display: 'none' }}
           onChange={(e) => {
             const f = e.target.files[0];
-            if (f) handleFile(f, 'photo').catch(() => showToast("That file didn't load. Try another."));
+            if (f) handleFile(f, 'photo').catch((err) => showToast(photoErrorMessage(err)));
           }}
         />
       </label>
@@ -1341,7 +1625,9 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     const outOfReach = answered && !passed && rightCount + left < rules.passMark;
     const collect = () => {
       const newS = { ...S };
-      newS.subs = { ...(newS.subs || {}), cp2b: { right: rightCount, answered: round.length, attempts: run.attempt ?? 1, at: Date.now() } };
+      /* The passing round, question by question, for the results page. */
+      const log = round.map((x, k) => ({ q: x.q, a: x.options[x.a], picked: x.options[picks[k]] ?? null }));
+      newS.subs = { ...(newS.subs || {}), cp2b: { right: rightCount, answered: round.length, attempts: run.attempt ?? 1, log, at: Date.now() } };
       newS.open = null;
       store.save(newS.teamId, newS);
       setS(newS);
@@ -1505,8 +1791,8 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
       if (!file) return;
       try {
         setPerson(k, { photo: await compressImage(file) });
-      } catch {
-        showToast('That photo didn’t load. Try again.');
+      } catch (e) {
+        showToast(photoErrorMessage(e));
       }
     };
     const ready = people.filter((p) => p.name.trim() && p.photo).length;
@@ -1680,17 +1966,14 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     setBusyTile(i);
     try {
       if (preview) {
-        const src = await compressImage(file, 420, 0.6);
+        const src = await compressImage(file, PHOTO_PRESETS.preview);
         setShots((prev) => ({ ...prev, [i]: { tile: i, src, uploader_name: 'You' } }));
       } else {
         await uploadShot(activeTeamId, i, file, huntResetAt);
         await refreshShots();
       }
     } catch (e) {
-      const msg = e?.message ?? '';
-      showToast(/row-level|policy|unauthori[sz]ed|403/i.test(msg)
-        ? 'Only your own team’s card can be filled in.'
-        : /fetch|network/i.test(msg) ? 'No signal — try again in a moment.' : "That photo didn't upload. Try another.");
+      showToast(photoErrorMessage(e, { denied: 'Only your own team’s card can be filled in.' }));
     } finally {
       setBusyTile(null);
     }
@@ -1771,7 +2054,8 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
         </div>
 
         <p className="note" style={{ margin: '10px 0 0' }}>
-          Tap a tile to see the photo full-size. Anyone on the team can snap any tile — a selfie of the whole team at the spot.
+          {readOnly ? 'Tap a tile to see the photo to find and the team’s shot, full-size.'
+            : 'Tap a tile to see the photo full-size. Anyone on the team can snap any tile — a selfie of the whole team at the spot.'}
         </p>
       </>
   );
@@ -1785,7 +2069,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     const shot = shots[i];
     const locked = !!S?.subs?.bingo;
     const busy = busyTile === i;
-    const canSnap = !locked;
+    const canSnap = !locked && !readOnly;
     const close = () => setOpenTile(null);
     const pic = {
       display: 'block', width: '100%', maxHeight: '42vh', objectFit: 'contain',
@@ -1834,7 +2118,8 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
               </>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
-              {locked ? 'Stamp collected — this card is final.'
+              {readOnly ? 'Read only — the hunt has ended.'
+                : locked ? 'Stamp collected — this card is final.'
                 : 'Find it, then take a selfie of the whole team at the spot.'}
             </p>
           </div>
@@ -1954,7 +2239,13 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     const pick = (opt) => {
       if (!cur || cur.picked != null || collected) return;
       const right = opt === cur.a;
-      commit({ ...run, current: { ...cur, picked: opt }, results: [...results, right] });
+      commit({
+        ...run,
+        current: { ...cur, picked: opt },
+        results: [...results, right],
+        /* Each question as answered, for the results page. */
+        log: [...(run.log ?? []), { who: cur.who, q: cur.q, a: cur.a, picked: opt }],
+      });
       if (right) confetti();
     };
 
@@ -1962,7 +2253,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
 
     const collect = () => {
       const newS = { ...S };
-      newS.subs = { ...(newS.subs || {}), guess: { right: rightCount, answered: results.length, at: Date.now() } };
+      newS.subs = { ...(newS.subs || {}), guess: { right: rightCount, answered: results.length, log: run.log ?? [], at: Date.now() } };
       newS.open = null;
       store.save(newS.teamId, newS);
       setS(newS);
@@ -2065,11 +2356,163 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
     );
   };
 
+  /* ── Read only: one game as the group played it ─────
+     The game's own page — its number, title, instructions and reference
+     photos — with what the group sent in where the inputs were. */
+  const renderReview = (key) => {
+    const subs = S.subs ?? {};
+    const t = currentTeam;
+    const sub = subs[DONE_SUB[key]];
+    const notPlayed = <p className="note" style={{ margin: '12px 0 0' }}>{esc(S.teamName)} didn’t play this one.</p>;
+    const shot = (p, alt) => {
+      if (!p) return null;
+      const src = srcOf(p);
+      return src ? (
+        <img src={src} alt={alt} style={{
+          display: 'block', width: '100%', maxHeight: 420, objectFit: 'contain',
+          background: '#0E1720', border: 'var(--line)', borderRadius: 8,
+        }} />
+      ) : (
+        <div style={{ padding: 24, textAlign: 'center', border: '3px dashed var(--th-dash)', borderRadius: 8 }}>
+          <span className="note">{p?.path ? 'Loading the photo…' : 'Photo not uploaded'}</span>
+        </div>
+      );
+    };
+    const theirs = (label) => (
+      <div className="eyebrow" style={{ color: 'var(--red)', margin: '16px 0 8px' }}>{label}</div>
+    );
+    const quizItems = (log) => (log ?? []).map((x) => ({ ...x, ok: x.picked === x.a }));
+    const head = (n, cpKey) => renderCpHead(n, CONFIG.cp[cpKey].title, CONFIG.cp[cpKey].stop);
+    const task = (cpKey) => (String(CONFIG.cp[cpKey].body || '').trim()
+      ? <div className="task"><Rich text={CONFIG.cp[cpKey].body} /></div> : null);
+
+    if (key === 'bingo') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.bingo, 'bingo')}
+          {bingoCard.length ? renderBingoGrid() : <p className="note">No bingo card for this group.</p>}
+          {renderBingoTile()}
+          <p style={{ margin: '12px 0 0', fontWeight: 700 }}>
+            {sub ? `Stamp collected — ${sub.points ?? 0} points.` : 'Stamp not collected.'}
+          </p>
+        </div>
+      );
+    }
+    if (key === 'cp1') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.cp1, 'cp1')}
+          {task('cp1')}
+          {t && renderPlate({ src: t.pose.place, alt: 'The place', caption: t.pose.placeHint || 'Go to this place', tag: 'WHERE', missing: missingPhoto('Place') })}
+          {t && renderPlate({ src: t.pose.photo, alt: 'The pose', caption: `Copy this pose — ${esc(t.name)}`, tag: 'POSE', missing: missingPhoto('Pose') })}
+          {sub ? <>{theirs('Their photo')}{shot(sub.photo, `${S.teamName}’s pose photo`)}</> : notPlayed}
+        </div>
+      );
+    }
+    if (key === 'cp2') {
+      const selfie = subs.cp2a;
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.cp2a, 'cp2a')}
+          {task('cp2a')}
+          {t && renderPlate({ src: t.spot.photo, alt: 'The place to find', caption: t.spot.hint, tag: 'WHERE', missing: missingPhoto('Place') })}
+          {selfie ? <>{theirs('Their selfie')}{shot(selfie.photo, `${S.teamName}’s selfie`)}</> : notPlayed}
+          {selfie && (
+            <>
+              {theirs(CONFIG.cp.cp2b.title)}
+              {sub ? (
+                <>
+                  <p style={{ margin: 0, fontWeight: 700 }}>
+                    {sub.right} of {sub.answered} right{sub.attempts > 1 ? ` · passed on try ${sub.attempts}` : ''} — {sub.right * CONFIG.atami.pts} points.
+                  </p>
+                  <QaList items={quizItems(sub.log)} />
+                </>
+              ) : <p className="note" style={{ margin: 0 }}>Quiz not passed.</p>}
+            </>
+          )}
+        </div>
+      );
+    }
+    if (key === 'cp3') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.cp3, 'cp3')}
+          <div className="task">
+            {CONFIG.buy.brief && <p><b>{CONFIG.buy.brief}</b></p>}
+            <Rich text={CONFIG.cp.cp3.body} />
+          </div>
+          {sub ? (
+            <>
+              {theirs('What they bought')}
+              <p className="display" style={{ fontSize: 22, margin: 0 }}>{sub.item || '—'}</p>
+              {theirs('Everyone’s photo with it')}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
+                {(sub.people ?? []).map((p, k) => (
+                  <div key={k} style={{ minWidth: 0 }}>
+                    {shot(p.photo, p.name)}
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 14, marginTop: 5, overflowWrap: 'anywhere' }}>{p.name}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : notPlayed}
+        </div>
+      );
+    }
+    if (key === 'cp4') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.cp4, 'cp4')}
+          {task('cp4')}
+          {/* The questions show either way: they're the same for every group. */}
+          {theirs(sub ? 'Their answers' : 'The questions')}
+          {CONFIG.quiz.questions.map((q, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{i + 1}. {q.q}</div>
+              <div style={{
+                padding: '10px 12px', border: 'var(--line)', borderRadius: 7, background: 'var(--th-parchment)', fontSize: 16,
+                color: sub?.answers?.[i] ? 'var(--ink)' : 'var(--ink-soft)',
+              }}>{sub?.answers?.[i] || 'No answer'}</div>
+            </div>
+          ))}
+          {!sub && notPlayed}
+        </div>
+      );
+    }
+    if (key === 'guess') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.guess, 'guess')}
+          {task('guess')}
+          {sub ? (
+            <>
+              <p style={{ margin: 0, fontWeight: 700 }}>
+                {sub.right} of {sub.answered} right — {sub.right * CONFIG.trivia.pts} points.
+              </p>
+              <QaList items={quizItems(sub.log)} />
+            </>
+          ) : notPlayed}
+        </div>
+      );
+    }
+    if (key === 'boss') {
+      return (
+        <div className="card flag">
+          {head(STAMP_NO.boss, 'boss')}
+          {task('boss')}
+          {sub ? <>{theirs('Their photo with the bosses')}{shot(sub.photo, `${S.teamName} with the bosses`)}</> : notPlayed}
+        </div>
+      );
+    }
+    return renderHub();
+  };
+
   /* Whichever game the team has open, or the hub if none. The only
      gate left is inside game 3, where the selfie reveals the Atami quiz. */
   const renderStage = () => {
     if (!S) return null;
     if (!S.open) return renderHub();
+    if (readOnly) return renderReview(S.open);
     const renderers = {
       cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
       bingo: renderBingo, guess: renderTrivia, boss: renderBoss,
@@ -2162,7 +2605,7 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
           type="button"
           className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card border-red transition-all duration-100 hover:opacity-90"
         >
-          {view === 'race' && S?.open ? '← Main menu' : preview ? '← Back to editor' : '← Back to Day 4'}
+          {view === 'race' && S?.open ? '← Main menu' : preview ? '← Back to editor' : viewTeamId ? '← Back to results' : '← Back to Day 4'}
         </button>
         <button
           onClick={() => setMapOpen(true)}
@@ -2176,8 +2619,11 @@ export default function TreasureHunt({ onClose, teamId, config, isOpen = true, p
       {preview && renderPreviewBar()}
       {renderHeader()}
 
-      {view === 'start' && renderStartScreen()}
-      {view === 'race' && (canPlay ? (
+      {readOnly && roState === 'loading' && (
+        <div className="card"><p className="note" style={{ margin: 0 }}>Loading…</p></div>
+      )}
+      {view === 'start' && !readOnly && renderStartScreen()}
+      {view === 'race' && S && (canPlay || readOnly ? (
         <div>
           {!S?.open && renderStampRally()}
           {renderStage()}

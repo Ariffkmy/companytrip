@@ -10,6 +10,21 @@ import PhotoCarousel from './PhotoCarousel';
 import Nearby from './Nearby';
 import groupRoster from '../data/groupRoster';
 import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
+import { fetchResultsPublished } from '../lib/huntScores';
+import HuntResults from './HuntResults';
+
+/* ── Treasure hunt results ──────────────────────────
+   Hidden until the committee publishes them from Admin → Organiser;
+   then they lead the page, because that is what everyone opens it for. */
+function PublishedHuntResults({ config, onOpenGroupGame }) {
+  const [published, setPublished] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetchResultsPublished().then((on) => { if (live) setPublished(on); });
+    return () => { live = false; };
+  }, []);
+  return published ? <HuntResults config={config} onOpenGroup={onOpenGroupGame} /> : null;
+}
 
 /* Lead and JP Speaker are the two you need to find fast, so they are
    the only rows that carry a badge. */
@@ -213,10 +228,11 @@ function Insurance({ userEmail }) {
   );
 }
 
-export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut }) {
+export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, huntConfig, onOpenGroupGame }) {
   return (
     <section>
       <Greeting userName={userName} userEmail={userEmail} />
+      <PublishedHuntResults config={huntConfig} onOpenGroupGame={onOpenGroupGame} />
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       <ForexWidget />

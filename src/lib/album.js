@@ -11,6 +11,7 @@
 */
 
 import { supabase } from './supabase';
+import { PHOTO_PRESETS, compressPhoto, loadImage } from './photos';
 
 const BUCKET = 'album';
 const URL_TTL = 60 * 60; // 1h — long enough to browse, short enough to not leak
@@ -32,29 +33,6 @@ export function cachedPhotos() {
 
 function remember(rows) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(rows.slice(0, PAGE_SIZE))); } catch (e) { /* quota — skip */ }
-}
-
-/* Resize to a JPEG blob. Phone photos are 3–10 MB; nobody on roaming
-   data should pay for that to see a thumbnail. */
-function resize(img, max, quality) {
-  const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-  const c = document.createElement('canvas');
-  c.width = Math.round(img.naturalWidth * scale);
-  c.height = Math.round(img.naturalHeight * scale);
-  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-  return new Promise((resolve, reject) => {
-    c.toBlob((b) => (b ? resolve({ blob: b, width: c.width, height: c.height }) : reject(new Error('encode failed'))), 'image/jpeg', quality);
-  });
-}
-
-function loadImage(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('not an image')); };
-    img.src = url;
-  });
 }
 
 /* Attach signed URLs to rows: { ...row, src, thumb }. */
@@ -92,7 +70,10 @@ export function updateCachedPhotos(fn) {
 /** Upload one photo (full + thumbnail) and record it. Returns the row. */
 export async function uploadPhoto(file, userId) {
   const img = await loadImage(file);
-  const [full, thumb] = await Promise.all([resize(img, 2000, 0.85), resize(img, 560, 0.74)]);
+  /* Phone photos are 3–10 MB; nobody on roaming data should pay for
+     that to see a thumbnail (src/lib/photos.js). */
+  const full = await compressPhoto(img, PHOTO_PRESETS.album);
+  const thumb = await compressPhoto(img, PHOTO_PRESETS.thumb);
   const id = crypto.randomUUID();
   const path = `${userId}/${id}.jpg`;
   const thumbPath = `${userId}/${id}_t.jpg`;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isStorageFull, photoErrorMessage } from '../lib/photos';
 import { PAGE_SIZE, cachedPhotos, deletePhoto, formatUploaded, listPhotos, updateCachedPhotos, uploadPhoto } from '../lib/album';
 import schedule from '../data/schedule';
 
@@ -162,11 +163,13 @@ export default function Album({ userId, isAdmin }) {
       } catch (e) {
         failed++;
         lastErr = e;
+        /* Storage is full: the rest would fail the same way. */
+        if (isStorageFull(e)) { failed += files.length - i - 1; break; }
       }
       setUpload({ done: i + 1, total: files.length, failed });
     }
     setUpload(null);
-    if (failed) setError(`${failed} of ${files.length} didn’t upload. ${friendly(lastErr)}`);
+    if (failed) setError(`${failed} of ${files.length} didn’t upload. ${photoErrorMessage(lastErr)}`);
   }
 
   const canDelete = (p) => isAdmin || p.uploader_id === userId;

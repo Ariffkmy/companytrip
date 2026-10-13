@@ -663,7 +663,7 @@ const SECTIONS = [
   { id: 'people', label: 'Trip members' },
   { id: 'insurance', label: 'Insurance', lede: 'One travel insurance certificate per person. Upload the PDF and it shows on their home screen — they can only ever see their own.' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
-  { id: 'organiser', label: 'Organiser', lede: 'Live board for the hunt: scores, each team’s answers and photos, bonus points and resets.' },
+  { id: 'organiser', label: 'Organiser', lede: 'Live scoreboard for the hunt: every group’s points, answers and photos, the judged awards, marking Look around you, the clock restart — and publishing the results to everyone’s Home.' },
 ];
 
 /* The organiser scores against the hunt as saved, not as being edited. */

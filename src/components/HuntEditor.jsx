@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { photoErrorMessage } from '../lib/photos';
 import TreasureHunt from './TreasureHunt';
 import { FrameDialog, framedImgStyle, samePhotos } from './FramedPhoto';
 import huntGroups from '../data/huntGroups';
@@ -151,7 +152,7 @@ function Photo({ label, hint, value, onChange }) {
     try {
       onChange(await uploadHuntPhoto(file));
     } catch (e) {
-      setError(/fetch|network/i.test(e?.message ?? '') ? 'No connection. Uploading needs internet.' : 'Upload failed. Try a JPG or PNG under 5 MB.');
+      setError(photoErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -195,7 +196,7 @@ function BingoTiles({ items, onChange, onFrame, frameOfSame }) {
   const tiles = items ?? [];
   const patch = (i, next) => onChange(tiles.map((t, j) => (j === i ? { ...t, ...next } : t)));
   const room = BINGO_MAX - tiles.length;
-  const failed = (e) => setError(/fetch|network/i.test(e?.message ?? '') ? 'No connection. Uploading needs internet.' : 'Upload failed. Try a JPG or PNG under 5 MB.');
+  const failed = (e) => setError(photoErrorMessage(e));
 
   async function onReplace(i, file) {
     if (!file) return;
@@ -698,8 +699,11 @@ export default function HuntEditor() {
       <Section title="General" sub="Clock, points, finish">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Num label="Race length (min)" value={val(['raceMinutes'])} onChange={set(['raceMinutes'])} min={1} />
-          <Num label="Points per stamp" value={val(['points', 'checkpoint'])} onChange={set(['points', 'checkpoint'])} />
-          <Num label="Quiz pts / answer" value={val(['points', 'quizPerAnswer'])} onChange={set(['points', 'quizPerAnswer'])} />
+          <Num label="Points per stamp (games 1–6)"value={val(['points', 'checkpoint'])} onChange={set(['points', 'checkpoint'])} />
+          <Num label="Look around you pts / answer" value={val(['points', 'quizPerAnswer'])} onChange={set(['points', 'quizPerAnswer'])} />
+          <Num label="Best pose / buy award pts" value={val(['points', 'judged'])} onChange={set(['points', 'judged'])} />
+          <Num label="Find the boss selfie pts" value={val(['points', 'boss'])} onChange={set(['points', 'boss'])} />
+          <Num label="First to complete pts" value={val(['points', 'first'])} onChange={set(['points', 'first'])} />
         </div>
         <Area label="Finish point" hint="Shown on the hub and the results screen." value={val(['finishPoint'])} onChange={set(['finishPoint'])} rows={2} />
         <Text label="Help note" hint="Small line under the list of games. Leave blank to hide." value={val(['helpNote'])} onChange={set(['helpNote'])} />

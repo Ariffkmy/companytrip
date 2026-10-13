@@ -9,27 +9,10 @@
 */
 
 import { supabase } from './supabase';
+import { PHOTO_PRESETS, compressPhoto } from './photos';
 
 const BUCKET = 'bingo';
 const URL_TTL = 60 * 60;
-
-function toJpeg(file, max = 1200, quality = 0.8) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      c.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', quality);
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
-    img.src = url;
-  });
-}
 
 /** { [tile]: row with src } for one team, or for every team the caller can see. */
 export async function listShots(teamId = null) {
@@ -49,7 +32,7 @@ export async function listShots(teamId = null) {
     taken before `keepBefore` (epoch ms — the last hunt restart) loses
     its tile but its file stays in the bucket. */
 export async function uploadShot(teamId, tile, file, keepBefore = 0) {
-  const blob = await toJpeg(file);
+  const { blob } = await compressPhoto(file, PHOTO_PRESETS.bingo);
   const path = `${teamId}/${tile}/${crypto.randomUUID()}.jpg`;
   const store = supabase.storage.from(BUCKET);
 
