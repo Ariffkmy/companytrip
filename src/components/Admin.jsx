@@ -6,6 +6,7 @@ import rooms from '../data/rooms';
 import HuntEditor from './HuntEditor';
 import { HuntOrganiser } from './TreasureHunt';
 import { AnnounceAdmin } from './Announcements';
+import { CheckinsAdmin } from './Checkins';
 import { fetchHuntConfig } from '../lib/huntConfig';
 import { sendInvites, inviteProblem } from '../lib/invites';
 import { listPolicies, removeCertificate, uploadCertificate } from '../lib/insurance';
@@ -677,6 +678,7 @@ const SECTIONS = [
   { id: 'insurance', label: 'Insurance', lede: 'One travel insurance certificate per person. Upload the PDF and it shows on their home screen — they can only ever see their own.' },
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
   { id: 'announce', label: 'Announce', lede: 'Send a message to everyone on the trip. It pops up on every phone with the app open the moment you send it.' },
+  { id: 'checkins', label: 'Check-ins', lede: 'Where everyone is during the hunt. Each member shares their location every 15 minutes; anyone overdue is at the top in red.' },
   { id: 'organiser', label: 'Organiser', lede: 'Live scoreboard for the hunt: every group’s points, answers and photos, the judged awards, marking Look around you, the clock restart — and publishing the results to everyone’s Home.' },
 ];
 
@@ -708,12 +710,12 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       <div className="pt-9 pb-5">
         <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Committee</p>
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board', announce: 'alerts' }[current.id] ?? 'members'}</span>
+          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board', announce: 'alerts', checkins: 'safety' }[current.id] ?? 'members'}</span>
         </h1>
         {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
 
-      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 sm:grid-cols-5 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-2xl">
+      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-3xl">
         {SECTIONS.map((x) => (
           <button key={x.id} type="button" role="tab" aria-selected={section === x.id} onClick={() => choose(x.id)}
             className={`h-9 rounded-md text-sm font-medium cursor-pointer transition-colors ${
@@ -728,7 +730,8 @@ export default function Admin({ currentEmail, onSelfChanged }) {
       {section === 'insurance' && <InsuranceAdmin />}
       {section === 'organiser' && <OrganiserAdmin />}
       {section === 'announce' && <AnnounceAdmin />}
-      {!['hunt', 'insurance', 'organiser', 'announce'].includes(section) && (
+      {section === 'checkins' && <CheckinsAdmin />}
+      {!['hunt', 'insurance', 'organiser', 'announce', 'checkins'].includes(section) && (
         <TripMembers currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
       )}
     </section>

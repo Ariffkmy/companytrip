@@ -8,6 +8,7 @@ import Login from './components/Login';
 import Admin from './components/Admin';
 import { BossInbox } from './components/BossChat';
 import { AnnouncementPopup } from './components/Announcements';
+import { CheckinPrompt } from './components/Checkins';
 import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
 import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig, withDefaults } from './lib/huntConfig';
@@ -411,8 +412,14 @@ export default function App() {
 
   /* The hunt is full screen: it has its own sticky bar and way out, and
      the app header above it only ate space on a phone mid-game. */
-  /* The committee's announcements pop up over every screen below. */
-  const announcements = <AnnouncementPopup key={auth.user?.id} userId={auth.user?.id} />;
+  /* The committee's announcements, and the hunt's safety check-ins,
+     pop up over every screen below. */
+  const announcements = (
+    <>
+      <CheckinPrompt key={`checkin:${auth.user?.id}`} userId={auth.user?.id} huntGroup={auth.member.huntGroup} />
+      <AnnouncementPopup key={auth.user?.id} userId={auth.user?.id} />
+    </>
+  );
 
   if (bossOpen && (auth.member.huntBoss || auth.isAdmin)) {
     return <>{announcements}<BossInbox onClose={() => setBossOpen(false)} /></>;
