@@ -12,6 +12,7 @@ import groupRoster from '../data/groupRoster';
 import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
 import { fetchResultsPublished } from '../lib/huntScores';
 import HuntResults from './HuntResults';
+import { BossInboxCard } from './BossChat';
 
 /* ── Treasure hunt results ──────────────────────────
    Hidden until the committee publishes them from Admin → Organiser;
@@ -228,10 +229,12 @@ function Insurance({ userEmail }) {
   );
 }
 
-export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, huntConfig, onOpenGroupGame }) {
+export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, huntConfig, onOpenGroupGame, showBossInbox, onOpenBossInbox }) {
   return (
     <section>
       <Greeting userName={userName} userEmail={userEmail} />
+      {/* The bosses (and admins, as a backup) answer Find the boss here. */}
+      {showBossInbox && <BossInboxCard onOpen={onOpenBossInbox} />}
       <PublishedHuntResults config={huntConfig} onOpenGroupGame={onOpenGroupGame} />
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />

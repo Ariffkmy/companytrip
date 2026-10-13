@@ -6,10 +6,10 @@ import Album from './components/Album';
 import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
+import { BossInbox } from './components/BossChat';
 import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
 import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig, withDefaults } from './lib/huntConfig';
-import { fetchResultsPublished } from './lib/huntScores';
 
 
 const THEME_KEY = 'olc-theme';
@@ -325,16 +325,12 @@ export default function App() {
      flipped at the briefing, with the app already open in every
      pocket. */
   const [huntOpen, setHuntOpen] = useState(() => cachedHuntOpen());
-  /* Publishing the results ends the game: from then on every game page,
-     the member's own included, opens read only. */
-  const [huntEnded, setHuntEnded] = useState(false);
   /* Another group's game page, opened from the published results:
      { teamId, game }. null is the member's own. */
   const [huntView, setHuntView] = useState(null);
   const openTreasureHunt = useCallback(() => {
     refreshMember();
     fetchHuntConfig().then(({ config, isOpen }) => { setHuntConfig(config); setHuntOpen(isOpen); });
-    fetchResultsPublished().then(setHuntEnded);
     setHuntView(null);
     setTreasureOpen(true);
   }, [refreshMember]);
@@ -347,12 +343,14 @@ export default function App() {
     setTreasureOpen(false);
     setHuntView(null);
   }, []);
+  /* Find the boss: the bosses answer the groups from here, full screen. */
+  const [bossOpen, setBossOpen] = useState(false);
+  const openBossInbox = useCallback(() => { setBossOpen(true); window.scrollTo({ top: 0 }); }, []);
 
   /* The area map is reachable from the itinerary without opening the
      hunt, so pick up any admin edits on the way in. */
   useEffect(() => {
     fetchHuntConfig().then(({ config, isOpen }) => { setHuntConfig(config); setHuntOpen(isOpen); });
-    fetchResultsPublished().then(setHuntEnded);
   }, []);
 
   /* Admin is a laptop job: on large screens it gets the full width.
@@ -412,12 +410,16 @@ export default function App() {
 
   /* The hunt is full screen: it has its own sticky bar and way out, and
      the app header above it only ate space on a phone mid-game. */
+  if (bossOpen && (auth.member.huntBoss || auth.isAdmin)) {
+    return <BossInbox onClose={() => setBossOpen(false)} />;
+  }
+
   if (treasureOpen) {
     return (
       <>
         <div className="max-w-[640px] mx-auto px-4 pb-8">
           <TreasureHunt
-            key={huntView ? `${huntView.teamId}:${huntView.game ?? ''}` : `own:${huntEnded}`}
+            key={huntView ? `${huntView.teamId}:${huntView.game ?? ''}` : 'own'}
             onClose={closeTreasureHunt}
             teamId={auth.member.huntGroup}
             config={huntConfig}
@@ -425,7 +427,6 @@ export default function App() {
             huntLeader={auth.member.huntLeader}
             viewTeamId={huntView?.teamId ?? null}
             viewGame={huntView?.game ?? null}
-            ended={huntEnded}
           />
         </div>
       </>
@@ -513,6 +514,8 @@ export default function App() {
             onSignOut={auth.signOut}
             huntConfig={huntConfig}
             onOpenGroupGame={openGroupGame}
+            showBossInbox={auth.member.huntBoss || auth.isAdmin}
+            onOpenBossInbox={openBossInbox}
           />
         )}
         {tab === 'itinerary' && (

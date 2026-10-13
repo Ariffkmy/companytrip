@@ -1,0 +1,334 @@
+/* ═══════════════════════════════════════════════════
+   Find the boss — the group's thread and the bosses' inbox
+   ═══════════════════════════════════════════════════
+
+   BossThread: inside game 7, a group asks the bosses yes/no questions
+   and sees the answers arrive live. Any member of the group can ask
+   (not only the leader), one question at a time: the next waits until
+   the last is answered, so the bosses aren't buried.
+
+   BossInbox: full screen, for the bosses on standby. Every group's
+   unanswered questions, oldest first, each with a big Yes and No.
+   It keeps the screen on and beeps when a question comes in. */
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import groupRoster from '../data/groupRoster';
+import huntGroups, { huntGroupOf } from '../data/huntGroups';
+import { QUESTION_MAX, ping, unlockSound, useBossQuestions, useWakeLock } from '../lib/bossChat';
+
+const ROSTER_SHORT = new Map(groupRoster.flatMap((t) => t.members)
+  .filter((m) => m.full).map((m) => [m.full.trim().toUpperCase(), m.name]));
+
+/* "LEE HOE JIN" is Aidan to everyone; anyone not on the roster (the
+   bosses) by their first name. */
+export function shortName(full) {
+  const f = String(full ?? '').trim();
+  if (!f) return 'Someone';
+  const known = ROSTER_SHORT.get(f.toUpperCase());
+  if (known) return known;
+  const first = f.split(/\s+/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+const clock = (iso) => {
+  try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; }
+};
+
+const ago = (iso, now) => {
+  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min ago` : clock(iso);
+};
+
+function LiveDot({ status }) {
+  const live = status === 'live';
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, font: '700 10px/1 var(--mono, monospace)', letterSpacing: '.08em', textTransform: 'uppercase', color: live ? 'var(--sea)' : 'var(--ink-soft)' }}>
+      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 99, background: live ? 'var(--sea)' : 'var(--gold)' }} />
+      {live ? 'Live' : status === 'offline' ? 'Reconnecting…' : 'Connecting…'}
+    </span>
+  );
+}
+
+function AnswerPill({ answer, big }) {
+  const yes = answer === 'yes';
+  return (
+    <span style={{
+      display: 'inline-block', padding: big ? '4px 14px' : '2px 10px', borderRadius: 999,
+      border: '2px solid var(--ink)', background: yes ? 'var(--sea)' : 'var(--red)', color: '#fff',
+      font: `800 ${big ? 15 : 12}px/1.3 var(--body)`, letterSpacing: '.06em',
+    }}>{yes ? 'YES' : 'NO'}</span>
+  );
+}
+
+/* ── A group's thread, inside the game ─────────────── */
+export function BossThread({ team, canAsk = true, readOnly = false, offNote = null }) {
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const listRef = useRef(null);
+  const { items, status, loaded, error, ask } = useBossQuestions({
+    team,
+    enabled: Boolean(team),
+    onEvent: (kind) => { if (kind === 'answered' && !readOnly) ping(); },
+  });
+
+  const pending = items.some((q) => !q.answer);
+  const allowAsk = canAsk && !readOnly;
+  const lastAnswer = items[items.length - 1]?.answer;
+
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [items.length, lastAnswer]);
+
+  const send = async (e) => {
+    e.preventDefault();
+    if (sending || !text.trim() || pending) return;
+    unlockSound();
+    setSending(true);
+    setSendError('');
+    try {
+      await ask(text);
+      setText('');
+    } catch (err) {
+      setSendError(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ fontWeight: 800, fontSize: 15 }}>{readOnly ? 'Their questions to the bosses' : 'Ask the bosses'}</div>
+        {!readOnly && <LiveDot status={status} />}
+      </div>
+      {!readOnly && (
+        <p className="note" style={{ margin: '0 0 8px' }}>
+          They can only answer <b>Yes</b> or <b>No</b>. Ask one question at a time.
+        </p>
+      )}
+
+      <div ref={listRef} style={{
+        maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10,
+        padding: 10, border: 'var(--line)', borderRadius: 8, background: 'var(--th-parchment)',
+      }}>
+        {!loaded && <p className="note" style={{ margin: 0 }}>Loading…</p>}
+        {loaded && error && <p style={{ margin: 0, color: 'var(--red)', fontSize: 14 }}>{error}</p>}
+        {loaded && !error && !items.length && (
+          <p className="note" style={{ margin: 0 }}>
+            {readOnly ? 'They didn’t ask the bosses anything.' : 'No questions yet. Try “Are you near the water?”'}
+          </p>
+        )}
+        {items.map((q) => (
+          <div key={q.id}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{
+                maxWidth: '85%', padding: '8px 11px', borderRadius: '12px 12px 3px 12px',
+                background: 'var(--card)', border: '2px solid var(--ink)', fontSize: 15, overflowWrap: 'anywhere',
+              }}>{q.question}</div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-soft)', marginTop: 3 }}>
+              {shortName(q.asker_name)} · {clock(q.created_at)}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              {q.answer ? (
+                <>
+                  <AnswerPill answer={q.answer} />
+                  <span style={{ fontSize: 11, color: 'var(--ink-soft)' }}>
+                    {q.answer_name ? shortName(q.answer_name) : 'Boss'}{q.answered_at ? ` · ${clock(q.answered_at)}` : ''}
+                  </span>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, fontStyle: 'italic', color: 'var(--ink-soft)' }}>
+                  {readOnly ? 'Not answered' : 'Waiting for the bosses…'}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {allowAsk && (
+        <form onSubmit={send} style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <label htmlFor={`boss-q-${team}`} className="sr-only">Your question</label>
+          <input
+            id={`boss-q-${team}`}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={QUESTION_MAX}
+            disabled={pending || Boolean(error)}
+            placeholder={pending ? 'Waiting for their answer…' : 'Ask a yes or no question'}
+            enterKeyHint="send"
+            style={{
+              flex: 1, minWidth: 0, height: 46, padding: '0 12px', borderRadius: 8, border: '2px solid var(--ink)',
+              background: 'var(--card)', color: 'var(--ink)', font: '400 16px var(--body)',
+            }}
+          />
+          <button className="btn" type="submit" disabled={sending || pending || !text.trim() || Boolean(error)}>
+            {sending ? '…' : 'Send'}
+          </button>
+        </form>
+      )}
+      {!allowAsk && !readOnly && offNote && <p className="note" style={{ margin: '8px 0 0' }}>{offNote}</p>}
+      {sendError && <p style={{ margin: '8px 0 0', color: 'var(--red)', fontSize: 14 }}>{sendError}</p>}
+    </div>
+  );
+}
+
+/* ── The bosses' inbox ─────────────────────────────── */
+export function BossInbox({ onClose }) {
+  const [standby, setStandby] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const [actError, setActError] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [fresh, setFresh] = useState(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
+  const wakeSupported = useWakeLock(standby);
+
+  const { items, status, loaded, error, answer } = useBossQuestions({
+    onEvent: (kind, row) => {
+      if (kind !== 'asked') return;
+      ping();
+      setFresh((s) => new Set(s).add(row.id));
+      setTimeout(() => setFresh((s) => { const n = new Set(s); n.delete(row.id); return n; }), 4000);
+    },
+  });
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const waiting = useMemo(() => items.filter((q) => !q.answer), [items]);
+  const answered = useMemo(() => items.filter((q) => q.answer && (filter === 'all' || q.team === filter)).reverse(), [items, filter]);
+
+  useEffect(() => {
+    const before = document.title;
+    document.title = waiting.length ? `(${waiting.length}) Boss inbox` : 'Boss inbox';
+    return () => { document.title = before; };
+  }, [waiting.length]);
+
+  const reply = async (id, value) => {
+    unlockSound();
+    setBusy(id);
+    setActError('');
+    try { await answer(id, value); } catch (err) { setActError(err.message); } finally { setBusy(null); }
+  };
+
+  const startStandby = () => { unlockSound(); setStandby(true); };
+
+  const chip = (team) => {
+    const g = huntGroupOf(team);
+    return (
+      <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-bold text-white border-2 border-ink" style={{ background: g?.colour ?? 'var(--ink)' }}>
+        {g?.name ?? team}
+      </span>
+    );
+  };
+
+  return (
+    <main className="max-w-[640px] mx-auto px-4 pb-16 min-h-dvh">
+      <div className="sticky top-0 z-30 flex items-center justify-between gap-2 py-2 bg-paper">
+        <button type="button" onClick={onClose}
+          className="px-3 py-1.5 border-2 border-ink rounded-lg font-mono text-[9px] font-bold cursor-pointer bg-ink dark:bg-flame text-card">
+          ← Back
+        </button>
+        <LiveDot status={status} />
+      </div>
+
+      <h1 className="display text-4xl leading-none mt-4">Boss <span className="text-red">inbox</span></h1>
+      <p className="text-sm text-gray-500 mt-2">
+        Find the boss: groups ask where you are. Answer only <b>Yes</b> or <b>No</b>.
+      </p>
+
+      {!standby ? (
+        <button type="button" onClick={startStandby} className="btn block mt-4">
+          Start standby · sound on, screen stays awake
+        </button>
+      ) : (
+        <p className="note mt-3">
+          On standby: you’ll hear a beep for each new question.
+          {wakeSupported ? ' The screen stays on while this page is open.' : ' Keep the screen on — this phone can’t hold it awake.'}
+        </p>
+      )}
+
+      {error && <p className="text-sm text-red mt-4">{error}</p>}
+      {actError && <p className="text-sm text-red mt-4" aria-live="polite">{actError}</p>}
+
+      <h2 className="font-mono text-[11px] tracking-[.18em] uppercase text-gray-500 mt-7 mb-2">
+        Waiting for you {waiting.length ? `· ${waiting.length}` : ''}
+      </h2>
+      {!loaded && <p className="note">Loading…</p>}
+      {loaded && !waiting.length && !error && (
+        <div className="card"><p className="note" style={{ margin: 0 }}>No questions waiting. New ones appear here by themselves.</p></div>
+      )}
+      <div className="space-y-3">
+        {waiting.map((q) => (
+          <div key={q.id} className="card" style={fresh.has(q.id) ? { outline: '3px solid var(--gold)', outlineOffset: 2 } : undefined}>
+            <div className="flex items-center justify-between gap-2">
+              {chip(q.team)}
+              <span className="text-[11px] text-gray-500">{shortName(q.asker_name)} · {ago(q.created_at, now)}</span>
+            </div>
+            <p className="text-xl font-semibold leading-snug mt-2.5 [overflow-wrap:anywhere]">{q.question}</p>
+            <div className="grid grid-cols-2 gap-3 mt-3.5">
+              <button type="button" className="btn sea" disabled={busy === q.id} onClick={() => reply(q.id, 'yes')}
+                style={{ height: 56, fontSize: 20, justifyContent: 'center' }}>Yes</button>
+              <button type="button" className="btn" disabled={busy === q.id} onClick={() => reply(q.id, 'no')}
+                style={{ height: 56, fontSize: 20, justifyContent: 'center' }}>No</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 className="font-mono text-[11px] tracking-[.18em] uppercase text-gray-500 mt-8 mb-2">Answered</h2>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {[{ id: 'all', name: 'All' }, ...huntGroups].map((g) => (
+          <button key={g.id} type="button" onClick={() => setFilter(g.id)} aria-pressed={filter === g.id}
+            className={`px-3 h-8 rounded-full border-2 text-xs font-semibold cursor-pointer ${filter === g.id ? 'border-ink bg-ink text-card' : 'border-gray-300 text-gray-500'}`}>
+            {g.name}
+          </button>
+        ))}
+      </div>
+      {!answered.length && <p className="note">Nothing answered yet.</p>}
+      <ul className="space-y-2">
+        {answered.map((q) => (
+          <li key={q.id} className="flex items-start gap-3 py-2 border-b border-gray-200">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">{chip(q.team)}<span className="text-[11px] text-gray-500">{clock(q.created_at)}</span></div>
+              <p className="text-sm mt-1 [overflow-wrap:anywhere]">{q.question}</p>
+            </div>
+            {/* Tapping the other answer corrects a slip. */}
+            <div className="flex gap-1 shrink-0" role="group" aria-label="Change answer">
+              {['yes', 'no'].map((v) => (
+                <button key={v} type="button" disabled={busy === q.id || q.answer === v} onClick={() => reply(q.id, v)}
+                  aria-pressed={q.answer === v}
+                  className="cursor-pointer disabled:cursor-default" style={{ opacity: q.answer === v ? 1 : 0.35, background: 'none', border: 0, padding: 0 }}>
+                  <AnswerPill answer={v} />
+                </button>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}
+
+/* ── Home: the way into the inbox ──────────────────── */
+export function BossInboxCard({ onOpen }) {
+  const { items, error } = useBossQuestions();
+  const waiting = items.filter((q) => !q.answer).length;
+  return (
+    <section className="card mt-5">
+      <div className="eyebrow" style={{ color: 'var(--red)' }}>Find the boss</div>
+      <h2 className="display text-2xl leading-tight mt-1">Boss inbox</h2>
+      <p className="text-sm text-gray-500 mt-1.5">
+        {error || (waiting ? `${waiting} question${waiting === 1 ? '' : 's'} waiting for a Yes or No.` : 'Groups’ yes/no questions to you arrive here live.')}
+      </p>
+      <button type="button" onClick={onOpen} className="btn block mt-3">Open inbox</button>
+    </section>
+  );
+}

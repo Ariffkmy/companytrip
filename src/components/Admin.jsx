@@ -162,6 +162,13 @@ function PersonRow({ person, joined, isSelf, onPatch, onRemove, selected, onSele
           title="Runs this person's hunt group's games (a different person from the trip Team Lead)"
           className="w-4 h-4 accent-[var(--color-red)] cursor-pointer disabled:cursor-not-allowed" />
       </td>
+      <td className="px-2 py-2.5 text-center">
+        <input type="checkbox" checked={Boolean(person.hunt_boss)} disabled={person.hunt_boss === undefined}
+          onChange={(e) => onPatch({ hunt_boss: e.target.checked })}
+          aria-label={`Boss: ${who}`}
+          title="Answers the groups' yes/no questions in Find the boss (the Boss inbox on Home)"
+          className="w-4 h-4 accent-[var(--color-red)] cursor-pointer disabled:cursor-not-allowed" />
+      </td>
       <td className="px-2 py-2.5 min-w-[120px]">
         <label htmlFor={`${base}-role`} className="sr-only">Role for {who}</label>
         <RoleSelect id={`${base}-role`} value={person.role} onChange={(v) => onPatch({ role: v })} />
@@ -211,9 +218,13 @@ function TripList({ currentEmail, onSelfChanged }) {
   const load = useCallback(async () => {
     const cols = 'email, full_name, team, role, is_admin, added_at';
     let [list, profiles] = await Promise.all([
-      supabase.from('allowed_emails').select(`${cols}, hunt_group, hunt_leader, invited_at, invite_count`).order('added_at'),
+      supabase.from('allowed_emails').select(`${cols}, hunt_group, hunt_leader, hunt_boss, invited_at, invite_count`).order('added_at'),
       supabase.from('profiles').select('email'),
     ]);
+    /* Before the boss-chat migration runs, hunt_boss doesn't exist. */
+    if (list.error && /hunt_boss/.test(list.error.message)) {
+      list = await supabase.from('allowed_emails').select(`${cols}, hunt_group, hunt_leader, invited_at, invite_count`).order('added_at');
+    }
     /* Before the hunt-leader migration runs, hunt_leader doesn't exist. */
     if (list.error && /hunt_leader/.test(list.error.message)) {
       list = await supabase.from('allowed_emails').select(`${cols}, hunt_group, invited_at, invite_count`).order('added_at');
@@ -373,6 +384,7 @@ function TripList({ currentEmail, onSelfChanged }) {
             <th scope="col" className="px-2 py-2.5 font-normal">Team</th>
             <th scope="col" className="px-2 py-2.5 font-normal">Hunt group</th>
             <th scope="col" className="px-2 py-2.5 font-normal text-center">Leader</th>
+            <th scope="col" className="px-2 py-2.5 font-normal text-center">Boss</th>
             <th scope="col" className="px-2 py-2.5 font-normal">Role</th>
             <th scope="col" className="px-2 py-2.5 font-normal text-center">Admin</th>
             <th scope="col" className="pl-2 pr-3 py-2.5 font-normal"><span className="sr-only">Actions</span></th>

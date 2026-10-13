@@ -16,7 +16,7 @@ function storedSession() {
   }
 }
 
-const EMPTY_MEMBER = { isAdmin: false, team: null, huntGroup: null, fullName: null, role: null, huntLeader: null };
+const EMPTY_MEMBER = { isAdmin: false, team: null, huntGroup: null, fullName: null, role: null, huntLeader: null, huntBoss: false };
 
 export function useAuth() {
   const [session, setSession] = useState(null);
@@ -64,6 +64,9 @@ export function useAuth() {
        hunt_leader with 20261012000000_hunt_leader.sql; until then read
        the profile without them rather than not at all. */
     const readProfile = async () => {
+      /* hunt_boss arrives with 20261015000000_boss_chat.sql. */
+      const withBoss = await supabase.from('profiles').select('full_name, team, role, hunt_group, hunt_leader, hunt_boss').eq('id', userId).maybeSingle();
+      if (!withBoss.error) return withBoss;
       const full = await supabase.from('profiles').select('full_name, team, role, hunt_group, hunt_leader').eq('id', userId).maybeSingle();
       if (!full.error) return full;
       const noLeader = await supabase.from('profiles').select('full_name, team, role, hunt_group').eq('id', userId).maybeSingle();
@@ -83,6 +86,8 @@ export function useAuth() {
         /* true / false once the hunt-leader flag exists; null while the
            column is not there yet, which the hunt reads as "not set up". */
         huntLeader: profile.data?.hunt_leader ?? null,
+        /* Answers the groups in Find the boss, from the Boss inbox. */
+        huntBoss: profile.data?.hunt_boss === true,
       };
       setMember(next);
       try { localStorage.setItem(cacheKey, JSON.stringify(next)); } catch (e) { /* silent */ }

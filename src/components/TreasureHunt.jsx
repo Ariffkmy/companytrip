@@ -6,6 +6,7 @@ import { listShots, uploadShot, deleteShot } from '../lib/bingo';
 import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhotoToDataUrl, photoErrorMessage } from '../lib/photos';
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
+import { BossThread } from './BossChat';
 import { framedImgStyle } from './FramedPhoto';
 import {
   AWARDS, SCORED_GAMES, completedAt, cp4Verdicts, fetchResultsPublished, fetchRun, photoPathsOf, pushRun, runSummary,
@@ -673,17 +674,18 @@ export function HuntOrganiser({ config }) {
    backstreet is worse than letting them finish. Defaults true so the
    admin preview plays regardless.
 
-   Read only: `viewTeamId` opens another group's game page from the
-   published results (at `viewGame`, if given), and `ended` — the
-   results are published — turns the member's own page read only too.
-   Nothing is saved, synced or uploaded from a read-only page, and RLS
-   (20261014000000_hunt_results_lock.sql) refuses it anyway. */
+   Read only: `viewTeamId` opens a group's game page from the published
+   results (at `viewGame`, if given). Publishing shows the results; it
+   does not end the game. So the group's own leader, tapping their own
+   group, gets their live page back, and everyone else looks without
+   touching: nothing is saved, synced or uploaded from a read-only page. */
 export default function TreasureHunt({
   onClose, teamId, config, isOpen = true, preview = false, huntLeader = null,
-  viewTeamId = null, viewGame = null, ended = false,
+  viewTeamId = null, viewGame = null,
 }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
-  const readOnly = !preview && (ended || viewTeamId != null);
+  const ownLivePage = viewTeamId != null && viewTeamId === teamId && huntLeader !== false;
+  const readOnly = !preview && viewTeamId != null && !ownLivePage;
   /* Set once showToast exists: says so when the phone is too full to
      keep the run (its photos are most of it). */
   const onDeviceFull = useRef(null);
@@ -1078,7 +1080,7 @@ export default function TreasureHunt({
     return (
       <div>
         <div className="card">
-          <div className="eyebrow" style={{ color: 'var(--red)' }}>{readOnly ? 'Read only · the hunt has ended' : 'Pick any one'}</div>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>{readOnly ? `Read only · ${huntGroupOf(activeTeamId)?.name ?? 'this group'}` : 'Pick any one'}</div>
           <h2 className="display" style={{ fontSize: 22, margin: '4px 0 6px' }}>
             {readOnly ? `${done.size} of ${CONFIG.stamps} stamps collected`
               : left === 0 ? 'Every stamp collected' : `${left} still to play`}
@@ -1495,6 +1497,8 @@ export default function TreasureHunt({
       <div className="task">
         <Rich text={CONFIG.cp.boss.body} />
       </div>
+      <BossThread team={activeTeamId} canAsk={!preview && isOpen}
+        offNote={preview ? 'Preview: the live chat is off here.' : 'Opens when the hunt starts.'} />
       <CheckpointPhoto src={CONFIG.cp.boss.photo} />
       {renderShot(draft.photo, 'Add your photo with the bosses', 'Tim, Ellice and all of you · funny pose')}
       <button
@@ -2118,7 +2122,7 @@ export default function TreasureHunt({
               </>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
-              {readOnly ? 'Read only — the hunt has ended.'
+              {readOnly ? `Read only — ${huntGroupOf(activeTeamId)?.name ?? 'this group'}’s card.`
                 : locked ? 'Stamp collected — this card is final.'
                 : 'Find it, then take a selfie of the whole team at the spot.'}
             </p>
@@ -2500,6 +2504,7 @@ export default function TreasureHunt({
         <div className="card flag">
           {head(STAMP_NO.boss, 'boss')}
           {task('boss')}
+          <BossThread team={activeTeamId} readOnly />
           {sub ? <>{theirs('Their photo with the bosses')}{shot(sub.photo, `${S.teamName} with the bosses`)}</> : notPlayed}
         </div>
       );
@@ -2638,6 +2643,14 @@ export default function TreasureHunt({
           </p>
         </div>
       ))}
+      {/* Only the leader runs the games, but anyone in the group can ask
+          the bosses in Find the boss. */}
+      {!preview && !readOnly && !canPlay && teamId && view !== 'done' && (
+        <div className="card flag" style={{ marginTop: 14 }}>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
+          <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />
+        </div>
+      )}
       {view === 'done' && renderDoneScreen()}
 
       {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}
