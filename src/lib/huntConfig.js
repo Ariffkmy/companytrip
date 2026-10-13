@@ -467,7 +467,55 @@ export async function restartClock() {
     .select('clock_reset_at')
     .single();
   if (error) throw error;
+  /* A restart is a new game: it lifts a stop too. Best effort, as the
+     stop columns arrive with 20261018000000_hunt_stop.sql. */
+  await supabase.from('hunt_config').update({ stopped_at: null }).eq('id', HUNT_ID);
   return new Date(data.clock_reset_at).getTime();
+}
+
+/* ── Stopping the game for everyone ──────────────────
+   Admin → Organiser → Stop the game. The moment is kept in
+   hunt_config.stopped_at; a "game over" announcement carries the
+   committee's message to every phone (src/components/Announcements.jsx),
+   which also fires HUNT_STOPPED_EVENT so an open hunt closes at once
+   instead of at its next check. */
+export const DEFAULT_STOP_MESSAGE =
+  'The game is over! Stop playing now and make your way back to the starting point.';
+
+export const HUNT_STOPPED_EVENT = 'hunt:stopped';
+
+/** { stoppedAt: epoch ms (0 while the game runs), message } */
+export async function fetchStop() {
+  if (!supabase) return { stoppedAt: 0, message: '' };
+  const { data, error } = await supabase
+    .from('hunt_config')
+    .select('stopped_at, stop_message')
+    .eq('id', HUNT_ID)
+    .maybeSingle();
+  if (error) return { stoppedAt: 0, message: '' };
+  return {
+    stoppedAt: data?.stopped_at ? new Date(data.stopped_at).getTime() : 0,
+    message: data?.stop_message ?? '',
+  };
+}
+
+/** Stop the hunt for every group, now, and tell everyone. Admin only. */
+export async function stopGame(message) {
+  const text = String(message ?? '').trim() || DEFAULT_STOP_MESSAGE;
+  const { data, error } = await supabase
+    .from('hunt_config')
+    .upsert({ id: HUNT_ID, stopped_at: new Date().toISOString(), stop_message: text })
+    .select('stopped_at')
+    .single();
+  if (error) throw error;
+  const { error: annErr } = await supabase.from('announcements').insert({ body: text, level: 'gameover' });
+  return { stoppedAt: new Date(data.stopped_at).getTime(), announced: !annErr };
+}
+
+/** Undo a stop. Runs already closed stay closed until their team plays on. */
+export async function resumeGame() {
+  const { error } = await supabase.from('hunt_config').upsert({ id: HUNT_ID, stopped_at: null });
+  if (error) throw error;
 }
 
 export async function saveHuntConfig(config) {

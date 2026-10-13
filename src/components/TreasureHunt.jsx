@@ -1,5 +1,8 @@
 import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { toRuntime, withDefaults, fetchClockReset, restartClock } from '../lib/huntConfig';
+import {
+  toRuntime, withDefaults, fetchClockReset, restartClock,
+  DEFAULT_STOP_MESSAGE, HUNT_STOPPED_EVENT, fetchStop, resumeGame, stopGame,
+} from '../lib/huntConfig';
 import { cachedColleagueAnswers, fetchColleagueAnswers } from '../lib/colleagueQuiz';
 import { huntGroupOf } from '../data/huntGroups';
 import { listShots, uploadShot, deleteShot } from '../lib/bingo';
@@ -352,6 +355,16 @@ export function HuntOrganiser({ config }) {
   const [restarting, setRestarting] = useState(false);
   const [clockError, setClockError] = useState('');
 
+  /* Stopping the game for everyone, with the committee's message. */
+  const [stop, setStop] = useState({ stoppedAt: 0, message: '' });
+  const [stopText, setStopText] = useState(DEFAULT_STOP_MESSAGE);
+  const [stopConfirm, setStopConfirm] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [stopNote, setStopNote] = useState(null);
+  useEffect(() => {
+    fetchStop().then((st) => { setStop(st); if (st.message) setStopText(st.message); });
+  }, []);
+
   /* Publishing the results to every member's Home. */
   const [published, setPublished] = useState(null);
   const [publishing, setPublishing] = useState(false);
@@ -376,10 +389,46 @@ export function HuntOrganiser({ config }) {
     setClockError('');
     try {
       setResetAt(await restartClock());
+      setStop((st) => ({ ...st, stoppedAt: 0 }));
     } catch (e) {
       setClockError(e?.message || 'Could not restart the clock.');
     } finally {
       setRestarting(false);
+    }
+  };
+
+  const handleStop = async () => {
+    if (!stopConfirm) { setStopConfirm(true); return; }
+    setStopConfirm(false);
+    setStopping(true);
+    setStopNote(null);
+    try {
+      const { stoppedAt, announced } = await stopGame(stopText);
+      setStop({ stoppedAt, message: stopText.trim() || DEFAULT_STOP_MESSAGE });
+      setStopNote(announced
+        ? { ok: true, text: 'Stopped. Everyone has the message, and each group’s score is recorded as its phone hears.' }
+        : { ok: false, text: 'Stopped, but the popup didn’t send — run 20261017000000_announcements.sql, or send it from Admin → Announce.' });
+      refresh();
+    } catch (e) {
+      setStopNote({ ok: false, text: /stopped_at|stop_message|schema cache/i.test(e?.message ?? '')
+        ? 'Run 20261018000000_hunt_stop.sql in Supabase first.'
+        : e?.message || 'Could not stop the game. Try again.' });
+    } finally {
+      setStopping(false);
+    }
+  };
+
+  const handleResume = async () => {
+    setStopping(true);
+    setStopNote(null);
+    try {
+      await resumeGame();
+      setStop((st) => ({ ...st, stoppedAt: 0 }));
+      setStopNote({ ok: true, text: 'Resumed. Groups with time left can tap “Keep playing”.' });
+    } catch (e) {
+      setStopNote({ ok: false, text: e?.message || 'Could not resume. Try again.' });
+    } finally {
+      setStopping(false);
     }
   };
 
@@ -443,6 +492,36 @@ export function HuntOrganiser({ config }) {
         </button>
       </div>
       {clockError && <p className="note" style={{ color: 'var(--red)', margin: '10px 0 0' }}>{clockError}</p>}
+
+      <div style={{ borderTop: '1px dashed var(--th-rule)', marginTop: 14, paddingTop: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--red)' }}>
+          {stop.stoppedAt ? `Game stopped ${clockTime(stop.stoppedAt)}` : 'Stop the game'}
+        </div>
+        <p className="note" style={{ margin: '4px 0 8px' }}>
+          Ends the hunt for every group right now. Each group’s run closes at this moment and its score
+          is recorded — anything sent in after doesn’t count. Everyone gets this message as a popup:
+        </p>
+        <label htmlFor="stop-msg" className="sr-only">Game over message</label>
+        <textarea id="stop-msg" value={stopText} maxLength={500} rows={3}
+          onChange={(e) => { setStopText(e.target.value); setStopConfirm(false); }}
+          style={{
+            width: '100%', padding: '9px 11px', borderRadius: 8, border: '2px solid var(--ink)',
+            background: 'var(--card)', color: 'var(--ink)', font: '400 15px/1.4 var(--body)', resize: 'vertical',
+          }} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <button className="btn" type="button" onClick={handleStop}
+            disabled={stopping || stop.stoppedAt > 0 || !stopText.trim()}
+            style={{ background: stopConfirm ? 'var(--gold)' : 'var(--red)' }}>
+            {stopping && !stop.stoppedAt ? 'Stopping…' : stopConfirm ? 'Tap again to stop the game' : '■ Stop the game now'}
+          </button>
+          {stop.stoppedAt > 0 && (
+            <button className="mini" type="button" onClick={handleResume} disabled={stopping}>Resume the game</button>
+          )}
+        </div>
+        {stopNote && (
+          <p className="note" style={{ color: stopNote.ok ? 'var(--sea)' : 'var(--red)', margin: '10px 0 0' }}>{stopNote.text}</p>
+        )}
+      </div>
     </div>
   );
 
@@ -961,6 +1040,46 @@ export default function TreasureHunt({
     return () => { clearTimeout(t); clearInterval(id); };
   }, [preview, readOnly, canPlay, S, onStorageFull]);
 
+  /* ── Committee stop ──────────────────────────────────
+     Admin → Organiser → Stop the game. The run closes at the moment the
+     committee pressed it, wherever this phone was: anything sent in
+     after that doesn't count. Then the score syncs at once. Heard from
+     the game-over popup straight away (HUNT_STOPPED_EVENT), and checked
+     every 20 s and on coming back to the app in case that was missed. */
+  const [stoppedAt, setStoppedAt] = useState(0);
+  const [stopMessage, setStopMessage] = useState('');
+  const checkStop = useCallback(async () => {
+    if (preview) return;
+    const { stoppedAt: at, message } = await fetchStop();
+    setStoppedAt(at);
+    setStopMessage(message);
+    if (readOnly || !at || !activeTeamId) return;
+    const run = store.load(activeTeamId);
+    if (!run?.startedAt || at <= run.startedAt || (run.finishedAt && run.finishedAt <= at)) return;
+    const subs = Object.fromEntries(Object.entries(run.subs || {}).filter(([, v]) => !(v?.at > at)));
+    const next = { ...run, subs, open: null, finishedAt: at, stoppedAt: at };
+    store.save(next.teamId, next);
+    setS((cur) => (cur ? next : cur));
+    setDraft({});
+    setOpenTile(null);
+    setView((v) => (v === 'race' ? 'done' : v));
+    if (canPlay) pushRun(next, { onStorageFull });
+  }, [preview, readOnly, activeTeamId, store, canPlay, onStorageFull]);
+
+  useEffect(() => {
+    if (preview) return undefined;
+    checkStop();
+    const id = setInterval(() => { if (!document.hidden) checkStop(); }, 20000);
+    const onVisible = () => { if (document.visibilityState === 'visible') checkStop(); };
+    window.addEventListener(HUNT_STOPPED_EVENT, checkStop);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener(HUNT_STOPPED_EVENT, checkStop);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [preview, checkStop]);
+
   /* ── Render views ──────────────────────────────────── */
 
   const doneSlots = () => new Set(
@@ -1156,17 +1275,20 @@ export default function TreasureHunt({
     const existing = team ? store.load(team.id) : null;
     const underway = Boolean(existing?.startedAt);
     /* Shut, and this team has not started: nothing to carry on with. */
-    const shut = !isOpen && !preview && !underway;
+    const over = stoppedAt > 0 && !preview;
+    const shut = (!isOpen || over) && !preview && !underway;
 
     return (
       <div>
         {shut && (
           <div className="card flag">
-            <div className="eyebrow" style={{ color: 'var(--red)' }}>Not yet</div>
-            <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>The hunt hasn’t started</h2>
+            <div className="eyebrow" style={{ color: 'var(--red)' }}>{over ? 'Game over' : 'Not yet'}</div>
+            <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>
+              {over ? 'The hunt is over' : 'The hunt hasn’t started'}
+            </h2>
             <p style={{ margin: 0 }}>
-              The committee opens it at the briefing. Come back to this screen then — you don’t need to
-              do anything now.
+              {over ? (stopMessage || DEFAULT_STOP_MESSAGE)
+                : 'The committee opens it at the briefing. Come back to this screen then — you don’t need to do anything now.'}
             </p>
             {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
           </div>
@@ -2542,7 +2664,7 @@ export default function TreasureHunt({
         <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>{esc(S.teamName)}</div>
           <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>
-            {ranOut ? 'Time’s up' : 'Hunt complete'}
+            {S.stoppedAt ? 'Game over' : ranOut ? 'Time’s up' : 'Hunt complete'}
           </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {GAMES.map((g, i) => (
@@ -2558,6 +2680,9 @@ export default function TreasureHunt({
               </li>
             ))}
           </ul>
+          {S.stoppedAt > 0 && (
+            <p style={{ margin: '12px 0 0', fontWeight: 700 }}>{stopMessage || DEFAULT_STOP_MESSAGE}</p>
+          )}
           <p className="note" style={{ margin: '12px 0 0' }}>
             The committee tallies the results at the finish point.
             {ranOut && ' If the committee restarts the clock, the hunt starts again from the beginning on this screen by itself.'}
@@ -2565,7 +2690,7 @@ export default function TreasureHunt({
         </div>
         {/* Finishing is the team's own call, so leave a way back in for
             anyone who tapped it early and still has time on the clock. */}
-        {!ranOut && secondsLeft > 0 && (
+        {!ranOut && secondsLeft > 0 && !stoppedAt && (
           <div className="card">
             <p style={{ margin: '0 0 10px' }}>
               Still {mmss(secondsLeft)} on the clock. Finished by mistake?
@@ -2574,7 +2699,7 @@ export default function TreasureHunt({
               className="btn block sea"
               type="button"
               onClick={() => {
-                const next = { ...S, finishedAt: null, open: null };
+                const next = { ...S, finishedAt: null, stoppedAt: null, open: null };
                 store.save(next.teamId, next);
                 setS(next);
                 setView('race');

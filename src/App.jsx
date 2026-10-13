@@ -7,6 +7,7 @@ import Home from './components/Home';
 import Login from './components/Login';
 import Admin from './components/Admin';
 import { BossInbox } from './components/BossChat';
+import { AnnouncementPopup } from './components/Announcements';
 import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
 import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig, withDefaults } from './lib/huntConfig';
@@ -410,13 +411,17 @@ export default function App() {
 
   /* The hunt is full screen: it has its own sticky bar and way out, and
      the app header above it only ate space on a phone mid-game. */
+  /* The committee's announcements pop up over every screen below. */
+  const announcements = <AnnouncementPopup key={auth.user?.id} userId={auth.user?.id} />;
+
   if (bossOpen && (auth.member.huntBoss || auth.isAdmin)) {
-    return <BossInbox onClose={() => setBossOpen(false)} />;
+    return <>{announcements}<BossInbox onClose={() => setBossOpen(false)} /></>;
   }
 
   if (treasureOpen) {
     return (
       <>
+        {announcements}
         <div className="max-w-[640px] mx-auto px-4 pb-8">
           <TreasureHunt
             key={huntView ? `${huntView.teamId}:${huntView.game ?? ''}` : 'own'}
@@ -435,6 +440,7 @@ export default function App() {
 
   return (
     <>
+      {announcements}
       <Header />
 
       {/* Tab navigation — desktop/tablet: strip under the header, edge-faded
