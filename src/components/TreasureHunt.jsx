@@ -2,6 +2,7 @@ import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'rea
 import {
   toRuntime, withDefaults, fetchClockReset, restartClock,
   DEFAULT_STOP_MESSAGE, HUNT_STOPPED_EVENT, fetchStop, resumeGame, stopGame,
+  clearLocalRuns, fetchHuntReset, resetHunt,
 } from '../lib/huntConfig';
 import { cachedColleagueAnswers, fetchColleagueAnswers } from '../lib/colleagueQuiz';
 import { huntGroupOf } from '../data/huntGroups';
@@ -355,6 +356,11 @@ export function HuntOrganiser({ config }) {
   const [restarting, setRestarting] = useState(false);
   const [clockError, setClockError] = useState('');
 
+  /* Back to "not started yet" for the real game. */
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetNote, setResetNote] = useState(null);
+
   /* Stopping the game for everyone, with the committee's message. */
   const [stop, setStop] = useState({ stoppedAt: 0, message: '' });
   const [stopText, setStopText] = useState(DEFAULT_STOP_MESSAGE);
@@ -394,6 +400,35 @@ export function HuntOrganiser({ config }) {
       setClockError(e?.message || 'Could not restart the clock.');
     } finally {
       setRestarting(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!resetConfirm) { setResetConfirm(true); return; }
+    setResetConfirm(false);
+    setResetting(true);
+    setResetNote(null);
+    try {
+      const r = await resetHunt();
+      clearLocalRuns();
+      setResetAt(0);
+      setStop((st) => ({ ...st, stoppedAt: 0 }));
+      setStopNote(null);
+      setPublished(false);
+      setResetNote({
+        ok: r.filesFailed === 0,
+        text: `Reset. Cleared ${r.scores} synced runs, ${r.bingo} bingo shots, ${r.boss} boss questions, `
+          + `${r.checkins} check-ins and ${r.files} photos`
+          + `${r.filesFailed ? ` (${r.filesFailed} photos couldn’t be deleted)` : ''}. `
+          + 'Every game’s setup is kept. The hunt is closed — open it at the briefing from Admin → Treasure hunt.',
+      });
+      refresh();
+    } catch (e) {
+      setResetNote({ ok: false, text: /reset_hunt|reset_at|schema cache|function/i.test(e?.message ?? '')
+        ? 'Run 20261020000000_hunt_reset.sql in Supabase first.'
+        : e?.message || 'Could not reset. Try again.' });
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -481,17 +516,37 @@ export function HuntOrganiser({ config }) {
           Stamps, answers and points go back to zero on every phone; nothing is deleted.
           {resetAt > 0 && ` Last restarted ${clockTime(resetAt)}.`}
         </p>
-        <button
-          className="mini"
-          type="button"
-          style={confirming ? { background: 'var(--gold)' } : {}}
-          disabled={restarting}
-          onClick={handleRestart}
-        >
-          {restarting ? 'Restarting…' : confirming ? 'Tap again to confirm' : 'Restart the clock'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            className="mini"
+            type="button"
+            style={confirming ? { background: 'var(--gold)' } : {}}
+            disabled={restarting}
+            onClick={handleRestart}
+          >
+            {restarting ? 'Restarting…' : confirming ? 'Tap again to confirm' : 'Restart the clock'}
+          </button>
+          <button
+            className="mini"
+            type="button"
+            style={resetConfirm ? { background: 'var(--red)', color: '#fff' } : {}}
+            disabled={resetting}
+            onClick={handleReset}
+            onBlur={() => setResetConfirm(false)}
+          >
+            {resetting ? 'Resetting…' : resetConfirm ? 'Tap again to reset everything' : 'Reset for the real game'}
+          </button>
+        </div>
       </div>
       {clockError && <p className="note" style={{ color: 'var(--red)', margin: '10px 0 0' }}>{clockError}</p>}
+      <p className="note" style={{ margin: '10px 0 0' }}>
+        <b>Reset for the real game</b> clears every rehearsal: scores, bingo shots and game photos, boss chat,
+        check-ins, judging, a stop and published results, and closes the hunt. Every phone goes back to the
+        start screen. Games, questions, answers, reference photos and points stay as configured.
+      </p>
+      {resetNote && (
+        <p className="note" style={{ color: resetNote.ok ? 'var(--sea)' : 'var(--red)', margin: '8px 0 0' }}>{resetNote.text}</p>
+      )}
 
       <div style={{ borderTop: '1px dashed var(--th-rule)', marginTop: 14, paddingTop: 14 }}>
         <div className="eyebrow" style={{ color: 'var(--red)' }}>
@@ -948,6 +1003,22 @@ export default function TreasureHunt({
      no longer fill the card (see `shots` below). */
   const checkClockReset = useCallback(async () => {
     if (preview || !activeTeamId) return;
+    /* Reset for the real game: a rehearsal's run is thrown away and the
+       team is back on the start screen, waiting for the briefing. */
+    const wiped = await fetchHuntReset();
+    const old = store.load(activeTeamId);
+    if (wiped && old?.startedAt && old.startedAt < wiped) {
+      clearLocalRuns(activeTeamId);
+      setTick(null);
+      setDraft({});
+      setOpenTile(null);
+      setBingoMissing(null);
+      setS(null);
+      setView('start');
+      setHuntResetAt(0);
+      showToast('The committee reset the hunt — it starts fresh at the briefing.', 5000);
+      return;
+    }
     const at = await fetchClockReset();
     setHuntResetAt(at);
     const run = store.load(activeTeamId);
@@ -1301,7 +1372,8 @@ export default function TreasureHunt({
             {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
           </div>
         )}
-        <div className="card">
+        {/* Until the committee opens it, that card is all there is. */}
+        {!shut && <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>Your team</div>
           {team ? (
             <>
@@ -1349,7 +1421,7 @@ export default function TreasureHunt({
               <p style={{ margin: 0 }}>You’re not in a hunt group. If you should be, ask the committee to add you, then come back here.</p>
             </>
           )}
-        </div>
+        </div>}
       </div>
     );
   };
@@ -2801,7 +2873,7 @@ export default function TreasureHunt({
       ))}
       {/* Only the leader runs the games, but anyone in the group can ask
           the bosses in Find the boss. */}
-      {!preview && !readOnly && !canPlay && teamId && view !== 'done' && (
+      {!preview && !readOnly && !canPlay && teamId && view !== 'done' && isOpen && !stoppedAt && (
         <div className="card flag" style={{ marginTop: 14 }}>
           <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
           <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />

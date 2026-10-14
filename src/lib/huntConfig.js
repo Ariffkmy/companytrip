@@ -473,6 +473,70 @@ export async function restartClock() {
   return new Date(data.clock_reset_at).getTime();
 }
 
+/* ── Resetting for the real game ─────────────────────
+   Admin → Organiser → Reset for the real game. reset_hunt()
+   (20261020000000_hunt_reset.sql) clears every rehearsal's progress in
+   the database and closes the hunt; the photos teams took are removed
+   here, as Storage can't be emptied from SQL. Only the play buckets:
+   the committee's reference photos (hunt-media) and the album stay. */
+const PLAY_BUCKETS = ['bingo', 'hunt-photos'];
+
+/* When the committee last reset the hunt (epoch ms, 0 if never). Each
+   phone drops a run it started before this. */
+export async function fetchHuntReset() {
+  if (!supabase) return 0;
+  const { data, error } = await supabase.from('hunt_config').select('reset_at').eq('id', HUNT_ID).maybeSingle();
+  if (error || !data?.reset_at) return 0;
+  return new Date(data.reset_at).getTime();
+}
+
+async function listFiles(bucket, prefix = '', depth = 0) {
+  const { data, error } = await supabase.storage.from(bucket).list(prefix, { limit: 1000 });
+  if (error || !data) return [];
+  const out = [];
+  for (const item of data) {
+    const path = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.id) out.push(path);
+    else if (depth < 3) out.push(...await listFiles(bucket, path, depth + 1));
+  }
+  return out;
+}
+
+/** Back to "not started yet", keeping everything configured. Admin only. */
+export async function resetHunt() {
+  const { data, error } = await supabase.rpc('reset_hunt');
+  if (error) throw error;
+  let files = 0;
+  let filesFailed = 0;
+  for (const bucket of PLAY_BUCKETS) {
+    const paths = await listFiles(bucket);
+    for (let i = 0; i < paths.length; i += 100) {
+      const chunk = paths.slice(i, i + 100);
+      const { data: removed, error: rmErr } = await supabase.storage.from(bucket).remove(chunk);
+      if (rmErr) filesFailed += chunk.length;
+      else files += removed?.length ?? 0;
+    }
+  }
+  try { localStorage.setItem(OPEN_KEY, 'false'); } catch (e) { /* silent */ }
+  return {
+    scores: data?.scores ?? 0, bingo: data?.bingo ?? 0, boss: data?.boss ?? 0, checkins: data?.checkins ?? 0,
+    files, filesFailed,
+  };
+}
+
+/** This phone's runs (and their restart archives): one team's, or all. */
+export function clearLocalRuns(teamId = '') {
+  try {
+    const prefix = `treasure:${teamId}`;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch (e) { /* silent */ }
+}
+
 /* ── Stopping the game for everyone ──────────────────
    Admin → Organiser → Stop the game. The moment is kept in
    hunt_config.stopped_at; a "game over" announcement carries the
