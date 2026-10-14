@@ -994,6 +994,21 @@ export default function TreasureHunt({
     return () => clearInterval(id);
   }, [preview, view, refreshShots, activeTeamId]);
 
+  /* How to play: a popup, so the game page itself stays clean. It opens
+     by itself the first time a game is opened on this phone, and the
+     "How to play" button brings it back. */
+  const [howToKey, setHowToKey] = useState(null);
+  const gameKey = S?.open === 'cp2' ? (S.subs?.cp2a ? 'cp2b' : 'cp2a') : S?.open ?? null;
+  useEffect(() => {
+    if (!gameKey || readOnly || view !== 'race') return;
+    const seenKey = `olc-howto:${gameKey}`;
+    try {
+      if (localStorage.getItem(seenKey)) return;
+      localStorage.setItem(seenKey, '1');
+    } catch (e) { /* silent */ }
+    setHowToKey(gameKey);
+  }, [gameKey, readOnly, view]);
+
   /* ── Committee clock restart ─────────────────────────
      The committee can give every team a fresh race clock from Admin →
      Organiser. Every team starts the hunt again from the beginning: no
@@ -1410,7 +1425,7 @@ export default function TreasureHunt({
               </button>
               <div style={{ marginTop: 12 }}>{rulesButton()}</div>
               <p className="note" style={{ margin: '12px 0 0' }}>
-                {!canPlay ? `Only your group leader${leaderName ? ` (${leaderName})` : ''} runs the games for ${team.name}. You can watch, but not start or submit.`
+                {!canPlay ? `Only your group leader${leaderName ? ` (${leaderName})` : ''} runs the games for ${team.name}. You can still take photo bingo shots and ask the bosses below.`
                   : shut ? 'This opens when the committee starts the game.'
                   : underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
               </p>
@@ -1578,7 +1593,6 @@ export default function TreasureHunt({
      (20261012000000_hunt_leader.sql), so each one says so. Not on the
      read-only pages, where nobody is playing. */
   const LEADER_NOTE = {
-    [STAMP_NO.bingo]: 'only the group leader takes and uploads the photos. Everyone helps spot them.',
     [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
     [STAMP_NO.cp3]: 'only the group leader sends the item and everyone’s photos.',
@@ -1594,6 +1608,84 @@ export default function TreasureHunt({
       <b style={{ color: 'var(--red)' }}>★ Leader only</b> — {LEADER_NOTE[n]}
     </p>
   ));
+
+  /* How to play: a few plain steps at the top of every game, so nobody
+     has to work the rules out from the screen. Not on read-only pages. */
+  const howTo = (key) => {
+    const a = CONFIG.atami;
+    return {
+      bingo: [
+        'Tap a tile to see its photo full-size.',
+        'Find that spot and take a selfie of the whole team there.',
+        'Anyone in the group can take any tile, from their own phone.',
+        'When every tile has a photo, the leader taps “Collect the stamp”.',
+      ],
+      cp1: [
+        'Go to the place in the WHERE photo.',
+        'Copy the pose in the POSE photo — the whole team.',
+        'Take one group photo and tap “Send photo”.',
+      ],
+      cp2a: [
+        'Find the landmark in the WHERE photo.',
+        'Take a selfie with everyone in it and the landmark behind you, then tap “Send selfie”.',
+        'The Atami quiz opens next — passing it earns the stamp.',
+      ],
+      cp2b: [
+        `Tap “Start” for ${a.perRound} questions${a.secs ? `, ${a.secs} seconds each` : ''}.`,
+        'Tap the answer you think is right.',
+        `Get ${a.passMark} right to pass. Miss it and you start again with new questions.`,
+        'Then tap “Collect the stamp”.',
+      ],
+      cp3: [
+        'Each member buys something — any amount.',
+        'Type what you bought.',
+        'Tap each person’s box to take their photo with it.',
+        'When everyone has a photo, tap “Send it”.',
+      ],
+      cp4: [
+        'Work the answers out together.',
+        'Type one answer for each question.',
+        'Tap “Send answers” — you only send once, so check them first.',
+      ],
+      guess: [
+        'Read the name and the question about that colleague.',
+        'Tap the answer you think is right. A wrong pick shows the right one.',
+        'After the last question, tap “Collect the stamp”.',
+      ],
+      boss: [
+        'Ask the bosses questions in the chat below — they only answer yes or no.',
+        'Use the answers to work out where they are, and go find them.',
+        'Take one funny-pose photo of the whole team with the bosses and tap “Send photo”.',
+      ],
+    }[key] ?? [];
+  };
+  const renderHowTo = (key) => (readOnly || !howTo(key).length ? null : (
+    <button className="mini" type="button" onClick={() => setHowToKey(key)} style={{ margin: '0 0 12px' }}>
+      ⓘ How to play
+    </button>
+  ));
+  const renderHowToPopup = () => {
+    const steps = howToKey ? howTo(howToKey) : [];
+    if (!steps.length) return null;
+    const close = () => setHowToKey(null);
+    return (
+      <div role="dialog" aria-modal="true" aria-labelledby="howto-title" onClick={close} style={{
+        position: 'fixed', inset: 0, zIndex: 96, background: 'rgba(10,10,12,.55)',
+        padding: '24px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, width: '100%', margin: 0 }}>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>How to play</div>
+          <h2 id="howto-title" className="display" style={{ fontSize: 24, margin: '4px 0 10px' }}>
+            {CONFIG.cp[howToKey]?.title ?? 'This game'}
+          </h2>
+          <ol style={{ margin: 0, paddingLeft: 22, fontSize: 15, lineHeight: 1.45 }}>
+            {steps.map((t, i) => <li key={i} style={{ marginTop: 6 }}>{t}</li>)}
+          </ol>
+          <button className="btn block" type="button" onClick={close} autoFocus style={{ marginTop: 16 }}>Got it</button>
+        </div>
+      </div>
+    );
+  };
 
   const renderShot = (preview, label, sub) => {
     if (preview) {
@@ -1673,6 +1765,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.stop)}
+        {renderHowTo('cp1')}
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
         </div>
@@ -1718,6 +1811,7 @@ export default function TreasureHunt({
   const renderBoss = () => (
     <div className="card flag">
       {renderCpHead(STAMP_NO.boss, CONFIG.cp.boss.title, CONFIG.cp.boss.stop)}
+      {renderHowTo('boss')}
       <div className="task">
         <Rich text={CONFIG.cp.boss.body} />
       </div>
@@ -1752,6 +1846,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp2a, CONFIG.cp.cp2a.title, CONFIG.cp.cp2a.stop)}
+        {renderHowTo('cp2a')}
         <div className="task">
           <Rich text={CONFIG.cp.cp2a.body} />
         </div>
@@ -1866,6 +1961,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.stop)}
+        {renderHowTo('cp2b')}
         {round.length > 0 && !collected && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <span aria-live="polite" aria-label={`${rightCount} right, ${rules.passMark} needed`} style={{
@@ -2037,6 +2133,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.stop)}
+        {renderHowTo('cp3')}
         <div className="task">
           {CONFIG.buy.brief && <p><b>{CONFIG.buy.brief}</b></p>}
           <Rich text={CONFIG.cp.cp3.body} />
@@ -2131,6 +2228,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp4, CONFIG.cp.cp4.title, CONFIG.cp.cp4.stop)}
+        {renderHowTo('cp4')}
         <div className="task">
           <Rich text={CONFIG.cp.cp4.body} />
         </div>
@@ -2393,6 +2491,7 @@ export default function TreasureHunt({
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.bingo, CONFIG.cp.bingo.title, CONFIG.cp.bingo.stop)}
+        {renderHowTo('bingo')}
         <div className="task">
           <p style={{ margin: 0 }}>Every tile is a photo of something around the area. Find the spot and take a selfie of the whole team there. Anyone on the team can snap any tile. All {bingoCard.length} earn the stamp — leave it part-filled and come back whenever you like.</p>
         </div>
@@ -2509,6 +2608,7 @@ export default function TreasureHunt({
           </span>
         </div>
         {renderLeaderNote(STAMP_NO.guess)}
+        {renderHowTo('guess')}
         <CheckpointPhoto src={CONFIG.cp.guess.photo} />
 
         {collected ? (
@@ -2867,23 +2967,35 @@ export default function TreasureHunt({
           <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>Your group leader runs the hunt</h2>
           <p style={{ margin: 0 }}>
             Only the leader{leaderName ? ` (${leaderName})` : ''} can play and submit the games for {S?.teamName ?? 'your group'}.
-            Ask them to run it, or come back when they do.
+            You can still take photo bingo shots and ask the bosses below.
           </p>
         </div>
       ))}
-      {/* Only the leader runs the games, but anyone in the group can ask
-          the bosses in Find the boss. */}
+      {/* Only the leader runs the games, but anyone in the group can fill
+          the photo bingo and ask the bosses in Find the boss. */}
       {!preview && !readOnly && !canPlay && teamId && view !== 'done' && isOpen && !stoppedAt && (
-        <div className="card flag" style={{ marginTop: 14 }}>
-          <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
-          <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />
-        </div>
+        <>
+          {bingoCard.length > 0 && (
+            <div className="card flag" style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.bingo} · {CONFIG.cp.bingo.title}</div>
+              <p className="note" style={{ margin: '4px 0 10px' }}>Everyone can take bingo photos — not just the leader.</p>
+              {renderHowTo('bingo')}
+              {renderBingoGrid()}
+              {renderBingoTile()}
+            </div>
+          )}
+          <div className="card flag" style={{ marginTop: 14 }}>
+            <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
+            <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />
+          </div>
+        </>
       )}
       {view === 'done' && renderDoneScreen()}
 
       {mapOpen && <HuntMapLoader map={CONFIG.map} onClose={closeMap} />}
 
       {renderRules()}
+      {renderHowToPopup()}
 
       {/* Toast */}
       {toast && (
