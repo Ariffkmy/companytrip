@@ -1209,6 +1209,14 @@ export default function TreasureHunt({
               ? `Open any game to see what ${esc(S.teamName)} sent in — the photos and the answers. Nothing can be changed any more.`
               : 'Play them in whatever order suits where you are. Skip anything you don’t fancy — an unplayed game just scores nothing.'}
           </p>
+          {huntGroupOf(activeTeamId)?.members?.length > 0 && (
+            <p className="note" style={{ margin: '0 0 10px' }}>
+              {huntGroupOf(activeTeamId).name}:{' '}
+              {huntGroupOf(activeTeamId).members
+                .map((m) => (m === huntGroupOf(activeTeamId).leader ? `${m} ★` : m))
+                .join(', ')}
+            </p>
+          )}
           {rulesButton()}
           <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0' }}>
             {GAMES.map((g, i) => {
@@ -1490,8 +1498,30 @@ export default function TreasureHunt({
           {renderStop(stop, { color: 'var(--sea)' })}
         </div>
       </div>
+      {renderLeaderNote(n)}
     </>
   );
+
+  /* Who does what: every game is sent in from the leader's phone
+     (20261012000000_hunt_leader.sql), so each one says so. Not on the
+     read-only pages, where nobody is playing. */
+  const LEADER_NOTE = {
+    [STAMP_NO.bingo]: 'only the group leader takes and uploads the photos. Everyone helps spot them.',
+    [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
+    [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
+    [STAMP_NO.cp3]: 'only the group leader sends the item and everyone’s photos.',
+    [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
+    [STAMP_NO.guess]: 'only the group leader picks the answers. Decide together first.',
+    [STAMP_NO.boss]: 'only the group leader sends the photo. Anyone in the group can ask the bosses.',
+  };
+  const renderLeaderNote = (n) => (readOnly || !LEADER_NOTE[n] ? null : (
+    <p style={{
+      margin: '0 0 12px', padding: '6px 10px', borderRadius: 7, background: 'var(--th-parchment)',
+      border: '1px dashed var(--th-rule)', fontSize: 13, lineHeight: 1.4,
+    }}>
+      <b style={{ color: 'var(--red)' }}>★ Leader only</b> — {LEADER_NOTE[n]}
+    </p>
+  ));
 
   const renderShot = (preview, label, sub) => {
     if (preview) {
@@ -2406,6 +2436,7 @@ export default function TreasureHunt({
             <span style={{ color: 'var(--red)' }}>{rightCount * CONFIG.trivia.pts} pts</span>
           </span>
         </div>
+        {renderLeaderNote(STAMP_NO.guess)}
         <CheckpointPhoto src={CONFIG.cp.guess.photo} />
 
         {collected ? (

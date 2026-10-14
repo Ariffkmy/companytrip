@@ -48,9 +48,9 @@
       'Be at the office by 8:00 AM — vans leave for KLIA2 right after.',
       'Keep passport and boarding pass accessible at every checkpoint.',
       'Buy your own food near the office / at KLIA2 — no group meal today.',
-      'Pack a change of clothes in your carry-on; you reach the hotel at 1 AM.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Confirm group check-in and seat assignments before 10:00.',
       'Count heads at office, KLIA2 check-in, gate, and Haneda arrival.',
       'Confirm the Japan Bus Charter pick-up point at Haneda (paid).',
@@ -79,6 +79,7 @@
       'Keep ~¥520 on your Suica for the round trip to Macnica.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Reconfirm Macnica agenda, lunch and Zauo dinner arrangements.',
       'Publish the Bandobashi Station meeting point and train plan.',
       'Brief everyone on Macnica etiquette and souvenir handover timing.',
@@ -125,15 +126,13 @@
     ],
     participantPrep: [
       'Top up ~¥2,500 on your Suica before leaving the hotel.',
-      'Bring ¥400 CASH for the Hasedera entrance fee.',
       'Comfortable shoes — Hasedera has slopes and stairs.',
       'Do not miss the 17:20 meet at Enoshima Station; dinner is a group booking.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Confirm the 26 pax booking at Shirasu Ya and the budget (¥2,000 vs ¥3,000/pax).',
-      'Assign subgroup leaders — many train transfers with tight platform buffers.',
       'Note: Keikyu LOCAL only at Koganecho on the way back.',
-      'Plan an alternative activity for anyone not joining the aquarium visit.',
     ],
   },
   {
@@ -171,13 +170,12 @@
     participantPrep: [
       'Bring a jacket — the bay is cold, and you walk 17 min after the fireworks.',
       'Charge your phone fully: the whole treasure hunt runs from it.',
-      'Bring your own money for Checkpoint 3 — each member buys something.',
-      'Cash for Kiunkaku (¥610) if you pick Option 1. Kinomiya is free but hilly.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Confirm Shinkansen seats (¥3,193/pax) and the morning option split.',
       'Confirm the group dinner booking at Izutaro.',
-      'Treasure hunt: Ariff = Game Master; Carmen & Kevin = facilitators; Liyana / Ellice / Tim = judges.',
+      'Treasure hunt: Ariff = Game Master; Carmen & Kevin = facilitators.',
       'Brief teams on the 21:00 walk to the station — no transport after the fireworks.',
     ],
   },
@@ -201,11 +199,9 @@
     ],
     participantPrep: [
       'Pack and be checked out by 08:30 — luggage goes to the storage area.',
-      'Buy breakfast at a convenience store the night before.',
-      'Bring ¥1,000 for the Cup Noodles workshop (+ ~¥400–500 if joining group lunch).',
-      'Keep your baggage allowance in mind during the World Porters free time.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Reconfirm the Cup Noodles Museum booking and workshop slot for 26 pax.',
       'Decide Option A vs Option B for lunch and announce it beforehand.',
       'Final headcount at Sakuragicho and again before leaving for Haneda.',
@@ -231,6 +227,7 @@
       'Confirm whether you are riding the van back to the office.',
     ],
     committeePrep: [
+      'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Confirm van pick-up timing at KLIA2 with the vendor (Kent).',
       'Final headcount at the Arrival Hall before departure.',
       'Collect any outstanding pay-and-claim receipts from participants.',
