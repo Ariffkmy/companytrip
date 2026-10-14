@@ -9,6 +9,8 @@ import ForexWidget from './ForexWidget';
 import PhotoCarousel from './PhotoCarousel';
 import Nearby from './Nearby';
 import groupRoster from '../data/groupRoster';
+import schedule from '../data/schedule';
+import cashExpenses, { itemTotal } from '../data/cashExpenses';
 import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
 import { fetchResultsPublished } from '../lib/huntScores';
 import HuntResults from './HuntResults';
@@ -94,6 +96,71 @@ function Groups() {
                         </span>
                       )}
                     </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Cash for the day ───────────────────────────────
+   What management pays in cash, day by day. Today's day opens by itself. */
+const yen = (n) => `¥${n.toLocaleString('en-US')}`;
+
+function CashExpenses() {
+  const today = new Date().toLocaleDateString('en-CA');
+  const days = cashExpenses.map((c) => {
+    const s = schedule.find((d) => d.day === c.day);
+    return { ...c, label: s?.label ?? c.day, title: s?.title ?? '', date: s?.date, total: c.items.reduce((t, it) => t + itemTotal(it), 0) };
+  });
+  const [open, setOpen] = useState(() => days.filter((d) => d.date === today).map((d) => d.day));
+  const toggle = (day) => setOpen((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  const grand = days.reduce((t, d) => t + d.total, 0);
+
+  return (
+    <section className="mt-9" aria-labelledby="cash-h">
+      <h2 id="cash-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
+        Cash for the day{' '}
+        <span className="normal-case tracking-normal font-normal text-gray-400">(view only available for management)</span>
+      </h2>
+      <p className="text-xs text-gray-500 leading-relaxed mb-2.5">
+        What management pays in cash each day, by activity. Trip total {yen(grand)}.
+      </p>
+      <p className="text-xs text-gray-400 italic -mt-1 mb-2.5">
+        Note: these amounts are dummy data for now. The committee will update them with the real figures and real items.
+      </p>
+      <div className="space-y-2.5">
+        {days.map((d) => (
+          <div key={d.day} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggle(d.day)}
+              type="button"
+              aria-expanded={open.includes(d.day)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 cursor-pointer"
+            >
+              <span className="min-w-0">
+                <span className="block font-display text-base tracking-wide">{d.label}</span>
+                <span className="block text-xs text-gray-400 truncate">{d.title}</span>
+              </span>
+              <span className="ml-auto shrink-0 font-mono text-sm font-semibold">{d.total ? yen(d.total) : '—'}</span>
+              <span className={`shrink-0 text-gray-400 text-xs transition-transform ${open.includes(d.day) ? 'rotate-90' : ''}`}>▶</span>
+            </button>
+            {open.includes(d.day) && (
+              <div className="px-4 pb-3 border-t border-gray-100">
+                {d.items.length === 0 && <p className="text-sm text-gray-500 py-2.5">No cash needed.</p>}
+                {d.items.map((it) => (
+                  <div key={it.activity} className="flex items-baseline gap-3 py-2.5 border-b border-gray-100 last:border-b-0">
+                    <span className="min-w-0 text-sm leading-snug">
+                      {it.activity}
+                      {it.perPax != null && (
+                        <span className="block text-xs text-gray-400 font-mono">{yen(it.perPax)} × {it.pax} pax</span>
+                      )}
+                    </span>
+                    <span className="ml-auto shrink-0 font-mono text-sm">{yen(itemTotal(it))}</span>
                   </div>
                 ))}
               </div>
@@ -239,6 +306,7 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, hu
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       <ForexWidget />
+      <CashExpenses />
       <Nearby />
       <Insurance userEmail={userEmail} />
       {/* Last: who is on which team is looked up once or twice a trip,

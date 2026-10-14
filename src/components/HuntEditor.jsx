@@ -755,6 +755,9 @@ export default function HuntEditor() {
               <Photo label="Place photo — where to go" value={val(['teams', g.id, 'pose', 'place'])} onChange={set(['teams', g.id, 'pose', 'place'])} />
               <Text label="Caption under the place photo" hint="Optional. Leave blank for “Go to this place”."
                 value={val(['teams', g.id, 'pose', 'placeHint'])} onChange={set(['teams', g.id, 'pose', 'placeHint'])} />
+              <Text label="Location of the place" hint="Optional. A Google Maps link, an address or “35.0961, 139.0753”. Teams get an “Open in Google Maps” button."
+                placeholder="https://maps.app.goo.gl/…"
+                value={val(['teams', g.id, 'pose', 'location'])} onChange={set(['teams', g.id, 'pose', 'location'])} />
               <Photo label="Pose photo — what to copy" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
             </div>
           ))}
@@ -835,8 +838,8 @@ export default function HuntEditor() {
           <Num label="Points per right answer" value={val([...cp('guess'), 'pointsPerRight'])} onChange={set([...cp('guess'), 'pointsPerRight'])} />
         </div>
         <p className="note -mt-2">
-          A group answers every question about its rival group&apos;s members (A ↔ B, C ↔ D), one at a time at its own
-          pace. A wrong pick just shows the right answer. The stamp lands after the last question. Wrong options are built
+          A group is asked about members of every other group, mixed together (group A gets B, C and D), one at a time
+          at its own pace. A round is one group&apos;s worth of questions on average. Only the group leader answers. A wrong pick just shows the right answer. The stamp lands after the last question. Wrong options are built
           from what other people said to the same question, and saved so every group sees the same choices. A question with
           no answer or no wrong options is never asked; the committee&apos;s answers never are.
         </p>

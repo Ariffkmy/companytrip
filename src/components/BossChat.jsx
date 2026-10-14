@@ -5,7 +5,8 @@
    BossThread: inside game 7, a group asks the bosses yes/no questions
    and sees the answers arrive live. Any member of the group can ask
    (not only the leader), one question at a time: the next waits until
-   the last is answered, so the bosses aren't buried.
+   the last is answered, so the bosses aren't buried. A group gets
+   QUESTION_LIMIT questions per spot; when the bosses move, more.
 
    BossInbox: full screen, for the bosses on standby. Every group's
    unanswered questions, oldest first, each with a big Yes and No.
@@ -14,7 +15,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import groupRoster from '../data/groupRoster';
 import huntGroups, { huntGroupOf } from '../data/huntGroups';
-import { QUESTION_MAX, ping, unlockSound, useBossQuestions, useWakeLock } from '../lib/bossChat';
+import {
+  QUESTION_LIMIT, QUESTION_MAX, ping, questionsUsed, unlockSound, useBossMoves, useBossQuestions, useWakeLock,
+} from '../lib/bossChat';
 
 const ROSTER_SHORT = new Map(groupRoster.flatMap((t) => t.members)
   .filter((m) => m.full).map((m) => [m.full.trim().toUpperCase(), m.name]));
@@ -74,9 +77,26 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
     onEvent: (kind) => { if (kind === 'answered' && !readOnly) ping(); },
   });
 
+  const [movedNote, setMovedNote] = useState(false);
+  const { moves, lastMoveAt, ready: limitOn } = useBossMoves({
+    enabled: Boolean(team),
+    onMove: () => { if (!readOnly) { ping(); setMovedNote(true); } },
+  });
+
   const pending = items.some((q) => !q.answer);
+  const left = limitOn ? Math.max(0, QUESTION_LIMIT - questionsUsed(items, team, lastMoveAt)) : QUESTION_LIMIT;
+  const usedUp = limitOn && left === 0;
   const allowAsk = canAsk && !readOnly;
   const lastAnswer = items[items.length - 1]?.answer;
+
+  /* Questions and the bosses' moves, in the order they happened. Moves
+     before this group's first question aren't news to it. */
+  const firstAt = items.length ? new Date(items[0].created_at).getTime() : Infinity;
+  const timeline = [
+    ...items.map((q) => ({ kind: 'q', at: new Date(q.created_at).getTime(), q })),
+    ...moves.filter((m) => new Date(m.created_at).getTime() > firstAt)
+      .map((m) => ({ kind: 'move', at: new Date(m.created_at).getTime(), m })),
+  ].sort((a, b) => a.at - b.at);
 
   useEffect(() => {
     const el = listRef.current;
@@ -85,13 +105,14 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
 
   const send = async (e) => {
     e.preventDefault();
-    if (sending || !text.trim() || pending) return;
+    if (sending || !text.trim() || pending || usedUp) return;
     unlockSound();
     setSending(true);
     setSendError('');
     try {
       await ask(text);
       setText('');
+      setMovedNote(false);
     } catch (err) {
       setSendError(err.message);
     } finally {
@@ -107,8 +128,19 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
       </div>
       {!readOnly && (
         <p className="note" style={{ margin: '0 0 8px' }}>
-          They can only answer <b>Yes</b> or <b>No</b>. Ask one question at a time.
+          They can only answer <b>Yes</b> or <b>No</b>. Your group gets <b>{QUESTION_LIMIT} questions</b> while
+          the bosses stay in one spot — when they move, you get {QUESTION_LIMIT} more.
         </p>
+      )}
+      {!readOnly && allowAsk && limitOn && (
+        <div aria-live="polite" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap',
+          margin: '0 0 8px', padding: '6px 10px', borderRadius: 8, border: 'var(--line)',
+          background: movedNote ? 'var(--gold)' : 'var(--card)', fontSize: 14,
+        }}>
+          <b>{movedNote ? '🚶 The bosses moved — new questions!' : usedUp ? 'No questions left' : 'Questions left'}</b>
+          <span style={{ font: '800 15px/1 var(--body)' }}>{left} of {QUESTION_LIMIT}</span>
+        </div>
       )}
 
       <div ref={listRef} style={{
@@ -122,7 +154,14 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
             {readOnly ? 'They didn’t ask the bosses anything.' : 'No questions yet. Try “Are you near the water?”'}
           </p>
         )}
-        {items.map((q) => (
+        {timeline.map((e) => (e.kind === 'move' ? (
+          <div key={`m-${e.m.id}`} style={{
+            textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)',
+            borderTop: '1px dashed var(--th-rule)', paddingTop: 6,
+          }}>
+            🚶 The bosses moved · {clock(e.m.created_at)}
+          </div>
+        ) : (({ q }) => (
           <div key={q.id}>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <div style={{
@@ -148,7 +187,7 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
               )}
             </div>
           </div>
-        ))}
+        ))(e)))}
       </div>
 
       {allowAsk && (
@@ -159,18 +198,23 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={QUESTION_MAX}
-            disabled={pending || Boolean(error)}
-            placeholder={pending ? 'Waiting for their answer…' : 'Ask a yes or no question'}
+            disabled={pending || usedUp || Boolean(error)}
+            placeholder={pending ? 'Waiting for their answer…' : usedUp ? 'Wait for the bosses to move' : 'Ask a yes or no question'}
             enterKeyHint="send"
             style={{
               flex: 1, minWidth: 0, height: 46, padding: '0 12px', borderRadius: 8, border: '2px solid var(--ink)',
               background: 'var(--card)', color: 'var(--ink)', font: '400 16px var(--body)',
             }}
           />
-          <button className="btn" type="submit" disabled={sending || pending || !text.trim() || Boolean(error)}>
+          <button className="btn" type="submit" disabled={sending || pending || usedUp || !text.trim() || Boolean(error)}>
             {sending ? '…' : 'Send'}
           </button>
         </form>
+      )}
+      {allowAsk && usedUp && (
+        <p className="note" style={{ margin: '8px 0 0' }}>
+          That’s your {QUESTION_LIMIT} questions. Search with what you know — when the bosses move, you get {QUESTION_LIMIT} more.
+        </p>
       )}
       {!allowAsk && !readOnly && offNote && <p className="note" style={{ margin: '8px 0 0' }}>{offNote}</p>}
       {sendError && <p style={{ margin: '8px 0 0', color: 'var(--red)', fontSize: 14 }}>{sendError}</p>}
@@ -187,6 +231,10 @@ export function BossInbox({ onClose }) {
   const [fresh, setFresh] = useState(() => new Set());
   const [now, setNow] = useState(() => Date.now());
   const wakeSupported = useWakeLock(standby);
+  const [moveConfirm, setMoveConfirm] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const [moveNote, setMoveNote] = useState('');
+  const { lastMoveAt, moves, ready: limitOn, markMoved } = useBossMoves();
 
   const { items, status, loaded, error, answer } = useBossQuestions({
     onEvent: (kind, row) => {
@@ -220,6 +268,22 @@ export function BossInbox({ onClose }) {
 
   const startStandby = () => { unlockSound(); setStandby(true); };
 
+  const moveNow = async () => {
+    if (!moveConfirm) { setMoveConfirm(true); return; }
+    setMoveConfirm(false);
+    setMoving(true);
+    setMoveNote('');
+    try {
+      await markMoved();
+      setMoveNote(`Done — every group has ${QUESTION_LIMIT} new questions. Answer them about your new spot.`);
+    } catch (err) {
+      setMoveNote(err.message);
+    } finally {
+      setMoving(false);
+    }
+  };
+  const lastMove = moves[moves.length - 1];
+
   const chip = (team) => {
     const g = huntGroupOf(team);
     return (
@@ -243,6 +307,46 @@ export function BossInbox({ onClose }) {
       <p className="text-sm text-gray-500 mt-2">
         Find the boss: groups ask where you are. Answer only <b>Yes</b> or <b>No</b>.
       </p>
+
+      <details className="card mt-4" open={!items.length}>
+        <summary className="cursor-pointer font-bold">How to play — for the bosses</summary>
+        <ol className="mt-2 pl-5 list-decimal space-y-1.5 text-[15px] leading-snug">
+          <li>Go to your hiding spot in the hunt area and stay there. Tap <b>Start standby</b> below so you hear every question.</li>
+          <li>Groups send questions to find you. Answer only <b>Yes</b> or <b>No</b>, and answer truthfully. No hints, in the app or in person.</li>
+          <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
+          <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
+          <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
+          <li>Keep the app open on this page. Sound on, phone charged.</li>
+        </ol>
+      </details>
+
+      <div className="card mt-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <b>Moving to a new spot?</b>
+          <span className="text-[12px] text-gray-500">
+            {!limitOn ? 'Question limit not switched on yet' : lastMove ? `Last moved ${clock(lastMove.created_at)}${lastMove.mover_name ? ` · ${shortName(lastMove.mover_name)}` : ''}` : 'Not moved yet'}
+          </span>
+        </div>
+        <button type="button" className="btn block mt-3" disabled={moving} onClick={moveNow} onBlur={() => setMoveConfirm(false)}
+          style={moveConfirm ? { background: 'var(--gold)', color: 'var(--ink)' } : undefined}>
+          {moving ? 'Telling the groups…' : moveConfirm ? `Tap again — every group gets ${QUESTION_LIMIT} new questions` : '🚶 We’re moving'}
+        </button>
+        {moveNote && <p className="note" style={{ margin: '8px 0 0' }}>{moveNote}</p>}
+        {limitOn && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {huntGroups.map((g) => {
+              const left = Math.max(0, QUESTION_LIMIT - questionsUsed(items, g.id, lastMoveAt));
+              return (
+                <span key={g.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border-2 border-ink text-[12px] font-bold"
+                  style={{ opacity: left ? 1 : 0.5 }}>
+                  <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: g.colour }} />
+                  {g.name}: {left} of {QUESTION_LIMIT} left
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {!standby ? (
         <button type="button" onClick={startStandby} className="btn block mt-4">

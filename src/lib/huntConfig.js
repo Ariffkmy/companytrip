@@ -90,14 +90,14 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question',
     '- Buy it, try it: most interesting buy, 5 more',
     '- Look around you: 2 a right answer',
-    '- Know your colleagues: every question is about your rival group (A ↔ B, C ↔ D), 2 a right answer',
+    '- Know your colleagues: questions about the other groups, mixed; 2 a right answer',
     '- Find the boss: 20 for the selfie with Tim and Ellice',
     '- First team to complete all 7 games: 15 more',
   ].join('\n'),
 
   /* Per hunt group (src/data/huntGroups.js), not per trip team. */
   teams: Object.fromEntries(HUNT_GROUP_IDS.map((id) => [id, {
-    pose: { photo: null, place: null, placeHint: '' },
+    pose: { photo: null, place: null, placeHint: '', location: '' },
     spot: { hint: 'Recce photo goes here.', photo: null },
     bingo: [],
   }])),
@@ -333,7 +333,7 @@ export function toRuntime(config) {
       name: g.name,
       colour: g.colour,
       rival: g.rival,
-      pose: { photo: null, place: null, placeHint: '', ...config.teams[g.id]?.pose },
+      pose: { photo: null, place: null, placeHint: '', location: '', ...config.teams[g.id]?.pose },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),

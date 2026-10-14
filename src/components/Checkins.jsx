@@ -14,7 +14,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { lazyChunk } from '../lib/chunk';
 import {
-  CHECKIN_EVERY_MS, OVERDUE_MS, SNOOZE_MS, deleteAllCheckins, fetchHuntActive, flushPending,
+  CHECKIN_EVERY_MS, CHECKIN_PROMPT_ON, OVERDUE_MS, SNOOZE_MS, deleteAllCheckins, fetchHuntActive, flushPending,
   getPosition, mapsLink, readLast, sendCheckin, useCheckinsLive, writeLast,
 } from '../lib/checkins';
 import { ping, unlockSound } from '../lib/bossChat';
@@ -36,7 +36,7 @@ const ago = (ms, now) => {
 
 /* ── Everyone in a hunt group: the popup ────────────── */
 export function CheckinPrompt({ userId, huntGroup }) {
-  const enabled = Boolean(userId && huntGroup);
+  const enabled = CHECKIN_PROMPT_ON && Boolean(userId && huntGroup);
   const [active, setActive] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [last, setLast] = useState(() => (userId ? readLast(userId) : 0));

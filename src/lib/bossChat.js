@@ -17,6 +17,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
 
 export const QUESTION_MAX = 200;
+/* Questions a group may ask while the bosses stay in one spot. Keep in
+   step with boss_questions_stamp() (20261022000000_boss_moves.sql). */
+export const QUESTION_LIMIT = 2;
 
 const byCreated = (a, b) => String(a.created_at).localeCompare(String(b.created_at));
 
@@ -33,6 +36,7 @@ export function chatErrorMessage(err) {
   const t = `${err?.name ?? ''} ${err?.message ?? ''}`;
   if (notReady(err)) return 'The boss chat isn’t switched on yet. Tell the committee.';
   if (/failed to fetch|network|offline|load failed|timed? ?out/i.test(t)) return 'No connection, so that didn’t send. Try again with signal.';
+  if (/question limit/i.test(t)) return `You’ve used your ${QUESTION_LIMIT} questions. You get more when the bosses move.`;
   if (/row-level|policy|permission|not allowed|\b403\b/i.test(t)) return 'You can’t do that here.';
   if (/check constraint|question_check/i.test(t)) return `Keep it to ${QUESTION_MAX} characters.`;
   return 'That didn’t go through. Try again.';
@@ -131,6 +135,68 @@ export function useBossQuestions({ team = null, enabled = true, onEvent } = {}) 
   }, []);
 
   return { items, status, loaded, error, ask, answer, reload };
+}
+
+/* ── The bosses moving ────────────────────────────────
+   A boss taps "We're moving" when they walk to a new spot (a row in
+   boss_moves). Every group's question allowance starts again from the
+   latest one. `ready` is false until 20261022000000_boss_moves.sql has
+   been run: then there is no limit. */
+export function useBossMoves({ enabled = true, onMove } = {}) {
+  const [moves, setMoves] = useState([]);
+  const [ready, setReady] = useState(false);
+  const onMoveRef = useRef(onMove);
+  onMoveRef.current = onMove;
+
+  const reload = useCallback(async () => {
+    if (!supabase || !enabled) return;
+    const { data, error } = await supabase.from('boss_moves').select('*').order('created_at');
+    if (error) { setReady(false); return; }
+    setReady(true);
+    setMoves(data ?? []);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!supabase || !enabled) return undefined;
+    reload();
+    const channel = supabase
+      .channel(`boss-moves:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'boss_moves' }, (payload) => {
+        const row = payload.new;
+        if (payload.eventType !== 'INSERT' || !row?.id) { reload(); return; }
+        setMoves((list) => (list.some((m) => m.id === row.id) ? list : [...list, row].sort(byCreated)));
+        onMoveRef.current?.(row);
+      })
+      .subscribe((st) => { if (st === 'SUBSCRIBED') reload(); });
+    const onVisible = () => { if (document.visibilityState === 'visible') reload(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', reload);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', reload);
+      supabase.removeChannel(channel);
+    };
+  }, [enabled, reload]);
+
+  const markMoved = useCallback(async () => {
+    const { data, error } = await supabase.from('boss_moves').insert({}).select().single();
+    if (error) {
+      throw new Error(/boss_moves|does not exist|schema cache/i.test(error.message ?? '')
+        ? 'Run 20261022000000_boss_moves.sql in Supabase first.'
+        : chatErrorMessage(error));
+    }
+    setMoves((list) => (list.some((m) => m.id === data.id) ? list : [...list, data].sort(byCreated)));
+    return data;
+  }, []);
+
+  const lastMoveAt = moves.length ? moves[moves.length - 1].created_at : null;
+  return { moves, lastMoveAt, ready, markMoved };
+}
+
+/** Questions `team` has asked since the bosses last moved. */
+export function questionsUsed(items, team, since) {
+  const from = since ? new Date(since).getTime() : 0;
+  return items.filter((q) => q.team === team && new Date(q.created_at).getTime() > from).length;
 }
 
 /* ── Getting someone's attention ──────────────────────

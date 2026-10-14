@@ -18,6 +18,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 
+/* The popup is switched off for now. Set back to true to ask again. */
+export const CHECKIN_PROMPT_ON = false;
+
 export const CHECKIN_EVERY_MS = 15 * 60 * 1000;
 export const OVERDUE_MS = 20 * 60 * 1000;
 /* "Not now" brings the popup back this much later. */

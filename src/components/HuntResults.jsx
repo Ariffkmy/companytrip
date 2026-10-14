@@ -291,7 +291,7 @@ export function GroupDetails({
     ),
     cp3: (
       <>
-        <p style={{ margin: '0 0 8px', fontSize: 14 }}>Bought: <b>{subs.cp3?.item || '—'}</b></p>
+        {subs.cp3?.item && <p style={{ margin: '0 0 8px', fontSize: 14 }}>Bought: <b>{subs.cp3.item}</b></p>}
         <div style={grid}>
           {(subs.cp3?.people ?? []).map((p, k) => (
             <div key={k} style={{ minWidth: 0 }}>

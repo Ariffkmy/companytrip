@@ -258,11 +258,28 @@ const shuffled = (list) => {
 };
 
 /* Rows a group can be asked (public.colleague_answers): answered, with
-   at least one wrong option, and about a member of its rival group
-   (A ↔ B, C ↔ D). A round is every one of them. */
+   at least one wrong option, and about a member of any other group —
+   group A gets B's, C's and D's, mixed together. */
 function colleaguePool(rows, teamId) {
-  const rival = huntGroupOf(teamId)?.rival;
-  return rows.filter((r) => String(r.answer ?? '').trim() && r.wrong?.length && rival && r.team === rival);
+  return rows.filter((r) => String(r.answer ?? '').trim() && r.wrong?.length
+    && r.team && r.team !== teamId && huntGroupOf(r.team));
+}
+
+/* Questions in a round: one group's worth on average, so a round is as
+   long as it was when a group was only asked about one other group. They
+   are drawn at random from all the other groups, so they come mixed. */
+function colleagueRoundSize(rows, teamId) {
+  const pool = colleaguePool(rows, teamId);
+  const groups = new Set(pool.map((r) => r.team)).size;
+  return groups ? Math.ceil(pool.length / groups) : 0;
+}
+
+/* The admin's location for a place: a Google Maps link as it is, or a
+   name / address / "lat, lng" turned into a Maps search. */
+function placeMapLink(location) {
+  const v = String(location ?? '').trim();
+  if (!v) return null;
+  return /^https?:\/\//i.test(v) ? v : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`;
 }
 
 /* A random row the team hasn't seen this round, with the stored wrong
@@ -1597,7 +1614,7 @@ export default function TreasureHunt({
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
     [STAMP_NO.cp3]: 'only the group leader sends the item and everyone’s photos.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
-    [STAMP_NO.guess]: 'only the group leader picks the answers. Decide together first.',
+    [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
     [STAMP_NO.boss]: 'only the group leader sends the photo. Anyone in the group can ask the bosses.',
   };
   const renderLeaderNote = (n) => (readOnly || !LEADER_NOTE[n] ? null : (
@@ -1621,7 +1638,9 @@ export default function TreasureHunt({
         'When every tile has a photo, the leader taps “Collect the stamp”.',
       ],
       cp1: [
-        'Go to the place in the WHERE photo.',
+        currentTeam && placeMapLink(currentTeam.pose.location)
+          ? 'Go to the place in the WHERE photo — “Open the place in Google Maps” gives directions.'
+          : 'Go to the place in the WHERE photo.',
         'Copy the pose in the POSE photo — the whole team.',
         'Take one group photo and tap “Send photo”.',
       ],
@@ -1638,7 +1657,6 @@ export default function TreasureHunt({
       ],
       cp3: [
         'Each member buys something — any amount.',
-        'Type what you bought.',
         'Tap each person’s box to take their photo with it.',
         'When everyone has a photo, tap “Send it”.',
       ],
@@ -1648,12 +1666,14 @@ export default function TreasureHunt({
         'Tap “Send answers” — you only send once, so check them first.',
       ],
       guess: [
-        'Read the name and the question about that colleague.',
+        'The questions are about people in the other groups, all mixed up.',
+        'Only the leader taps the answers — everyone else reads along on the leader’s phone and helps decide.',
         'Tap the answer you think is right. A wrong pick shows the right one.',
         'After the last question, tap “Collect the stamp”.',
       ],
       boss: [
         'Ask the bosses questions in the chat below — they only answer yes or no.',
+        'Your group gets only 2 questions. When the bosses move to a new spot, you get 2 more.',
         'Use the answers to work out where they are, and go find them.',
         'Take one funny-pose photo of the whole team with the bosses and tap “Send photo”.',
       ],
@@ -1730,22 +1750,31 @@ export default function TreasureHunt({
   /* The dark mount a reference photo sits in, with a caption bar across
      the bottom. Stamp 2 shows two of these — where to go, then what to
      do there — and stamp 3 shows one. */
+  /* The whole photo, at its own shape: never cropped, as wide as the
+     screen and no taller than most of it. Tap it for full size. */
   const renderPlate = ({ src, alt, caption, tag, missing }) => (
     <div style={{
-      background: 'var(--ink)', padding: '10px 10px 34px', borderRadius: 6,
-      position: 'relative', color: 'var(--card)', marginBottom: 14,
+      background: 'var(--ink)', padding: 10, borderRadius: 6,
+      color: 'var(--card)', marginBottom: 14,
     }}>
-      <div style={{ background: 'var(--sea)', borderRadius: 3, aspectRatio: '3/2', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+      <div style={{
+        background: src ? '#0E1720' : 'var(--sea)', borderRadius: 3, display: 'grid', placeItems: 'center',
+        overflow: 'hidden', ...(src ? {} : { aspectRatio: '3/2' }),
+      }}>
         {src
-          ? <img src={src} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? (
+            <a href={src} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%' }}>
+              <img src={src} alt={alt} style={{ display: 'block', width: '100%', height: 'auto', maxHeight: '75vh', objectFit: 'contain' }} />
+            </a>
+          )
           : missing}
       </div>
       <div style={{
-        position: 'absolute', left: 12, right: 12, bottom: 9,
+        marginTop: 8, padding: '0 2px',
         fontFamily: '"DM Mono", monospace', fontSize: 11, color: 'var(--th-label)',
         display: 'flex', justifyContent: 'space-between', gap: 8,
       }}>
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{caption}</span>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{caption}</span>
         <b style={{ color: 'var(--gold)', fontWeight: 500, flex: 'none' }}>{tag}</b>
       </div>
     </div>
@@ -1776,6 +1805,12 @@ export default function TreasureHunt({
           tag: 'WHERE',
           missing: missingPhoto('Place'),
         })}
+        {placeMapLink(t.pose.location) && (
+          <a className="btn block sea" href={placeMapLink(t.pose.location)} target="_blank" rel="noopener noreferrer"
+            style={{ margin: '-4px 0 14px', justifyContent: 'center', textDecoration: 'none' }}>
+            📍 Open the place in Google Maps
+          </a>
+        )}
         {renderPlate({
           src: t.pose.photo,
           alt: `The pose for ${t.name} to copy`,
@@ -2120,7 +2155,7 @@ export default function TreasureHunt({
       }
     };
     const ready = people.filter((p) => p.name.trim() && p.photo).length;
-    const canSend = Boolean(buy.item.trim()) && people.length > 0 && ready === people.length;
+    const canSend = people.length > 0 && ready === people.length;
     const input = {
       width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
       border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
@@ -2139,13 +2174,6 @@ export default function TreasureHunt({
           <Rich text={CONFIG.cp.cp3.body} />
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
-
-        <label className="f" style={{ display: 'block', marginBottom: 14 }}>
-          <span style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 5 }}>What did you buy?</span>
-          <input type="text" placeholder="e.g. ume soft serve" value={buy.item}
-            onChange={(e) => { const item = e.target.value; updateBuy((b) => ({ ...b, item })); }}
-            style={input} />
-        </label>
 
         <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
           Everyone’s photo with it · {ready}/{people.length}
@@ -2204,7 +2232,7 @@ export default function TreasureHunt({
           onClick={() => {
             const done = people.map((p) => ({ name: p.name.trim(), photo: p.photo }));
             const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cp3: { item: buy.item.trim(), people: done, photo: done[0].photo, at: Date.now() } };
+            newS.subs = { ...(newS.subs || {}), cp3: { people: done, photo: done[0].photo, at: Date.now() } };
             delete newS.buy;
             newS.open = null;
             store.save(newS.teamId, newS);
@@ -2551,7 +2579,7 @@ export default function TreasureHunt({
      answer. The stamp lands after the last question. */
 
   const renderTrivia = () => {
-    const total = colleaguePool(colleague, S.teamId).length;
+    const total = colleagueRoundSize(colleague, S.teamId);
     const run = S.trivia;
     const cur = run?.current;
     const results = run?.results ?? [];
@@ -2772,8 +2800,12 @@ export default function TreasureHunt({
           </div>
           {sub ? (
             <>
-              {theirs('What they bought')}
-              <p className="display" style={{ fontSize: 22, margin: 0 }}>{sub.item || '—'}</p>
+              {sub.item && (
+                <>
+                  {theirs('What they bought')}
+                  <p className="display" style={{ fontSize: 22, margin: 0 }}>{sub.item}</p>
+                </>
+              )}
               {theirs('Everyone’s photo with it')}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
                 {(sub.people ?? []).map((p, k) => (
@@ -2984,6 +3016,13 @@ export default function TreasureHunt({
               {renderBingoTile()}
             </div>
           )}
+          <div className="card flag" style={{ marginTop: 14 }}>
+            <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.guess} · {CONFIG.cp.guess.title}</div>
+            <p style={{ margin: '6px 0 0' }}>
+              Only {leaderName || 'your group leader'} can answer this one. Gather round their phone to view the
+              questions and help pick — you can watch, but not answer.
+            </p>
+          </div>
           <div className="card flag" style={{ marginTop: 14 }}>
             <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
             <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />
