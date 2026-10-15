@@ -237,9 +237,9 @@ export const MEDICAL = [
 
 export const MEDICAL_NOTES = [
   'Bring your passport. Hospitals ask for photo ID before they will register you.',
-  'You pay on the spot, in full — Japanese hospitals will not bill Etiqa directly. Cards are widely accepted at large hospitals, less so at small clinics. Carry cash.',
-  'Keep every receipt and the itemised bill (明細書, meisaisho). Ask for it explicitly — it is what Etiqa needs for the claim.',
-  'Save your Etiqa policy number offline, not just in your email.',
+  'You pay on the spot, in full — Japanese hospitals will not bill Tune Talk directly. Cards are widely accepted at large hospitals, less so at small clinics. Carry cash.',
+  'Keep every receipt and the itemised bill (明細書, meisaisho). Ask for it explicitly — it is what Tune Talk needs for the claim.',
+  'Save your Tune Talk policy number offline, not just in your email.',
   'An ambulance (119) is free to call and free to ride. Cost is never a reason to hesitate.',
   'Pharmacies (薬局) handle minor things but most close by 19:00. Convenience stores stock painkillers, plasters and cold remedies at all hours.',
   'Tell the committee. Nobody goes to a hospital alone — send a JP speaker from your team.',

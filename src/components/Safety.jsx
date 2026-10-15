@@ -139,7 +139,6 @@ export default function Safety() {
       </div>
 
       <div className="rounded-lg border-2 border-red p-4 mb-4">
-        <p className="text-sm font-semibold mb-1">This page does not warn you.</p>
         <p className="text-sm text-gray-600 leading-relaxed">
           Japan’s warnings — earthquake, tsunami, typhoon, landslide — reach you through
           your phone’s alert system, not through this app, which will be closed when it
