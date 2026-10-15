@@ -9,9 +9,8 @@ import Admin from './components/Admin';
 import { BossInbox } from './components/BossChat';
 import { AnnouncementPopup } from './components/Announcements';
 import { CheckinPrompt } from './components/Checkins';
-import HuntMapLoader from './components/HuntMapLoader';
 import { useAuth } from './lib/useAuth';
-import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig, withDefaults } from './lib/huntConfig';
+import { cachedHuntConfig, cachedHuntOpen, fetchHuntConfig } from './lib/huntConfig';
 
 
 const THEME_KEY = 'olc-theme';
@@ -183,9 +182,7 @@ function ChecklistDayPanel({ day }) {
 }
 
 /* ── DayPanel ──────────────────────────────────────── */
-function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
-  const [mapOpen, setMapOpen] = useState(false);
-  const closeMap = useCallback(() => setMapOpen(false), []);
+function DayPanel({ day, index, active, onOpenTreasureHunt }) {
   if (!active) return null;
 
   if (index === 0) {
@@ -205,16 +202,6 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
           <span><em className="not-italic text-gold dark:text-paper">Atami</em> Treasure Hunt</span>
         </button>
       )}
-      {index === 4 && (
-        <button
-          onClick={() => setMapOpen(true)}
-          type="button"
-          className="w-full -mt-1 h-11 rounded-xl border border-gray-200 bg-white text-sm font-medium text-ink cursor-pointer transition-colors hover:border-gray-300"
-        >
-          View the hunt area map
-        </button>
-      )}
-      {mapOpen && <HuntMapLoader map={huntMap} onClose={closeMap} />}
 
       {/* Timeline */}
       <div className="relative space-y-2.5 pl-5">
@@ -272,7 +259,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt, huntMap }) {
 }
 
 /* ── Itinerary ─────────────────────────────────────── */
-function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay, huntMap }) {
+function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay }) {
   return (
     <section>
       <PageHead
@@ -303,7 +290,7 @@ function Itinerary({ onOpenTreasureHunt, activeDay, setActiveDay, huntMap }) {
       </div>
 
       {schedule.map((day, i) => (
-        <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} huntMap={huntMap} />
+        <DayPanel key={i} day={day} index={i} active={i === activeDay} onOpenTreasureHunt={onOpenTreasureHunt} />
       ))}
     </section>
   );
@@ -536,7 +523,6 @@ export default function App() {
             onOpenTreasureHunt={openTreasureHunt}
             activeDay={itinDay}
             setActiveDay={setItinDay}
-            huntMap={(huntConfig ?? withDefaults(null)).map}
           />
         )}
         {tab === 'album' && <Album userId={auth.user?.id} isAdmin={auth.isAdmin} />}

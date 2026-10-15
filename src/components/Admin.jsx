@@ -679,6 +679,12 @@ const SECTIONS = [
   { id: 'hunt', label: 'Treasure hunt', lede: 'Every game’s text, questions and reference photos. Preview plays your edits before anyone else sees them.' },
   { id: 'announce', label: 'Announce', lede: 'Send a message to everyone on the trip. It pops up on every phone with the app open the moment you send it.' },
   { id: 'checkins', label: 'Check-ins', lede: 'Where everyone is during the hunt. Each member shares their location every 15 minutes; anyone overdue is at the top in red.' },
+];
+
+/* Treasure hunt has two pages: editing the games, and the organiser's
+   live scoreboard. */
+const HUNT_PAGES = [
+  { id: 'edit', label: 'Edit the hunt' },
   { id: 'organiser', label: 'Organiser', lede: 'Live scoreboard for the hunt: every group’s points, answers and photos, the judged awards, marking Look around you, the clock restart — and publishing the results to everyone’s Home.' },
 ];
 
@@ -699,39 +705,64 @@ export default function Admin({ currentEmail, onSelfChanged }) {
   const [section, setSection] = useState(() => {
     try { return sessionStorage.getItem('olc-admin-section') || 'people'; } catch (e) { return 'people'; }
   });
+  const [huntPage, setHuntPage] = useState(() => {
+    try { return sessionStorage.getItem('olc-admin-hunt-page') || 'edit'; } catch (e) { return 'edit'; }
+  });
+  /* Organiser used to be a section of its own. */
+  const shown = section === 'organiser' ? 'hunt' : section;
+  const page = section === 'organiser' ? 'organiser' : huntPage;
   const choose = (id) => {
     setSection(id);
     try { sessionStorage.setItem('olc-admin-section', id); } catch (e) { /* silent */ }
   };
-  const current = SECTIONS.find((x) => x.id === section) ?? SECTIONS[0];
+  const chooseHuntPage = (id) => {
+    setHuntPage(id);
+    if (section === 'organiser') choose('hunt');
+    try { sessionStorage.setItem('olc-admin-hunt-page', id); } catch (e) { /* silent */ }
+  };
+  const base = SECTIONS.find((x) => x.id === shown) ?? SECTIONS[0];
+  const current = base.id === 'hunt' && page === 'organiser' ? { ...base, lede: HUNT_PAGES[1].lede } : base;
 
   return (
     <section>
       <div className="pt-9 pb-5">
         <p className="font-mono text-[10px] tracking-[.28em] uppercase text-gray-400">Committee</p>
         <h1 className="display text-3xl sm:text-4xl mt-2.5 leading-[1.05]">
-          Admin <span className="text-red">{{ hunt: 'hunt', insurance: 'cover', organiser: 'board', announce: 'alerts', checkins: 'safety' }[current.id] ?? 'members'}</span>
+          Admin <span className="text-red">{current.id === 'hunt' && page === 'organiser' ? 'board' : { hunt: 'hunt', insurance: 'cover', announce: 'alerts', checkins: 'safety' }[current.id] ?? 'members'}</span>
         </h1>
         {current.lede && <p className="text-sm text-gray-500 leading-relaxed mt-2.5 max-w-[46ch]">{current.lede}</p>}
       </div>
 
-      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-3xl">
+      <div role="tablist" aria-label="Admin sections" className="grid grid-cols-3 sm:grid-cols-5 gap-1 p-1 mb-5 rounded-lg bg-gray-100 lg:max-w-3xl">
         {SECTIONS.map((x) => (
-          <button key={x.id} type="button" role="tab" aria-selected={section === x.id} onClick={() => choose(x.id)}
+          <button key={x.id} type="button" role="tab" aria-selected={shown === x.id} onClick={() => choose(x.id)}
             className={`h-9 rounded-md text-sm font-medium cursor-pointer transition-colors ${
-              section === x.id ? 'bg-white text-ink shadow-sm' : 'text-gray-500 hover:text-ink'
+              shown === x.id ? 'bg-white text-ink shadow-sm' : 'text-gray-500 hover:text-ink'
             }`}>
             {x.label}
           </button>
         ))}
       </div>
 
-      {section === 'hunt' && <HuntEditor />}
-      {section === 'insurance' && <InsuranceAdmin />}
-      {section === 'organiser' && <OrganiserAdmin />}
-      {section === 'announce' && <AnnounceAdmin />}
-      {section === 'checkins' && <CheckinsAdmin />}
-      {!['hunt', 'insurance', 'organiser', 'announce', 'checkins'].includes(section) && (
+      {shown === 'hunt' && (
+        <div role="tablist" aria-label="Treasure hunt pages" className="inline-grid grid-cols-2 gap-1 p-1 mb-5 rounded-lg border border-gray-200">
+          {HUNT_PAGES.map((x) => (
+            <button key={x.id} type="button" role="tab" aria-selected={page === x.id} onClick={() => chooseHuntPage(x.id)}
+              className={`h-8 px-4 rounded-md text-sm font-medium cursor-pointer transition-colors ${
+                page === x.id ? 'bg-ink text-white' : 'text-gray-500 hover:text-ink'
+              }`}>
+              {x.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {shown === 'hunt' && page !== 'organiser' && <HuntEditor />}
+      {shown === 'hunt' && page === 'organiser' && <OrganiserAdmin />}
+      {shown === 'insurance' && <InsuranceAdmin />}
+      {shown === 'announce' && <AnnounceAdmin />}
+      {shown === 'checkins' && <CheckinsAdmin />}
+      {!['hunt', 'insurance', 'announce', 'checkins'].includes(shown) && (
         <TripMembers currentEmail={currentEmail} onSelfChanged={onSelfChanged} />
       )}
     </section>

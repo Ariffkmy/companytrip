@@ -5,6 +5,7 @@ import {
   clearLocalRuns, fetchHuntReset, resetHunt,
 } from '../lib/huntConfig';
 import { cachedColleagueAnswers, fetchColleagueAnswers } from '../lib/colleagueQuiz';
+import { useColleagueBroadcast, useColleagueWatch } from '../lib/colleagueLive';
 import { huntGroupOf } from '../data/huntGroups';
 import { listShots, uploadShot, deleteShot } from '../lib/bingo';
 import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhotoToDataUrl, photoErrorMessage } from '../lib/photos';
@@ -38,6 +39,92 @@ const mmss = (s) => {
   const sec = s % 60;
   return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
 };
+
+/* ── Know your colleagues, as the leader plays it ──────
+   For members who aren't the leader: the same question, options and
+   pick as on the leader's phone, live. Nothing here can be tapped. */
+function ColleagueLive({ teamId, leaderName, teams, pts }) {
+  const { state, connected } = useColleagueWatch(teamId, true);
+  const leader = leaderName || 'your group leader';
+  const cur = state?.current;
+  const answered = cur?.picked != null;
+  const right = answered && cur.picked === cur.a;
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      <p className="note" style={{ margin: '0 0 10px' }}>
+        Only {leader} can answer. You see their screen here, live.
+      </p>
+      {!state ? (
+        <p style={{ margin: 0 }}>
+          {connected ? `Waiting for ${leader} to open this game…` : 'Connecting…'}
+        </p>
+      ) : state.collected ? (
+        <p style={{ margin: 0, fontWeight: 700 }}>
+          Stamp collected — {state.collected.right} of {state.collected.answered} right, {state.collected.right * pts} points.
+        </p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
+            <span style={{
+              padding: '4px 11px', borderRadius: 999, border: 'var(--line)', background: 'var(--card)',
+              font: '700 14px/1.2 "DM Mono", monospace', color: 'var(--ink)',
+            }}>
+              <span style={{ color: 'var(--sea)' }}>✓</span> {state.right}/{state.total}
+              <span style={{ color: 'var(--ink-soft)' }}> · </span>
+              <span style={{ color: 'var(--red)' }}>{state.right * pts} pts</span>
+            </span>
+          </div>
+          {!state.open && <p className="note" style={{ margin: '0 0 8px' }}>{leader} is on another game right now.</p>}
+          {cur ? (
+            <>
+              {cur.who && (() => {
+                const team = teams.find((t) => t.id === cur.team);
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, margin: '6px 0 8px' }}>
+                    <b className="display" style={{ fontSize: 24, lineHeight: 1 }}>{cur.who}</b>
+                    {team && (
+                      <span style={{
+                        padding: '3px 10px', borderRadius: 999, border: 'var(--line)',
+                        background: team.colour, color: '#fff', font: '700 12px/1.3 var(--body)',
+                      }}>{team.name}</span>
+                    )}
+                  </div>
+                );
+              })()}
+              <p style={{ fontWeight: 700, fontSize: 17, lineHeight: 1.35, margin: '0 0 12px' }}>{cur.q}</p>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {cur.options.map((opt) => {
+                  const isAnswer = answered && opt === cur.a;
+                  const isPicked = opt === cur.picked;
+                  return (
+                    <div key={opt} aria-current={isPicked || undefined} style={{
+                      display: 'flex', alignItems: 'center', gap: 10, minHeight: 46, padding: '10px 14px',
+                      borderRadius: 8, border: 'var(--line)', font: '600 15px/1.3 var(--body)',
+                      background: isAnswer ? 'var(--sea)' : isPicked ? 'var(--red)' : 'var(--card)',
+                      color: isAnswer || isPicked ? '#fff' : 'var(--ink)',
+                      opacity: answered && !isAnswer && !isPicked ? 0.55 : 1,
+                    }}>
+                      <span style={{ flex: 1 }}>{opt}</span>
+                      {isAnswer && <span aria-label="Correct answer">✓</span>}
+                      {isPicked && !isAnswer && <span aria-label={`${leader}'s answer, wrong`}>✕</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              <p role="status" style={{ margin: '12px 0 0', fontWeight: 700, color: !answered ? 'var(--ink-soft)' : right ? 'var(--sea)' : 'var(--red)' }}>
+                {!answered ? `Waiting for ${leader} to pick…`
+                  : right ? `Correct! +${pts}` : `Not quite — it was ${cur.a}.`}
+              </p>
+            </>
+          ) : (
+            <p style={{ margin: 0 }}>Waiting for the next question…</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 /* ── Stamp slot component ──────────────────────────── */
 
@@ -201,13 +288,13 @@ function CheckpointPhoto({ src }) {
    the numbering below is only how the games are listed and stamped, not
    a sequence. Nothing here gates anything else. */
 const GAMES = [
-  { key: 'bingo', short: 'Photo bingo' },
-  { key: 'cp1', short: 'Pose photo' },
-  { key: 'cp2', short: 'Selfie + Atami quiz' },
-  { key: 'cp3', short: 'Buy & try' },
-  { key: 'cp4', short: 'Observation quiz' },
-  { key: 'guess', short: 'Know your colleagues' },
-  { key: 'boss', short: 'Find the boss' },
+  { key: 'bingo', short: 'Photo bingo', emoji: '📸' },
+  { key: 'cp1', short: 'Pose photo', emoji: '🤸' },
+  { key: 'cp2', short: 'Selfie + Atami quiz', emoji: '🧠' },
+  { key: 'cp3', short: 'Buy & try', emoji: '🛍️' },
+  { key: 'cp4', short: 'Observation quiz', emoji: '👀' },
+  { key: 'guess', short: 'Know your colleagues', emoji: '🤝' },
+  { key: 'boss', short: 'Find the boss', emoji: '🕵️' },
 ];
 
 const SLOTS = GAMES.map((_, i) => i);
@@ -219,6 +306,30 @@ const SLOT_OF = { bingo: 0, cp1: 1, cp2b: 2, cp3: 3, cp4: 4, guess: 5, boss: 6 }
 
 /* The number printed on each game's header. cp2a and cp2b share one. */
 const STAMP_NO = { bingo: 1, cp1: 2, cp2a: 3, cp2b: 3, cp3: 4, cp4: 5, guess: 6, boss: 7 };
+
+/* How it works: the rules text cut into accordion sections at each
+   "**Heading**" line. Its own "What scores" section is left out — the
+   popup prints the live scoring table instead. */
+function splitRules(text) {
+  const intro = [];
+  const sections = [];
+  String(text ?? '').split('\n').forEach((line) => {
+    const head = line.trim().match(/^\*\*(.+)\*\*$/);
+    if (head) sections.push({ title: head[1].trim(), lines: [] });
+    else (sections.length ? sections[sections.length - 1].lines : intro).push(line);
+  });
+  return {
+    intro: intro.join('\n').trim(),
+    sections: sections
+      .filter((s) => !/^what scores$/i.test(s.title))
+      .map((s) => ({ title: s.title, body: s.lines.join('\n').trim() }))
+      .filter((s) => s.body),
+  };
+}
+const ACCORDION = { borderTop: 'var(--line)', padding: '10px 0' };
+/* The sections the Safety measures button shows. */
+const SAFETY_SECTION = /safety|stay together|signal|app is down/i;
+const ACCORDION_HEAD = { cursor: 'pointer', fontWeight: 700, fontSize: 15 };
 
 /* A game counts as collected once its stamping submission is in. */
 const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp4', guess: 'guess', boss: 'boss' };
@@ -986,6 +1097,24 @@ export default function TreasureHunt({
     setS(next);
   }, [onTrivia, readOnly, S, colleague, store]);
 
+  /* The leader's phone shows the rest of the group the colleague quiz as
+     it is played (src/lib/colleagueLive.js). The answer goes out only
+     once the leader has picked. */
+  const liveCur = S?.trivia?.current;
+  const liveResults = S?.trivia?.results ?? [];
+  const liveGuess = S?.subs?.guess;
+  useColleagueBroadcast(S?.teamId, S?.trivia || liveGuess ? {
+    open: S?.open === 'guess',
+    current: liveCur ? {
+      who: liveCur.who, team: liveCur.team, q: liveCur.q, options: liveCur.options,
+      picked: liveCur.picked ?? null, a: liveCur.picked != null ? liveCur.a : null,
+    } : null,
+    right: liveResults.filter(Boolean).length,
+    answered: liveResults.length,
+    total: colleagueRoundSize(colleague, S?.teamId),
+    collected: liveGuess ? { right: liveGuess.right ?? 0, answered: liveGuess.answered ?? 0 } : null,
+  } : null, Boolean(!preview && !readOnly && canPlay && S?.teamId));
+
   const currentTeam = S ? CONFIG.teams.find((t) => t.id === S.teamId) : null;
   const bingoCard = CONFIG.teams.find((t) => t.id === activeTeamId)?.bingo ?? [];
 
@@ -1217,7 +1346,8 @@ export default function TreasureHunt({
         <div style={{ padding: '0 4px 10px' }}>
           <b style={{ fontFamily: 'var(--display)', fontSize: 15, letterSpacing: '.06em' }}>Stamp rally</b>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        {/* One line: every stamp side by side, shrinking to fit a phone. */}
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${SLOTS.length}, minmax(0, 1fr))`, gap: 4 }}>
           {SLOTS.map((i) => (
             <StampSlot key={i} idx={i} done={doneStamps.has(i)} now={!doneStamps.has(i) && i === nowIdx} />
           ))}
@@ -1230,9 +1360,51 @@ export default function TreasureHunt({
      The counts and the clock are printed from the live config, so they
      cannot drift from the game actually being played; the prose under
      them is the committee's to edit. */
+  /* Every game's points, printed from the live config so the table can't
+     drift from how huntScores.js actually counts them. */
+  const renderScoring = () => {
+    const p = CONFIG.points ?? {};
+    const stamp = Number(p.checkpoint) || 0;
+    const judged = Number(p.judged ?? 5) || 0;
+    const per4 = Number(p.quizPerAnswer) || 0;
+    const n4 = CONFIG.quiz?.questions?.length ?? 0;
+    const { pts: atamiPts, perRound, passMark } = CONFIG.atami;
+    const title = (k) => CONFIG.cp[k]?.title ?? k;
+    const rows = [
+      [STAMP_NO.bingo, title('bingo'), `${stamp} for the stamp + ${CONFIG.bingo.tilePts} a photo + ${CONFIG.bingo.fullPts} for the full card`],
+      [STAMP_NO.cp1, title('cp1'), `${stamp} for the stamp · best pose photo +${judged}`],
+      [STAMP_NO.cp2a, title('cp2a'), `${stamp} for the stamp + ${atamiPts} a right answer (need ${passMark} of ${perRound}; up to ${stamp + atamiPts * perRound})`],
+      [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp · most interesting buy +${judged}`],
+      [STAMP_NO.cp4, title('cp4'), `${stamp} for the stamp + ${per4} a right answer${n4 ? ` (up to ${stamp + per4 * n4})` : ''}`],
+      [STAMP_NO.guess, title('guess'), `${stamp} for the stamp + ${CONFIG.trivia.pts} a right answer`],
+      [STAMP_NO.boss, title('boss'), `${Number(p.boss ?? 20) || 0} for the selfie with the bosses (no stamp points)`],
+      ['★', 'First to finish', `+${Number(p.first ?? 15) || 0} for the first group to complete all ${CONFIG.stamps} games`],
+    ];
+    return (
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, lineHeight: 1.35, margin: '6px 0 2px' }}>
+        <tbody>
+          {rows.map(([no, name, how]) => (
+            <tr key={name} style={{ borderTop: '1px solid var(--rule, rgba(0,0,0,.1))' }}>
+              <td style={{ padding: '6px 6px 6px 0', verticalAlign: 'top', fontWeight: 700, color: 'var(--red)', width: 20 }}>{no}</td>
+              <td style={{ padding: '6px 0' }}><b>{name}</b><br />{how}.</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
+
   const renderRules = () => {
     if (!rulesOpen) return null;
     const close = () => setRulesOpen(false);
+    const rules = splitRules(CONFIG.rules);
+    /* The Safety measures button: only the safety parts of the rules,
+       already open. */
+    const safety = rulesOpen === 'safety';
+    /* How it works leaves Safety measures to its own button. */
+    const shown = safety
+      ? rules.sections.filter((s) => SAFETY_SECTION.test(s.title))
+      : rules.sections.filter((s) => !/^safety measures$/i.test(s.title));
     return (
       <div
         role="dialog"
@@ -1255,19 +1427,31 @@ export default function TreasureHunt({
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}
         >
-          <div className="eyebrow" style={{ color: 'var(--red)' }}>About</div>
-          <h2 className="display" style={{ fontSize: 25, margin: '4px 0 2px' }}>How it works</h2>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>{safety ? 'Read before you start' : 'About'}</div>
+          <h2 className="display" style={{ fontSize: 25, margin: '4px 0 2px' }}>{safety ? 'Safety measures' : 'How it works'}</h2>
           <p className="note" style={{ margin: '0 0 12px' }}>
-            {CONFIG.stamps} games · any order · {CONFIG.raceMinutes} minutes
+            {safety ? 'Stay safe and stay together.' : `${CONFIG.stamps} games · any order · ${CONFIG.raceMinutes} minutes`}
           </p>
           <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-            <div className="task">
-              <Rich text={CONFIG.rules} />
-            </div>
-            <p style={{ margin: '12px 0 0' }}>
-              <b>Finish:</b> {CONFIG.finishPoint}
-            </p>
-            {CONFIG.helpNote && <p className="note" style={{ marginTop: 10 }}>{CONFIG.helpNote}</p>}
+            {!safety && rules.intro && <div className="task" style={{ marginBottom: 8 }}><Rich text={rules.intro} /></div>}
+            {shown.map((s) => (
+              <details key={s.title} style={ACCORDION} open={safety}>
+                <summary style={ACCORDION_HEAD}>{s.title}</summary>
+                <div className="task" style={{ margin: '6px 0 2px' }}><Rich text={s.body} /></div>
+              </details>
+            ))}
+            {!safety && (<>
+            <details style={ACCORDION} open>
+              <summary style={ACCORDION_HEAD}>Scoring marks</summary>
+              {renderScoring()}
+            </details>
+            <details style={ACCORDION}>
+              <summary style={ACCORDION_HEAD}>Finish &amp; help</summary>
+              {CONFIG.finishPoint && <p style={{ margin: '6px 0 2px' }}><b>Finish:</b> {CONFIG.finishPoint}</p>}
+              {CONFIG.helpNote && <p className="note" style={{ margin: '6px 0 2px' }}>{CONFIG.helpNote}</p>}
+            </details>
+            </>)}
+            {safety && CONFIG.helpNote && <p className="note" style={{ margin: '10px 0 0' }}>{CONFIG.helpNote}</p>}
           </div>
           <button className="btn block" style={{ marginTop: 16, flex: 'none' }} type="button" onClick={close} autoFocus>
             Got it
@@ -1277,19 +1461,21 @@ export default function TreasureHunt({
     );
   };
 
-  const rulesButton = (style) => (
-    <button
-      type="button"
-      onClick={() => setRulesOpen(true)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '6px 12px', borderRadius: 999, border: 'var(--line)',
-        background: 'var(--card)', color: 'var(--ink)',
-        font: '700 12px/1.2 var(--body)', cursor: 'pointer', ...style,
-      }}
-    >
-      ？ How it works
-    </button>
+  /* Same full-width .btn as Start the hunt, each its own colour. */
+  const rulesButton = () => (
+    <div style={{ display: 'grid', gap: 10 }}>
+      <button className="btn block sea" type="button" onClick={() => setRulesOpen('all')}>
+        ？ How it works
+      </button>
+      <button className="btn block" type="button" onClick={() => setRulesOpen('safety')}
+        style={{ background: 'var(--ink)', color: 'var(--card)' }}>
+        🛟 Safety measures
+      </button>
+      <button className="btn block" type="button" onClick={() => setMapOpen(true)}
+        style={{ background: 'var(--gold)', color: 'var(--ink)' }}>
+        🗺️ View the hunt area map
+      </button>
+    </div>
   );
 
   /* ── Hub ────────────────────────────────────────────
@@ -1307,11 +1493,11 @@ export default function TreasureHunt({
             {readOnly ? `${done.size} of ${CONFIG.stamps} stamps collected`
               : left === 0 ? 'Every stamp collected' : `${left} still to play`}
           </h2>
-          <p style={{ margin: '0 0 10px' }}>
-            {readOnly
-              ? `Open any game to see what ${esc(S.teamName)} sent in — the photos and the answers. Nothing can be changed any more.`
-              : 'Play them in whatever order suits where you are. Skip anything you don’t fancy — an unplayed game just scores nothing.'}
-          </p>
+          {readOnly && (
+            <p style={{ margin: '0 0 10px' }}>
+              {`Open any game to see what ${esc(S.teamName)} sent in — the photos and the answers. Nothing can be changed any more.`}
+            </p>
+          )}
           {huntGroupOf(activeTeamId)?.members?.length > 0 && (
             <p className="note" style={{ margin: '0 0 10px' }}>
               {huntGroupOf(activeTeamId).name}:{' '}
@@ -1321,41 +1507,54 @@ export default function TreasureHunt({
             </p>
           )}
           {rulesButton()}
-          <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0' }}>
+          {/* Square tiles, three to a row; the last game (Find the boss)
+              runs the full width under them. */}
+          <ul style={{ listStyle: 'none', padding: 0, margin: '14px 0 0', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
             {GAMES.map((g, i) => {
               const isDone = done.has(i);
               const started = g.key === 'cp2' && !isDone && S.subs?.cp2a;
+              const wide = i === GAMES.length - 1 && GAMES.length % 3 === 1;
               return (
-                <li key={g.key} style={{ marginBottom: 8 }}>
+                <li key={g.key} style={wide ? { gridColumn: '1 / -1' } : undefined}>
                   <button
                     type="button"
                     onClick={() => openGame(g.key)}
+                    aria-label={`${gameTitle(g.key, CONFIG.cp)}${isDone ? ', stamp collected' : ''}`}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
-                      padding: '11px 13px', borderRadius: 9, border: 'var(--line)', cursor: 'pointer',
-                      background: isDone ? 'var(--th-parchment)' : 'var(--card)',
+                      position: 'relative', width: '100%', height: '100%',
+                      ...(wide ? { minHeight: 76, flexDirection: 'row', gap: 10 } : { aspectRatio: '1 / 1', flexDirection: 'column', gap: 4 }),
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                      padding: 8, borderRadius: 9, border: 'var(--line)', cursor: 'pointer',
+                      background: isDone ? 'var(--th-parchment)' : 'var(--card)', color: 'var(--ink)',
                       boxShadow: isDone ? 'none' : 'var(--hard-sm)',
                     }}
                   >
-                    <span aria-hidden="true" style={{
-                      flex: 'none', width: 32, height: 32, borderRadius: '50%',
-                      display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 15,
-                      background: isDone ? 'var(--red)' : 'var(--ink)',
-                      color: isDone ? '#fff' : 'var(--gold)',
-                    }}>{isDone ? '✓' : i + 1}</span>
-                    <span style={{ minWidth: 0, flex: 1 }}>
-                      <b style={{ display: 'block', fontSize: 15, lineHeight: 1.25 }}>
-                        {gameTitle(g.key, CONFIG.cp)}
-                      </b>
-                      <span className="note">
-                        {isDone ? 'Stamp collected'
-                          : started ? (readOnly ? 'Selfie in — quiz not passed' : 'Selfie in — quiz waiting')
-                          : readOnly ? 'Not played' : g.short}
+                    <span aria-hidden="true" style={{ fontSize: wide ? 30 : 32, lineHeight: 1 }}>{g.emoji}</span>
+                    <b style={{ fontSize: 13, lineHeight: 1.2 }}>{gameTitle(g.key, CONFIG.cp)}</b>
+                    {!isDone && (started || readOnly) && (
+                      <span className="note" style={{ fontSize: 10, lineHeight: 1.2 }}>
+                        {started ? (readOnly ? 'Quiz not passed' : 'Quiz waiting') : 'Not played'}
                       </span>
-                    </span>
-                    <span aria-hidden="true" style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-                      {isDone || readOnly ? 'View' : 'Open'} →
-                    </span>
+                    )}
+                    {/* Collected: a rubber stamp pressed over the tile — the
+                        emoji and name still show through underneath. */}
+                    {isDone && (
+                      <span aria-hidden="true" style={{
+                        position: 'absolute', inset: 0, borderRadius: 7, pointerEvents: 'none',
+                        display: 'grid', placeItems: 'center', zIndex: 2,
+                      }}>
+                        <span style={{
+                          width: wide ? 64 : '82%', aspectRatio: '1 / 1', borderRadius: '50%',
+                          border: '7px double #E3262E', color: '#E3262E', background: 'rgba(227, 38, 46, .12)',
+                          display: 'grid', placeItems: 'center', alignContent: 'center', gap: 2,
+                          transform: 'rotate(-12deg)', boxShadow: '0 0 0 2px #E3262E, inset 0 0 0 2px #E3262E',
+                          animation: 'slam .45s cubic-bezier(.2,1.5,.4,1) both',
+                        }}>
+                          <span style={{ fontFamily: '"Zen Kaku Gothic New", sans-serif', fontWeight: 900, fontSize: wide ? 26 : 36, lineHeight: 1 }}>✓</span>
+                          <span style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: wide ? 10 : 13, letterSpacing: '.08em' }}>CLEARED</span>
+                        </span>
+                      </span>
+                    )}
                   </button>
                 </li>
               );
@@ -1364,19 +1563,11 @@ export default function TreasureHunt({
           {CONFIG.helpNote && !readOnly && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
         </div>
 
-        {!readOnly && <div style={{
-          background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
-          padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
-        }}>
-          <div className="eyebrow" style={{ color: 'var(--gold)' }}>When you’re ready</div>
-          <h2 className="display" style={{ fontSize: 26, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
-            Walk it in
-          </h2>
-          <p style={{ color: 'var(--th-body-alt)', marginTop: 0 }}>{CONFIG.finishPoint}</p>
-          <button className="btn block sea" type="button" onClick={() => finishRun(S)}>
+        {!readOnly && (
+          <button className="btn block sea" type="button" onClick={() => finishRun(S)} style={{ marginBottom: 16 }}>
             Finish the hunt{left > 0 ? ` · ${left} unplayed` : ''}
           </button>
-        </div>}
+        )}
       </div>
     );
   };
@@ -1417,6 +1608,27 @@ export default function TreasureHunt({
                 <b className="display" style={{ fontSize: 24 }}>{team.name}</b>
                 {leaderBadge()}
               </div>
+              {huntGroupOf(team.id)?.members?.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="note" style={{ marginBottom: 6 }}>
+                    {huntGroupOf(team.id).members.length} members
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {huntGroupOf(team.id).members.map((m) => {
+                      const lead = m === huntGroupOf(team.id).leader;
+                      return (
+                        <li key={m} style={{
+                          padding: '4px 10px', borderRadius: 999, fontSize: 13, fontWeight: lead ? 700 : 500,
+                          border: lead ? '2px solid var(--red)' : 'var(--line)',
+                          color: lead ? 'var(--red)' : 'var(--ink)',
+                        }}>
+                          {lead ? `★ ${m}` : m}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
               <button
                 className="btn block"
                 style={{ marginTop: 14, ...(shut || !canPlay ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
@@ -1440,9 +1652,8 @@ export default function TreasureHunt({
                   : shut ? 'Waiting for the committee'
                   : underway ? (existing.finishedAt ? 'See your stamps' : 'Carry on') : 'Start the hunt'}
               </button>
-              <div style={{ marginTop: 12 }}>{rulesButton()}</div>
               <p className="note" style={{ margin: '12px 0 0' }}>
-                {!canPlay ? `Only your group leader${leaderName ? ` (${leaderName})` : ''} runs the games for ${team.name}. You can still take photo bingo shots and ask the bosses below.`
+                {!canPlay ? `Only your group leader${leaderName ? ` (${leaderName})` : ''} runs the games for ${team.name}. You can still take photo bingo shots and follow the boss chat below.`
                   : shut ? 'This opens when the committee starts the game.'
                   : underway ? 'Pick up where your team left off.' : 'Keep this tab open while you play.'}
               </p>
@@ -1531,7 +1742,6 @@ export default function TreasureHunt({
     const doneCount = Object.keys(S.subs || {}).filter((k) => k !== 'cp2a').length;
     return (
       <div style={{
-        position: 'sticky', top: 0, zIndex: 60,
         background: 'var(--ink)', color: 'var(--card)',
         borderBottom: '4px solid var(--red)', margin: '0 -14px', padding: '0 14px',
       }}>
@@ -1615,7 +1825,7 @@ export default function TreasureHunt({
     [STAMP_NO.cp3]: 'only the group leader sends the item and everyone’s photos.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
     [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
-    [STAMP_NO.boss]: 'only the group leader sends the photo. Anyone in the group can ask the bosses.',
+    [STAMP_NO.boss]: 'only the leader asks the bosses and sends the photo.',
   };
   const renderLeaderNote = (n) => (readOnly || !LEADER_NOTE[n] ? null : (
     <p style={{
@@ -1667,12 +1877,12 @@ export default function TreasureHunt({
       ],
       guess: [
         'The questions are about people in the other groups, all mixed up.',
-        'Only the leader taps the answers — everyone else reads along on the leader’s phone and helps decide.',
+        'Only the leader taps the answers — everyone else sees the same question live on their own phone and helps decide.',
         'Tap the answer you think is right. A wrong pick shows the right one.',
         'After the last question, tap “Collect the stamp”.',
       ],
       boss: [
-        'Ask the bosses questions in the chat below — they only answer yes or no.',
+        'Only the group leader asks the bosses, in the chat below — they only answer yes or no. Everyone sees the answers.',
         'Your group gets only 2 questions. When the bosses move to a new spot, you get 2 more.',
         'Use the answers to work out where they are, and go find them.',
         'Take one funny-pose photo of the whole team with the bosses and tap “Send photo”.',
@@ -2740,6 +2950,24 @@ export default function TreasureHunt({
     );
     const quizItems = (log) => (log ?? []).map((x) => ({ ...x, ok: x.picked === x.a }));
     const head = (n, cpKey) => renderCpHead(n, CONFIG.cp[cpKey].title, CONFIG.cp[cpKey].stop);
+    /* Retake: back to the game's own form, starting from what was sent.
+       The stamp stays until the new photo is sent in its place. */
+    const retake = () => {
+      if (key === 'cp3') {
+        const next = { ...S, buy: { item: sub?.item ?? '', people: (sub?.people ?? []).map((p) => ({ ...p })) } };
+        store.save(next.teamId, next);
+        setS(next);
+        setDraft({ retake: true });
+      } else {
+        setDraft({ retake: true, photo: sub?.photo ?? null });
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    const retakeButton = !readOnly && sub ? (
+      <button className="btn block sea" type="button" onClick={retake} style={{ marginTop: 14 }}>
+        📷 Retake {key === 'cp3' ? 'the photos' : 'the photo'}
+      </button>
+    ) : null;
     const task = (cpKey) => (String(CONFIG.cp[cpKey].body || '').trim()
       ? <div className="task"><Rich text={CONFIG.cp[cpKey].body} /></div> : null);
 
@@ -2762,7 +2990,7 @@ export default function TreasureHunt({
           {task('cp1')}
           {t && renderPlate({ src: t.pose.place, alt: 'The place', caption: t.pose.placeHint || 'Go to this place', tag: 'WHERE', missing: missingPhoto('Place') })}
           {t && renderPlate({ src: t.pose.photo, alt: 'The pose', caption: `Copy this pose — ${esc(t.name)}`, tag: 'POSE', missing: missingPhoto('Pose') })}
-          {sub ? <>{theirs('Their photo')}{shot(sub.photo, `${S.teamName}’s pose photo`)}</> : notPlayed}
+          {sub ? <>{theirs(readOnly ? 'Their photo' : 'Your photo · stamp collected')}{shot(sub.photo, `${S.teamName}’s pose photo`)}{retakeButton}</> : notPlayed}
         </div>
       );
     }
@@ -2806,7 +3034,7 @@ export default function TreasureHunt({
                   <p className="display" style={{ fontSize: 22, margin: 0 }}>{sub.item}</p>
                 </>
               )}
-              {theirs('Everyone’s photo with it')}
+              {theirs(readOnly ? 'Everyone’s photo with it' : 'Your photos · stamp collected')}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
                 {(sub.people ?? []).map((p, k) => (
                   <div key={k} style={{ minWidth: 0 }}>
@@ -2815,6 +3043,7 @@ export default function TreasureHunt({
                   </div>
                 ))}
               </div>
+              {retakeButton}
             </>
           ) : notPlayed}
         </div>
@@ -2862,7 +3091,7 @@ export default function TreasureHunt({
           {head(STAMP_NO.boss, 'boss')}
           {task('boss')}
           <BossThread team={activeTeamId} readOnly />
-          {sub ? <>{theirs('Their photo with the bosses')}{shot(sub.photo, `${S.teamName} with the bosses`)}</> : notPlayed}
+          {sub ? <>{theirs(readOnly ? 'Their photo with the bosses' : 'Your photo with the bosses · stamp collected')}{shot(sub.photo, `${S.teamName} with the bosses`)}{retakeButton}</> : notPlayed}
         </div>
       );
     }
@@ -2875,6 +3104,9 @@ export default function TreasureHunt({
     if (!S) return null;
     if (!S.open) return renderHub();
     if (readOnly) return renderReview(S.open);
+    /* A photo game already collected opens on what was sent, not on an
+       empty form (its photo lives in the run, not in the draft). */
+    if (['cp1', 'cp3', 'boss'].includes(S.open) && S.subs?.[DONE_SUB[S.open]] && !draft.retake) return renderReview(S.open);
     const renderers = {
       cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
       bingo: renderBingo, guess: renderTrivia, boss: renderBoss,
@@ -2952,7 +3184,7 @@ export default function TreasureHunt({
           <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
             Walk it in
           </h2>
-          <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>
+          {CONFIG.finishPoint && <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>}
         </div>
       </div>
     );
@@ -2964,7 +3196,10 @@ export default function TreasureHunt({
     <div className="relative min-h-[300px]">
       {/* Back on the left: from inside a game it goes to the games
           overview; from the overview or start screen it leaves the hunt. */}
-      <div className="sticky top-0 z-70 flex justify-between gap-2 py-1.5">
+      {/* The back/map bar and the team header stick together at the top,
+          so the header never slides under the bar. */}
+      <div className="sticky top-0 z-70 bg-paper">
+      <div className="flex justify-between gap-2 py-1.5">
         <button
           onClick={view === 'race' && S?.open ? backToHub : onClose}
           type="button"
@@ -2980,9 +3215,10 @@ export default function TreasureHunt({
           🗺️ Area map
         </button>
       </div>
+      {renderHeader()}
+      </div>
 
       {preview && renderPreviewBar()}
-      {renderHeader()}
 
       {readOnly && roState === 'loading' && (
         <div className="card"><p className="note" style={{ margin: 0 }}>Loading…</p></div>
@@ -2990,7 +3226,6 @@ export default function TreasureHunt({
       {view === 'start' && !readOnly && renderStartScreen()}
       {view === 'race' && S && (canPlay || readOnly ? (
         <div>
-          {!S?.open && renderStampRally()}
           {renderStage()}
         </div>
       ) : (
@@ -2999,12 +3234,12 @@ export default function TreasureHunt({
           <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>Your group leader runs the hunt</h2>
           <p style={{ margin: 0 }}>
             Only the leader{leaderName ? ` (${leaderName})` : ''} can play and submit the games for {S?.teamName ?? 'your group'}.
-            You can still take photo bingo shots and ask the bosses below.
+            You can still take photo bingo shots and follow the boss chat below.
           </p>
         </div>
       ))}
       {/* Only the leader runs the games, but anyone in the group can fill
-          the photo bingo and ask the bosses in Find the boss. */}
+          the photo bingo, and watch the Find the boss chat (only the leader asks). */}
       {!preview && !readOnly && !canPlay && teamId && view !== 'done' && isOpen && !stoppedAt && (
         <>
           {bingoCard.length > 0 && (
@@ -3018,14 +3253,12 @@ export default function TreasureHunt({
           )}
           <div className="card flag" style={{ marginTop: 14 }}>
             <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.guess} · {CONFIG.cp.guess.title}</div>
-            <p style={{ margin: '6px 0 0' }}>
-              Only {leaderName || 'your group leader'} can answer this one. Gather round their phone to view the
-              questions and help pick — you can watch, but not answer.
-            </p>
+            <ColleagueLive teamId={teamId} leaderName={leaderName} teams={CONFIG.teams} pts={CONFIG.trivia.pts} />
           </div>
           <div className="card flag" style={{ marginTop: 14 }}>
             <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.boss} · {CONFIG.cp.boss.title}</div>
-            <BossThread team={teamId} canAsk={isOpen} offNote="Opens when the hunt starts." />
+            <BossThread team={teamId} canAsk={false}
+              offNote={`Only ${leaderName || 'your group leader'} can ask. The answers show here live.`} />
           </div>
         </>
       )}

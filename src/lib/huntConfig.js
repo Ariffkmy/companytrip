@@ -44,7 +44,7 @@ export const DEFAULT_HUNT_CONFIG = {
      the Find the boss selfie (no stamp points). first: the first group
      to complete all seven games. See src/lib/huntScores.js. */
   points: { checkpoint: 10, quizPerAnswer: 2, judged: 5, boss: 20, first: 15 },
-  finishPoint: 'The committee will point you to the finish at the briefing.',
+  finishPoint: '',
   helpNote: 'Stuck? The committee is in the WhatsApp group.',
 
   /* Shown behind the "How it works" button on the hub. Points, not
@@ -56,43 +56,44 @@ export const DEFAULT_HUNT_CONFIG = {
      here — those are the parts that would go stale. */
   rules: [
     '**The clock**',
-    '- Starts when your team taps Start the hunt',
-    '- Counts down in the header; at zero the hunt closes itself',
-    '- You can finish early any time',
+    '- Starts when your team taps Start the hunt.',
+    '- Counts down in the header; at zero the hunt closes itself.',
+    '- You can finish early any time.',
     '',
     '**Order**',
-    '- Any order — open whichever game suits where you are',
-    '- Skipping is allowed; a game you never play scores nothing',
-    '- Leave one half-done and come back to it',
+    '- Any order — open whichever game suits where you are.',
+    '- Skipping is allowed; a game you never play scores nothing.',
     '',
     '**Where you can go**',
-    '- Stay inside the marked areas on the map',
-    '- No route to follow, so walk where you like within them',
+    '- Stay inside the marked areas on the map.',
+    '- No route to follow, so walk where you like within them.',
     '',
     '**Stay together**',
-    '- One team — most photos need everyone in the frame',
-    '- Photo bingo too: anyone can snap a tile, but it’s a selfie of the whole team at the spot',
+    '- Every game is played as a group. Nobody goes off alone, so nobody gets lost.',
+    '- For safety, the whole group goes to every spot together — photo bingo included.',
     '',
-    '**No looking things up**',
-    '- Atami quiz: no searching, no asking anyone outside the team, no AI',
-    '- Know your colleagues: no asking the person the question is about',
-    '- Observation quiz: from what you noticed on the way, with no doubling back',
-    '- Every photo taken today, by your team',
+    '**Safety measures**',
+    '- Stay with your group the whole time. Count heads before you move on.',
+    '- Watch for cars and bikes — many streets are narrow with no pavement. Cross at crossings.',
+    '- Atami is hilly: walk, don’t run, on slopes and stairs.',
+    '- Drink water, and stop for a rest if anyone feels unwell.',
+    '- Emergency: call 119 (ambulance, fire) or 110 (police), then tell the committee.',
     '',
-    '**Buy it, try it**',
-    '- Spend any amount you like',
-    '- Every member takes a photo with what you bought',
+    '**If the app is down or there’s no signal**',
+    '- Don’t wait around or wander off looking for signal.',
+    '- Go straight back to the starting point, together as a group.',
+    '- The committee will meet you there.',
     '',
     '**What scores**',
-    '- 10 a stamp, games 1 to 6',
-    '- Photo bingo: 1 a photo, 5 more for the full card',
-    '- Copy the pose: best pose photo, 5 more',
-    '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question',
-    '- Buy it, try it: most interesting buy, 5 more',
-    '- Look around you: 2 a right answer',
-    '- Know your colleagues: questions about the other groups, mixed; 2 a right answer',
-    '- Find the boss: 20 for the selfie with Tim and Ellice',
-    '- First team to complete all 7 games: 15 more',
+    '- 10 a stamp, games 1 to 6.',
+    '- Photo bingo: 1 a photo, 5 more for the full card.',
+    '- Copy the pose: best pose photo, 5 more.',
+    '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question.',
+    '- Buy it, try it: most interesting buy, 5 more.',
+    '- Look around you: 2 a right answer.',
+    '- Know your colleagues: questions about the other groups, mixed; 2 a right answer.',
+    '- Find the boss: 20 for the selfie with Tim and Ellice.',
+    '- First team to complete all 7 games: 15 more.',
   ].join('\n'),
 
   /* Per hunt group (src/data/huntGroups.js), not per trip team. */
@@ -173,7 +174,7 @@ export const DEFAULT_HUNT_CONFIG = {
        with them, in a funny pose. */
     boss: {
       title: 'Find the boss', photo: null, stop: '',
-      body: 'Tim and Ellice are hiding somewhere in the hunt area. Find them both, then take **one photo of your whole team with them, pulling your funniest pose**.\n\nEveryone in the frame — Tim and Ellice too.',
+      body: 'Find Tim and Ellice, then take **one funny photo of the whole team with them**.',
     },
   },
 };
@@ -247,6 +248,18 @@ export function withDefaults(stored) {
       const fresh = block(DEFAULT_HUNT_CONFIG.rules)[0];
       merged.rules = block(rules) ? rules.replace(block(rules)[0], fresh) : `${rules.trimEnd()}\n\n${fresh}`;
     }
+  }
+  /* Saved before the rules gained Safety measures and the no-signal
+     plan, and dropped No looking things up and Buy it, try it: the
+     whole text is replaced with the current one. */
+  if (/^\*\*No looking things up\*\*$|^- Leave one half-done/m.test(String(merged.rules ?? ''))) {
+    merged.rules = DEFAULT_HUNT_CONFIG.rules;
+  }
+  /* The old placeholder finish text: nothing is shown instead. */
+  if (merged.finishPoint === 'The committee will point you to the finish at the briefing.') merged.finishPoint = '';
+  /* Find the boss's longer text, saved before it was cut down. */
+  if (/^Tim and Ellice are hiding somewhere in the hunt area\. Find them both/.test(merged.checkpoints.boss.body ?? '')) {
+    merged.checkpoints.boss.body = DEFAULT_HUNT_CONFIG.checkpoints.boss.body;
   }
   /* Saved while stamp 6 was the closest-guess or general knowledge game:
      its title, text and questions describe a game that no longer exists. */

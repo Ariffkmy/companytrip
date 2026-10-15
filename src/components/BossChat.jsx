@@ -123,25 +123,21 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
   return (
     <div style={{ marginTop: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <div style={{ fontWeight: 800, fontSize: 15 }}>{readOnly ? 'Their questions to the bosses' : 'Ask the bosses'}</div>
-        {!readOnly && <LiveDot status={status} />}
+        <div style={{ fontWeight: 800, fontSize: 15 }}>{readOnly ? 'Their questions to the bosses' : 'Ask the bosses (Yes / No)'}</div>
+        {!readOnly && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            {allowAsk && limitOn && (
+              <span aria-live="polite" style={{
+                padding: '2px 9px', borderRadius: 999, border: 'var(--line)', fontSize: 12, fontWeight: 800,
+                background: movedNote ? 'var(--gold)' : 'var(--card)', color: 'var(--ink)',
+              }}>
+                {movedNote ? '🚶 New questions! ' : ''}{left}/{QUESTION_LIMIT} left
+              </span>
+            )}
+            <LiveDot status={status} />
+          </span>
+        )}
       </div>
-      {!readOnly && (
-        <p className="note" style={{ margin: '0 0 8px' }}>
-          They can only answer <b>Yes</b> or <b>No</b>. Your group gets <b>{QUESTION_LIMIT} questions</b> while
-          the bosses stay in one spot — when they move, you get {QUESTION_LIMIT} more.
-        </p>
-      )}
-      {!readOnly && allowAsk && limitOn && (
-        <div aria-live="polite" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap',
-          margin: '0 0 8px', padding: '6px 10px', borderRadius: 8, border: 'var(--line)',
-          background: movedNote ? 'var(--gold)' : 'var(--card)', fontSize: 14,
-        }}>
-          <b>{movedNote ? '🚶 The bosses moved — new questions!' : usedUp ? 'No questions left' : 'Questions left'}</b>
-          <span style={{ font: '800 15px/1 var(--body)' }}>{left} of {QUESTION_LIMIT}</span>
-        </div>
-      )}
 
       <div ref={listRef} style={{
         maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10,
@@ -151,7 +147,7 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
         {loaded && error && <p style={{ margin: 0, color: 'var(--red)', fontSize: 14 }}>{error}</p>}
         {loaded && !error && !items.length && (
           <p className="note" style={{ margin: 0 }}>
-            {readOnly ? 'They didn’t ask the bosses anything.' : 'No questions yet. Try “Are you near the water?”'}
+            {readOnly ? 'They didn’t ask the bosses anything.' : 'Try “Are you near the water?”'}
           </p>
         )}
         {timeline.map((e) => (e.kind === 'move' ? (
@@ -213,7 +209,7 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
       )}
       {allowAsk && usedUp && (
         <p className="note" style={{ margin: '8px 0 0' }}>
-          That’s your {QUESTION_LIMIT} questions. Search with what you know — when the bosses move, you get {QUESTION_LIMIT} more.
+          No questions left — you get {QUESTION_LIMIT} more when the bosses move.
         </p>
       )}
       {!allowAsk && !readOnly && offNote && <p className="note" style={{ margin: '8px 0 0' }}>{offNote}</p>}
@@ -309,7 +305,7 @@ export function BossInbox({ onClose }) {
       </p>
 
       <details className="card mt-4" open={!items.length}>
-        <summary className="cursor-pointer font-bold">How to play — for the bosses</summary>
+        <summary className="cursor-pointer font-bold">How to play — for management</summary>
         <ol className="mt-2 pl-5 list-decimal space-y-1.5 text-[15px] leading-snug">
           <li>Go to your hiding spot in the hunt area and stay there. Tap <b>Start standby</b> below so you hear every question.</li>
           <li>Groups send questions to find you. Answer only <b>Yes</b> or <b>No</b>, and answer truthfully. No hints, in the app or in person.</li>
