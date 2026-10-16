@@ -119,7 +119,6 @@ function CashExpenses() {
   });
   const [open, setOpen] = useState(() => days.filter((d) => d.date === today).map((d) => d.day));
   const toggle = (day) => setOpen((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-  const grand = days.reduce((t, d) => t + d.total, 0);
 
   return (
     <section className="mt-9" aria-labelledby="cash-h">
@@ -127,12 +126,6 @@ function CashExpenses() {
         Cash for the day{' '}
         <span className="normal-case tracking-normal font-normal text-gray-400">(view only available for management)</span>
       </h2>
-      <p className="text-xs text-gray-500 leading-relaxed mb-2.5">
-        What management pays in cash each day, by activity. Trip total {yen(grand)}.
-      </p>
-      <p className="text-xs text-gray-400 italic -mt-1 mb-2.5">
-        Note: these amounts are dummy data for now. The committee will update them with the real figures and real items.
-      </p>
       <div className="space-y-2.5">
         {days.map((d) => (
           <div key={d.day} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -296,6 +289,54 @@ function Insurance({ userEmail }) {
   );
 }
 
+/* ── Admin checklist ────────────────────────────────
+   The must-have shots the committee owns. Ticks live on this phone only. */
+const ADMIN_TASKS = [
+  'One big group photo (with orange jacket)',
+  'Team group photo',
+  '1 video from each team sharing their thoughts / feelings (for recruitment)',
+  'Video of getting into the plane',
+  'Group pic in the plane',
+];
+const TASKS_KEY = 'adminChecklist';
+
+function AdminChecklist() {
+  const [done, setDone] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(TASKS_KEY)) ?? []; } catch { return []; }
+  });
+  const toggle = (task) => setDone((prev) => {
+    const next = prev.includes(task) ? prev.filter((t) => t !== task) : [...prev, task];
+    try { localStorage.setItem(TASKS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+    return next;
+  });
+
+  return (
+    <section className="mt-9" aria-labelledby="tasks-h">
+      <h2 id="tasks-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
+        Admin checklist{' '}
+        <span className="normal-case tracking-normal font-normal text-gray-400">(admin only)</span>
+      </h2>
+      <p className="text-xs text-gray-500 leading-relaxed mb-2.5">
+        Mandatory photos and videos. The rest come from teams and individuals during the activities.
+      </p>
+      <div className="bg-white border border-gray-200 rounded-lg px-4">
+        {ADMIN_TASKS.map((task) => (
+          <label key={task} className="flex items-start gap-3 py-2.5 border-b border-gray-100 last:border-b-0 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={done.includes(task)}
+              onChange={() => toggle(task)}
+              className="mt-0.5 shrink-0 w-4 h-4 accent-red"
+            />
+            <span className={`text-sm leading-snug ${done.includes(task) ? 'line-through text-gray-400' : ''}`}>{task}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 mt-2">{done.length} of {ADMIN_TASKS.length} done</p>
+    </section>
+  );
+}
+
 export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, huntConfig, onOpenGroupGame, showBossInbox, onOpenBossInbox }) {
   return (
     <section>
@@ -306,6 +347,7 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, hu
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       <ForexWidget />
+      {isAdmin && <AdminChecklist />}
       <CashExpenses />
       <Nearby />
       <Insurance userEmail={userEmail} />

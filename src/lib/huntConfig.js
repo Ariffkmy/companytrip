@@ -89,7 +89,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo: 1 a photo, 5 more for the full card.',
     '- Copy the pose: best pose photo, 5 more.',
     '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question.',
-    '- Buy it, try it: most interesting buy, 5 more.',
+    '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.',
     '- Look around you: 2 a right answer.',
     '- Know your colleagues: questions about the other groups, mixed; 2 a right answer.',
     '- Find the boss: 20 for the selfie with Tim and Ellice.',
@@ -142,8 +142,10 @@ export const DEFAULT_HUNT_CONFIG = {
     },
     cp3: {
       title: 'Buy it, try it', photo: null, stop: '',
-      brief: 'Something Japanese that nobody on your team has tried before.',
-      body: 'Spend any amount you like. Every member takes a photo with what you bought — tap each name below to add their photo. Line-up changed? Edit the names, remove someone or add a member.',
+      brief: 'Buy anything you like — then sell it to the bosses.',
+      body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.',
+      /* Points for each mark of the bosses' 1–10 rating. */
+      pointsPerRating: 2,
     },
     cp4: {
       title: 'Look around you', photo: null, stop: '',
@@ -255,6 +257,16 @@ export function withDefaults(stored) {
   if (/^\*\*No looking things up\*\*$|^- Leave one half-done/m.test(String(merged.rules ?? ''))) {
     merged.rules = DEFAULT_HUNT_CONFIG.rules;
   }
+  /* Saved while Buy it, try it was a photo of every member with what
+     they bought: now the bosses rate the team's sales pitch. */
+  if (/Every member takes a photo with what you bought/.test(merged.checkpoints.cp3.body ?? '')) {
+    merged.checkpoints.cp3.body = DEFAULT_HUNT_CONFIG.checkpoints.cp3.body;
+  }
+  if (merged.checkpoints.cp3.brief === 'Something Japanese that nobody on your team has tried before.') {
+    merged.checkpoints.cp3.brief = DEFAULT_HUNT_CONFIG.checkpoints.cp3.brief;
+  }
+  merged.rules = String(merged.rules ?? '').replace(/^- Buy it, try it: most interesting buy, 5 more\.?$/m,
+    '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.');
   /* The old placeholder finish text: nothing is shown instead. */
   if (merged.finishPoint === 'The committee will point you to the finish at the briefing.') merged.finishPoint = '';
   /* Find the boss's longer text, saved before it was cut down. */
@@ -350,7 +362,7 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { brief: cp.cp3.brief },
+    buy: { brief: cp.cp3.brief, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
     map: config.map,

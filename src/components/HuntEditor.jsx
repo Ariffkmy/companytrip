@@ -797,7 +797,10 @@ export default function HuntEditor() {
       <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
         <Sub>The game</Sub>
         <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
-        <p className="note -mt-1">No budget — teams spend what they like. Every member of the group needs a photo with what they bought; the list starts as the group line-up, and teams can rename, remove or add people during the game.</p>
+        <p className="note -mt-1">No budget — teams buy anything, find Tim and Ellice and try to sell it to them. The boss rates the pitch from 1 to 10 on the group leader’s phone.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Num label="Points per rating mark" value={val([...cp('cp3'), 'pointsPerRating'])} onChange={set([...cp('cp3'), 'pointsPerRating'])} />
+        </div>
         {commonFields('cp3')}
       </Section>
 

@@ -312,6 +312,7 @@ export function BossInbox({ onClose }) {
           <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
           <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
           <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
+          <li><b>Buy it, try it:</b> a group may try to sell you something they bought. Hear their pitch, then rate how convincing it was from <b>1 to 10</b> on their leader’s phone.</li>
           <li>Keep the app open on this page. Sound on, phone charged.</li>
         </ol>
       </details>

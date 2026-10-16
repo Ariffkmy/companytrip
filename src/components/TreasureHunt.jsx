@@ -1374,7 +1374,7 @@ export default function TreasureHunt({
       [STAMP_NO.bingo, title('bingo'), `${stamp} for the stamp + ${CONFIG.bingo.tilePts} a photo + ${CONFIG.bingo.fullPts} for the full card`],
       [STAMP_NO.cp1, title('cp1'), `${stamp} for the stamp · best pose photo +${judged}`],
       [STAMP_NO.cp2a, title('cp2a'), `${stamp} for the stamp + ${atamiPts} a right answer (need ${passMark} of ${perRound}; up to ${stamp + atamiPts * perRound})`],
-      [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp · most interesting buy +${judged}`],
+      [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp + ${CONFIG.buy.ratingPts} a mark of the bosses’ 1–10 rating for your pitch (up to ${stamp + CONFIG.buy.ratingPts * 10})`],
       [STAMP_NO.cp4, title('cp4'), `${stamp} for the stamp + ${per4} a right answer${n4 ? ` (up to ${stamp + per4 * n4})` : ''}`],
       [STAMP_NO.guess, title('guess'), `${stamp} for the stamp + ${CONFIG.trivia.pts} a right answer`],
       [STAMP_NO.boss, title('boss'), `${Number(p.boss ?? 20) || 0} for the selfie with the bosses (no stamp points)`],
@@ -1822,7 +1822,7 @@ export default function TreasureHunt({
   const LEADER_NOTE = {
     [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
-    [STAMP_NO.cp3]: 'only the group leader sends the item and everyone’s photos.',
+    [STAMP_NO.cp3]: 'the bosses rate your pitch on the group leader’s phone.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
     [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
     [STAMP_NO.boss]: 'only the leader asks the bosses and sends the photo.',
@@ -1866,9 +1866,9 @@ export default function TreasureHunt({
         'Then tap “Collect the stamp”.',
       ],
       cp3: [
-        'Each member buys something — any amount.',
-        'Tap each person’s box to take their photo with it.',
-        'When everyone has a photo, tap “Send it”.',
+        'Buy anything you like — any amount.',
+        'Find Tim and Ellice and convince them to buy it from you.',
+        'Hand the leader’s phone to them: they rate your pitch from 1 to 10 and tap “Give”.',
       ],
       cp4: [
         'Work the answers out together.',
@@ -2336,43 +2336,28 @@ export default function TreasureHunt({
   };
 
   /* ── Stamp 4 — Buy it, try it ──────────────────────
-     Any amount. Every member of the group has a photo taken with what
-     they bought. The list starts as the group's line-up
-     (src/data/huntGroups.js); line-ups change at the last minute, so the
-     team can rename, remove and add people here. Everything is kept in
-     the run as it goes, so leaving the screen loses nothing. */
+     The team buys anything, finds Tim and Ellice and tries to sell it to
+     them. Whichever boss heard the pitch rates it 1–10 on the leader's
+     phone; that rating, and who gave it, is the stamp. */
   const renderCp3 = () => {
-    const lineUp = () => (huntGroupOf(S.teamId)?.members ?? []).map((name) => ({ name, photo: null }));
-    const blankBuy = () => ({ item: '', people: lineUp() });
-    const buy = { ...blankBuy(), ...S.buy };
-    const people = buy.people;
-    /* From the latest run, not this render's: a photo lands after it has
-       been compressed, by which time a name may have been changed. */
-    const updateBuy = (fn) => setS((prev) => {
-      const next = { ...prev, buy: fn({ ...blankBuy(), ...prev.buy }) };
-      store.save(next.teamId, next);
-      return next;
+    const rating = draft.rating ?? null;
+    const ratedBy = draft.ratedBy ?? null;
+    const per = CONFIG.buy.ratingPts;
+    const pick = (on) => ({
+      minHeight: 46, borderRadius: 8, border: 'var(--line)', cursor: 'pointer',
+      font: '800 17px/1 var(--body)',
+      background: on ? 'var(--red)' : 'var(--card)', color: on ? '#fff' : 'var(--ink)',
+      boxShadow: on ? 'none' : 'var(--hard-sm)',
     });
-    const setPerson = (k, patch) => updateBuy((b) => ({
-      ...b, people: b.people.map((p, j) => (j === k ? { ...p, ...patch } : p)),
-    }));
-    const onPhoto = async (k, file) => {
-      if (!file) return;
-      try {
-        setPerson(k, { photo: await compressImage(file) });
-      } catch (e) {
-        showToast(photoErrorMessage(e));
-      }
-    };
-    const ready = people.filter((p) => p.name.trim() && p.photo).length;
-    const canSend = people.length > 0 && ready === people.length;
-    const input = {
-      width: '100%', fontFamily: 'var(--body)', fontSize: 16, padding: '11px 12px',
-      border: 'var(--line)', borderRadius: 7, background: 'var(--card)', color: 'var(--ink)',
-    };
-    const tile = {
-      position: 'relative', display: 'grid', placeItems: 'center', aspectRatio: 1,
-      borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
+    const give = () => {
+      const newS = { ...S };
+      newS.subs = { ...(newS.subs || {}), cp3: { rating, ratedBy, at: Date.now() } };
+      delete newS.buy;
+      newS.open = null;
+      store.save(newS.teamId, newS);
+      setS(newS);
+      setDraft({});
+      showToast(`Stamp collected — ${rating}/10.`);
     };
 
     return (
@@ -2385,78 +2370,34 @@ export default function TreasureHunt({
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
 
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>
-          Everyone’s photo with it · {ready}/{people.length}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
-          {people.map((p, k) => {
-            const fileId = `buy-photo-${k}`;
-            return (
-              <div key={k} style={{ minWidth: 0 }}>
-                <div style={{ position: 'relative' }}>
-                  <label htmlFor={fileId} aria-label={p.photo ? `Retake ${p.name || 'this'} photo` : `Take ${p.name || 'this'} photo`}
-                    style={{
-                      ...tile,
-                      border: p.photo ? 'var(--line)' : '3px dashed var(--th-dash)',
-                      background: p.photo ? '#0E1720' : 'var(--th-parchment)',
-                    }}>
-                    {p.photo
-                      ? <img src={p.photo} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <span style={{ fontSize: 22 }}>📷</span>}
-                    {p.photo && (
-                      <span style={{
-                        position: 'absolute', top: 4, left: 4, padding: '1px 6px', borderRadius: 999,
-                        background: 'var(--sea)', color: '#fff', font: '700 11px/1.4 var(--body)',
-                      }}>✓</span>
-                    )}
-                  </label>
-                  <button type="button" aria-label={`Remove ${p.name || `member ${k + 1}`}`}
-                    onClick={() => updateBuy((b) => ({ ...b, people: b.people.filter((_, j) => j !== k) }))}
-                    style={{
-                      position: 'absolute', top: 4, right: 4, width: 26, height: 26, borderRadius: 999,
-                      border: 'var(--line)', background: 'var(--card)', color: 'var(--ink)',
-                      font: '700 14px/1 var(--body)', cursor: 'pointer', display: 'grid', placeItems: 'center',
-                    }}>×</button>
-                </div>
-                <input id={fileId} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                  onChange={(e) => { onPhoto(k, e.target.files[0]); e.target.value = ''; }} />
-                <input type="text" placeholder="Name" aria-label={`Member ${k + 1} name`} value={p.name}
-                  onChange={(e) => { const name = e.target.value; setPerson(k, { name }); }}
-                  style={{ ...input, marginTop: 5, padding: '7px 8px', fontSize: 15, fontWeight: 700, textAlign: 'center' }} />
-              </div>
-            );
-          })}
-          <button type="button" onClick={() => updateBuy((b) => ({ ...b, people: [...b.people, { name: '', photo: null }] }))}
-            style={{
-              ...tile, border: '3px dashed var(--th-dash)', background: 'transparent', color: 'var(--ink-soft)',
-              font: '700 13px/1.3 var(--body)', padding: 6,
-            }}>
-            + Add a member
+        <div style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '3px solid var(--red)' }}>
+          <div className="eyebrow" style={{ color: 'var(--red)' }}>For Tim or Ellice</div>
+          <p style={{ margin: '4px 0 12px', fontWeight: 800, fontSize: 17 }}>How convincing was their pitch?</p>
+          <div role="radiogroup" aria-label="Rating from 1 to 10"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+            {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={rating === n}
+                onClick={() => setDraft((d) => ({ ...d, rating: n }))} style={pick(rating === n)}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <p className="note" style={{ margin: '12px 0 6px' }}>Who is rating?</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {['Tim', 'Ellice'].map((who) => (
+              <button key={who} type="button" aria-pressed={ratedBy === who}
+                onClick={() => setDraft((d) => ({ ...d, ratedBy: who }))} style={pick(ratedBy === who)}>
+                {who}
+              </button>
+            ))}
+          </div>
+          <button className="btn block" type="button" style={{ marginTop: 14 }} disabled={!rating || !ratedBy} onClick={give}>
+            {rating ? `Give ${rating}/10` : 'Pick a rating'}
           </button>
+          <p className="note" style={{ margin: '10px 0 0' }}>
+            Team: hand this phone to the boss. {per ? `Each mark is worth ${per} points.` : ''}
+          </p>
         </div>
-
-        <button
-          className="btn block"
-          style={{ marginTop: 14 }}
-          disabled={!canSend}
-          onClick={() => {
-            const done = people.map((p) => ({ name: p.name.trim(), photo: p.photo }));
-            const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), cp3: { people: done, photo: done[0].photo, at: Date.now() } };
-            delete newS.buy;
-            newS.open = null;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            showToast('Stamp collected.');
-          }}
-          type="button"
-        >
-          Send it
-        </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>
-          {canSend ? 'Most interesting find takes a bonus stamp at the finish.'
-            : 'Tap each box to take that person’s photo. Someone not here? Remove them, or change the name.'}
-        </p>
       </div>
     );
   };
@@ -2953,19 +2894,12 @@ export default function TreasureHunt({
     /* Retake: back to the game's own form, starting from what was sent.
        The stamp stays until the new photo is sent in its place. */
     const retake = () => {
-      if (key === 'cp3') {
-        const next = { ...S, buy: { item: sub?.item ?? '', people: (sub?.people ?? []).map((p) => ({ ...p })) } };
-        store.save(next.teamId, next);
-        setS(next);
-        setDraft({ retake: true });
-      } else {
-        setDraft({ retake: true, photo: sub?.photo ?? null });
-      }
+      setDraft({ retake: true, photo: sub?.photo ?? null });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     const retakeButton = !readOnly && sub ? (
       <button className="btn block sea" type="button" onClick={retake} style={{ marginTop: 14 }}>
-        📷 Retake {key === 'cp3' ? 'the photos' : 'the photo'}
+        📷 Retake the photo
       </button>
     ) : null;
     const task = (cpKey) => (String(CONFIG.cp[cpKey].body || '').trim()
@@ -3028,13 +2962,21 @@ export default function TreasureHunt({
           </div>
           {sub ? (
             <>
+              {sub.rating != null && (
+                <>
+                  {theirs(readOnly ? 'The bosses’ rating' : 'The bosses’ rating · stamp collected')}
+                  <p className="display" style={{ fontSize: 28, margin: 0 }}>
+                    {sub.rating}/10{sub.ratedBy ? <span className="note" style={{ fontSize: 13 }}> · by {sub.ratedBy}</span> : null}
+                  </p>
+                </>
+              )}
               {sub.item && (
                 <>
                   {theirs('What they bought')}
                   <p className="display" style={{ fontSize: 22, margin: 0 }}>{sub.item}</p>
                 </>
               )}
-              {theirs(readOnly ? 'Everyone’s photo with it' : 'Your photos · stamp collected')}
+              {(sub.people ?? []).length > 0 && theirs('Everyone’s photo with it')}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
                 {(sub.people ?? []).map((p, k) => (
                   <div key={k} style={{ minWidth: 0 }}>
@@ -3043,7 +2985,6 @@ export default function TreasureHunt({
                   </div>
                 ))}
               </div>
-              {retakeButton}
             </>
           ) : notPlayed}
         </div>
@@ -3106,7 +3047,7 @@ export default function TreasureHunt({
     if (readOnly) return renderReview(S.open);
     /* A photo game already collected opens on what was sent, not on an
        empty form (its photo lives in the run, not in the draft). */
-    if (['cp1', 'cp3', 'boss'].includes(S.open) && S.subs?.[DONE_SUB[S.open]] && !draft.retake) return renderReview(S.open);
+    if (['cp1', 'cp3', 'boss'].includes(S.open) && S.subs?.[DONE_SUB[S.open]] && (S.open === 'cp3' || !draft.retake)) return renderReview(S.open);
     const renderers = {
       cp1: renderCp1, cp3: renderCp3, cp4: renderCp4,
       bingo: renderBingo, guess: renderTrivia, boss: renderBoss,
@@ -3176,16 +3117,6 @@ export default function TreasureHunt({
             </button>
           </div>
         )}
-        <div style={{
-          background: 'var(--ink)', color: 'var(--card)', borderRadius: 10,
-          padding: 20, boxShadow: 'var(--hard)', border: 'var(--line)', marginBottom: 16,
-        }}>
-          <div className="eyebrow" style={{ color: 'var(--gold)' }}>Last thing</div>
-          <h2 className="display" style={{ fontSize: 29, margin: '6px 0 10px', textTransform: 'uppercase', lineHeight: 0.95 }}>
-            Walk it in
-          </h2>
-          {CONFIG.finishPoint && <p style={{ color: 'var(--th-body-alt)' }}>{CONFIG.finishPoint}</p>}
-        </div>
       </div>
     );
   };
