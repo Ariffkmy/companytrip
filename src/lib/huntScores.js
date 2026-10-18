@@ -12,6 +12,7 @@
    The committee's own calls (judged awards, marks on typed answers) are
    in hunt_config.judging. */
 
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { HUNT_ID } from './huntConfig';
 import { isStorageFull } from './photos';
@@ -278,6 +279,45 @@ export async function fetchRun(teamId) {
   const { data, error } = await supabase.from('hunt_scores').select('run, updated_at').eq('team_id', teamId).maybeSingle();
   if (error || !data) return null;
   return { ...data.run, teamId, syncedAt: data.updated_at };
+}
+
+/**
+ * A group's synced run, kept live for the members who don't play it:
+ * the leader's phone writes, everyone else's follows. Realtime when the
+ * row changes (20261029000000_hunt_scores_group_read.sql), and a check
+ * every 20 s, on coming back to the app and back online, for when
+ * Atami's signal drops the socket. `null` until there is one to show.
+ */
+export function useGroupRun(teamId, enabled = true) {
+  const [run, setRun] = useState(null);
+
+  const reload = useCallback(async () => {
+    if (!supabase || !enabled || !teamId) return;
+    const next = await fetchRun(teamId);
+    /* Unchanged runs keep their identity, so nothing re-renders. */
+    setRun((cur) => (cur?.syncedAt === next?.syncedAt ? cur : next));
+  }, [teamId, enabled]);
+
+  useEffect(() => {
+    if (!supabase || !enabled || !teamId) { setRun(null); return undefined; }
+    reload();
+    const channel = supabase
+      .channel(`hunt-run:${teamId}:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hunt_scores', filter: `team_id=eq.${teamId}` }, () => reload())
+      .subscribe((s) => { if (s === 'SUBSCRIBED') reload(); });
+    const id = setInterval(() => { if (!document.hidden) reload(); }, 20000);
+    const onVisible = () => { if (document.visibilityState === 'visible') reload(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', reload);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', reload);
+      supabase.removeChannel(channel);
+    };
+  }, [teamId, enabled, reload]);
+
+  return run;
 }
 
 export async function fetchJudging() {

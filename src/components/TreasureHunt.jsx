@@ -18,7 +18,7 @@ import PitchVideo from './PitchVideo';
 import { framedImgStyle } from './FramedPhoto';
 import {
   AWARDS, SCORED_GAMES, completedAt, cp4Verdicts, fetchResultsPublished, fetchRun, photoPathsOf, pushRun, runSummary,
-  saveJudging, setResultsPublished, signPhotos,
+  saveJudging, setResultsPublished, signPhotos, useGroupRun,
 } from '../lib/huntScores';
 import { GroupDetails, GroupDot, PointsTable, QaList, TD, TH, clockTime, linkBtn, useGroupJump, useHuntBoard } from './HuntResults';
 
@@ -340,6 +340,26 @@ const DONE_SUB = { bingo: 'bingo', cp1: 'cp1', cp2: 'cp2b', cp3: 'cp3', cp4: 'cp
 /* Title for a game in the hub and the preview menu. cp2 is titled by
    its first screen. */
 const gameTitle = (key, cp) => cp[key === 'cp2' ? 'cp2a' : key]?.title ?? key;
+
+/* Collected: a rubber stamp pressed over a game tile — the emoji and
+   name still show through underneath. */
+const StampMark = ({ wide }) => (
+  <span aria-hidden="true" style={{
+    position: 'absolute', inset: 0, borderRadius: 7, pointerEvents: 'none',
+    display: 'grid', placeItems: 'center', zIndex: 2,
+  }}>
+    <span style={{
+      width: wide ? 64 : '82%', aspectRatio: '1 / 1', borderRadius: '50%',
+      border: '7px double #E3262E', color: '#E3262E', background: 'rgba(227, 38, 46, .12)',
+      display: 'grid', placeItems: 'center', alignContent: 'center', gap: 2,
+      transform: 'rotate(-12deg)', boxShadow: '0 0 0 2px #E3262E, inset 0 0 0 2px #E3262E',
+      animation: 'slam .45s cubic-bezier(.2,1.5,.4,1) both',
+    }}>
+      <span style={{ fontFamily: '"Zen Kaku Gothic New", sans-serif', fontWeight: 900, fontSize: wide ? 26 : 36, lineHeight: 1 }}>✓</span>
+      <span style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: wide ? 10 : 13, letterSpacing: '.08em' }}>CLEARED</span>
+    </span>
+  </span>
+);
 
 function blankState(team) {
   return {
@@ -1239,6 +1259,28 @@ export default function TreasureHunt({
     return () => clearInterval(id);
   }, [preview, readOnly, checkClockReset]);
 
+  /* ── The group's stamps, for members who don't play ──
+     Only the leader's phone plays. Everyone else in the group follows
+     what it syncs, live, so each stamp lands on their phones too. A run
+     from before the committee's last restart doesn't count. */
+  const watchGroup = !preview && !readOnly && !canPlay && Boolean(teamId);
+  const syncedGroupRun = useGroupRun(teamId, watchGroup);
+  const groupRun = syncedGroupRun?.startedAt && !(huntResetAt
+    && !(Number(syncedGroupRun.clockReset) >= huntResetAt || Number(syncedGroupRun.startedAt) >= huntResetAt))
+    ? syncedGroupRun : null;
+  const groupDoneKey = Object.keys(groupRun?.subs || {}).map((k) => SLOT_OF[k]).filter((v) => v != null).sort().join(',');
+  const seenStampsRef = useRef(null);
+  useEffect(() => {
+    if (!watchGroup || !groupRun) return;
+    const before = seenStampsRef.current;
+    seenStampsRef.current = groupDoneKey;
+    /* The first load is what was already there: no toast for it. */
+    if (before === null) return;
+    const had = new Set(before ? before.split(',') : []);
+    const fresh = (groupDoneKey ? groupDoneKey.split(',') : []).filter((s) => !had.has(s));
+    if (fresh.length) showToast(`Stamp collected — ${gameTitle(GAMES[Number(fresh[0])].key, CONFIG.cp)}!`, 4000);
+  }, [watchGroup, groupRun, groupDoneKey, showToast, CONFIG]);
+
   /* ── Read only ───────────────────────────────────────
      The group's run as it stands: this phone's own copy for the
      member's own group (it has the photos), otherwise what the leader's
@@ -1568,23 +1610,7 @@ export default function TreasureHunt({
                     )}
                     {/* Collected: a rubber stamp pressed over the tile — the
                         emoji and name still show through underneath. */}
-                    {isDone && (
-                      <span aria-hidden="true" style={{
-                        position: 'absolute', inset: 0, borderRadius: 7, pointerEvents: 'none',
-                        display: 'grid', placeItems: 'center', zIndex: 2,
-                      }}>
-                        <span style={{
-                          width: wide ? 64 : '82%', aspectRatio: '1 / 1', borderRadius: '50%',
-                          border: '7px double #E3262E', color: '#E3262E', background: 'rgba(227, 38, 46, .12)',
-                          display: 'grid', placeItems: 'center', alignContent: 'center', gap: 2,
-                          transform: 'rotate(-12deg)', boxShadow: '0 0 0 2px #E3262E, inset 0 0 0 2px #E3262E',
-                          animation: 'slam .45s cubic-bezier(.2,1.5,.4,1) both',
-                        }}>
-                          <span style={{ fontFamily: '"Zen Kaku Gothic New", sans-serif', fontWeight: 900, fontSize: wide ? 26 : 36, lineHeight: 1 }}>✓</span>
-                          <span style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: wide ? 10 : 13, letterSpacing: '.08em' }}>CLEARED</span>
-                        </span>
-                      </span>
-                    )}
+                    {isDone && <StampMark wide={wide} />}
                   </button>
                 </li>
               );
@@ -1598,6 +1624,44 @@ export default function TreasureHunt({
             Finish the hunt{left > 0 ? ` · ${left} unplayed` : ''}
           </button>
         )}
+      </div>
+    );
+  };
+
+  /* For members who aren't the leader: the group's stamp card, filled
+     live from the leader's phone (useGroupRun above). Look only. */
+  const renderGroupStamps = () => {
+    const done = new Set(groupDoneKey ? groupDoneKey.split(',').map(Number) : []);
+    return (
+      <div className="card flag" style={{ marginTop: 14 }}>
+        <div className="eyebrow" style={{ color: 'var(--red)' }}>Your group’s stamps</div>
+        <h2 className="display" style={{ fontSize: 22, margin: '4px 0 6px' }}>
+          {!groupRun ? `Waiting for ${leaderName || 'your leader'} to start`
+            : groupRun.finishedAt ? `Finished · ${done.size} of ${CONFIG.stamps} stamps`
+            : done.size === GAMES.length ? 'Every stamp collected'
+            : `${done.size} of ${CONFIG.stamps} stamps collected`}
+        </h2>
+        <p className="note" style={{ margin: '0 0 10px' }}>
+          Each stamp shows here as soon as {leaderName || 'your leader'}’s phone collects it.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
+          {GAMES.map((g, i) => {
+            const isDone = done.has(i);
+            const wide = i === GAMES.length - 1 && GAMES.length % 3 === 1;
+            return (
+              <li key={g.key} aria-label={`${gameTitle(g.key, CONFIG.cp)}${isDone ? ', stamp collected' : ', not yet'}`} style={{
+                position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                ...(wide ? { gridColumn: '1 / -1', minHeight: 76, flexDirection: 'row', gap: 10 } : { aspectRatio: '1 / 1', flexDirection: 'column', gap: 4 }),
+                padding: 8, borderRadius: 9, border: 'var(--line)',
+                background: isDone ? 'var(--th-parchment)' : 'var(--card)', color: 'var(--ink)',
+              }}>
+                <span aria-hidden="true" style={{ fontSize: wide ? 30 : 32, lineHeight: 1 }}>{g.emoji}</span>
+                <b style={{ fontSize: 13, lineHeight: 1.2 }}>{gameTitle(g.key, CONFIG.cp)}</b>
+                {isDone && <StampMark wide={wide} />}
+              </li>
+            );
+          })}
+        </ul>
       </div>
     );
   };
@@ -2069,6 +2133,9 @@ export default function TreasureHunt({
           tag: 'POSE',
           missing: missingPhoto('Pose'),
         })}
+        <p className="note" style={{ margin: '-4px 0 14px' }}>
+          🤔 More or fewer people in the POSE photo than in your group? Use your creativity — share a pose, add a prop, or let someone hold the phone.
+        </p>
         {renderShot(draft.photo, 'Add your group photo', 'At the place, in the pose · one photo')}
         <button
           className="btn block"
@@ -3245,6 +3312,7 @@ export default function TreasureHunt({
         <div className="card"><p className="note" style={{ margin: 0 }}>Loading…</p></div>
       )}
       {view === 'start' && !readOnly && renderStartScreen()}
+      {watchGroup && view === 'start' && (groupRun || (isOpen && !stoppedAt)) && renderGroupStamps()}
       {view === 'race' && S && (canPlay || readOnly ? (
         <div>
           {renderStage()}

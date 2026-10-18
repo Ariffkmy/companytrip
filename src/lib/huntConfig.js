@@ -143,7 +143,7 @@ export const DEFAULT_HUNT_CONFIG = {
     cp3: {
       title: 'Buy it, try it', photo: null, stop: '',
       brief: 'Buy anything you like — then sell it to the bosses.',
-      body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.',
+      body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.\n\nYou can do this right after you take the selfie with them for **Find the boss**.',
       /* Points for each mark of the bosses' 1–10 rating. */
       pointsPerRating: 2,
     },
@@ -263,7 +263,11 @@ export function withDefaults(stored) {
   if (/Every member takes a photo with what you bought/.test(merged.checkpoints.cp3.body ?? '')) {
     merged.checkpoints.cp3.body = DEFAULT_HUNT_CONFIG.checkpoints.cp3.body;
   }
-  if (merged.checkpoints.cp3.brief === 'Something Japanese that nobody on your team has tried before.') {
+  /* Saved before the body said the pitch can follow the boss selfie. */
+  if (merged.checkpoints.cp3.body === 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.') {
+    merged.checkpoints.cp3.body = DEFAULT_HUNT_CONFIG.checkpoints.cp3.body;
+  }
+  if (merged.checkpoints.cp3.brief ==='Something Japanese that nobody on your team has tried before.') {
     merged.checkpoints.cp3.brief = DEFAULT_HUNT_CONFIG.checkpoints.cp3.brief;
   }
   merged.rules = String(merged.rules ?? '').replace(/^- Buy it, try it: most interesting buy, 5 more\.?$/m,

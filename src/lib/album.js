@@ -131,7 +131,46 @@ export async function deleteMedia({ bucket, table }, item) {
   await supabase.storage.from(bucket).remove([item.path, item.thumb_path]);
 }
 
-export const uploadAlbumMedia = (file, userId, onProgress) => uploadMedia(ALBUM, file, userId, { onProgress });
+/** The full-size file of an album photo or video, as a File ready to
+    save. Fetched through the API rather than the signed URL, which may
+    have expired on a cached row. */
+export async function fetchAlbumFile(item) {
+  const { data, error } = await supabase.storage.from(ALBUM.bucket).download(item.path);
+  if (error) throw error;
+  const ext = item.path.split('.').pop();
+  const d = new Date(item.created_at);
+  const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const name = `atami-trip-${day}-${item.id.slice(0, 6)}.${ext}`;
+  return new File([data], name, { type: data.type || (item.kind === 'video' ? 'video/mp4' : 'image/jpeg') });
+}
+
+/** Save a file to the phone. The share sheet comes first where it can
+    take files (iPhone and Android: "Save image" / "Save video" puts it in
+    the camera roll); otherwise a plain browser download. Throws
+    NotAllowedError when the tap that started it is too old to share
+    from, so the caller can ask for one more tap. */
+export async function saveFile(file) {
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (e) {
+      if (e?.name === 'AbortError') return; // closed the share sheet
+      if (e?.name === 'NotAllowedError') throw e;
+      /* Anything else: fall through to a download. */
+    }
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export const uploadAlbumMedia =(file, userId, onProgress) => uploadMedia(ALBUM, file, userId, { onProgress });
 export const deletePhoto = (photo) => deleteMedia(ALBUM, photo);
 
 export function formatUploaded(iso) {

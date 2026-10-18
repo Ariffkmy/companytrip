@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isStorageFull } from '../lib/photos';
-import { PAGE_SIZE, cachedPhotos, deletePhoto, formatUploaded, listPhotos, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
+import { PAGE_SIZE, cachedPhotos, deletePhoto, fetchAlbumFile, formatUploaded, listPhotos, saveFile, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
 import { formatDuration, isVideoFile, mediaErrorMessage } from '../lib/video';
 import StoriesBar from './StoriesBar';
 import schedule from '../data/schedule';
@@ -100,8 +100,9 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
         <button type="button" className={`${navBtn} right-2`} onClick={() => onIndex(index + 1)} disabled={index === photos.length - 1} aria-label="Next photo">›</button>
       </div>
 
-      {canDelete(photo) && (
-        <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-end">
+      <div className="shrink-0 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
+        <SaveButton key={photo.id} photo={photo} />
+        {canDelete(photo) && (
           <button type="button" disabled={busy}
             onClick={async () => {
               if (!confirming) { setConfirming(true); return; }
@@ -112,9 +113,48 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
             className={`h-10 px-4 rounded-lg text-sm font-medium cursor-pointer ${confirming ? 'bg-red text-paper' : 'text-onscrim/80 border border-white/30 hover:border-white/60'}`}>
             {busy ? 'Deleting…' : confirming ? 'Tap again to delete' : photo.kind === 'video' ? 'Delete video' : 'Delete photo'}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
+  );
+}
+
+/* Anyone can save any photo or video to their phone. The file is fetched
+   first; a long video can outlast the tap, and the share sheet then
+   refuses to open — so the button turns into "Tap to save" for a second
+   tap with the file already in hand. */
+function SaveButton({ photo }) {
+  const [state, setState] = useState(null); // null | 'loading' | { file } | 'error'
+  const what = photo.kind === 'video' ? 'video' : 'photo';
+
+  async function save(file) {
+    try {
+      await saveFile(file);
+      setState(null);
+    } catch (e) {
+      if (e?.name === 'NotAllowedError') setState({ file });
+      else setState('error');
+    }
+  }
+
+  async function onClick() {
+    if (state?.file) { save(state.file); return; }
+    setState('loading');
+    try {
+      save(await fetchAlbumFile(photo));
+    } catch {
+      setState('error');
+    }
+  }
+
+  return (
+    <button type="button" onClick={onClick} disabled={state === 'loading'}
+      className="h-10 px-4 rounded-lg text-sm font-medium cursor-pointer text-onscrim border border-white/30 hover:border-white/60 disabled:cursor-wait disabled:opacity-60">
+      {state === 'loading' ? `Getting ${what}…`
+        : state?.file ? 'Tap to save'
+        : state === 'error' ? 'Couldn’t save — try again'
+        : `⬇ Save ${what}`}
+    </button>
   );
 }
 
