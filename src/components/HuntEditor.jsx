@@ -719,7 +719,6 @@ export default function HuntEditor() {
         {commonFields('bingo', { body: false })}
         <div className="grid grid-cols-2 gap-3">
           <Num label="Points per photo" value={val([...cp('bingo'), 'tilePts'])} onChange={set([...cp('bingo'), 'tilePts'])} />
-          <Num label="Bonus for the full card" value={val([...cp('bingo'), 'fullPts'])} onChange={set([...cp('bingo'), 'fullPts'])} />
         </div>
         <Sub>Each group’s card</Sub>
         <p className="note -mt-2">

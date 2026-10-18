@@ -17,7 +17,7 @@
 import { supabase } from './supabase';
 import { PHOTO_PRESETS, compressPhoto } from './photos';
 import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
-import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
+import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, OLD_HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
 import ATAMI_QUIZ from '../data/atamiQuiz';
 
 export const HUNT_ID = 'atami';
@@ -86,13 +86,13 @@ export const DEFAULT_HUNT_CONFIG = {
     '',
     '**What scores**',
     '- 10 a stamp, games 1 to 6.',
-    '- Photo bingo: 1 a photo, 5 more for the full card.',
+    '- Photo bingo: 1 for every correct photo.',
     '- Copy the pose: best pose photo, 5 more.',
-    '- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question.',
+    '- Atami quiz: 2 for every right answer, at least 10 of 15 right for the stamp, 10 seconds a question.',
     '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.',
-    '- Look around you: 2 a right answer.',
-    '- Know your colleagues: questions about the other groups, mixed; 2 a right answer.',
-    '- Find the boss: 20 for the selfie with Tim and Ellice.',
+    '- Look around you: 2 for every right answer.',
+    '- Know your colleagues: questions about the other groups, mixed; 2 for every right answer.',
+    '- Find the boss: 20 for the selfie with Tim and Ellice, 5 more for the funniest group photo.',
     '- First team to complete all 7 games: 15 more.',
   ].join('\n'),
 
@@ -158,10 +158,11 @@ export const DEFAULT_HUNT_CONFIG = {
         { q: 'The last shop you passed before reaching Checkpoint 4. Name it.', accept: [] },
       ],
     },
+    /* Every tile is needed for the stamp, so a full card is just the
+       stamp: no separate bonus for it. */
     bingo: {
       title: 'Photo bingo', photo: null, stop: '',
       tilePts: 1,
-      fullPts: 5,
     },
     /* Stamp 6. Keyed `guess` because it replaced the closest-guess game
        (and then general knowledge); the key is what saved team progress
@@ -300,6 +301,18 @@ export function withDefaults(stored) {
      with placeholder captions on tiles that had no photo yet. */
   delete merged.checkpoints.bingo.linePts;
   delete merged.checkpoints.bingo.size;
+  /* Saved while a full bingo card earned a bonus on top of the stamp. */
+  delete merged.checkpoints.bingo.fullPts;
+  /* Saved with the older scoring wording ("2 a right answer"), the
+     full-card bingo bonus, and Find the boss without the funniest photo. */
+  merged.rules = String(merged.rules ?? '')
+    .replace(/^- Photo bingo: 1 a photo, 5 more for the full card\.?$/m, '- Photo bingo: 1 for every correct photo.')
+    .replace(/^(- (?:Atami quiz|Look around you|Know your colleagues): .*?)\b(\d+) a right answer/gm, '$1$2 for every right answer')
+    .replace(/^- Find the boss: 20 for the selfie with Tim and Ellice\.?$/m,
+      '- Find the boss: 20 for the selfie with Tim and Ellice, 5 more for the funniest group photo.');
+  /* The old short link to a walking route that no longer exists, which
+     some phones' Google Maps app refuses as an unsupported link. */
+  if (merged.map.link === OLD_HUNT_MAP_LINK) merged.map.link = HUNT_MAP_LINK;
   Object.values(merged.teams).forEach((t) => { if (Array.isArray(t.bingo)) t.bingo = bingoTiles(t.bingo); });
   delete merged.unlocks;
   delete merged.map.checkpoints;
@@ -364,7 +377,7 @@ export function toRuntime(config) {
     })),
     buy: { brief: cp.cp3.brief, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
-    bingo: { tilePts: Number(cp.bingo.tilePts) || 0, fullPts: Number(cp.bingo.fullPts) || 0 },
+    bingo: { tilePts: Number(cp.bingo.tilePts) || 0 },
     map: config.map,
     trivia: { pts: Math.max(0, Number(cp.guess.pointsPerRight) || 0) },
     atami: atamiRules(cp.cp2b),
@@ -396,7 +409,7 @@ export function validate(config) {
   huntGroups.forEach((g) => {
     if (bingoTiles(config.teams[g.id]?.bingo).length > BINGO_MAX) errs.push(`Stamp 1: ${g.name} has more than ${BINGO_MAX} bingo photos.`);
   });
-  if (!posInt(cp.bingo.tilePts) || !posInt(cp.bingo.fullPts)) errs.push('Stamp 1: bingo points must be 0 or more.');
+  if (!posInt(cp.bingo.tilePts)) errs.push('Stamp 1: bingo points must be 0 or more.');
   /* Answers go in as the form comes back, so blanks are fine: a blank
      fact simply isn't asked. */
   if (!posInt(cp.guess.pointsPerRight)) errs.push('Stamp 6: points per right answer must be 0 or more.');

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isStorageFull, photoErrorMessage } from '../lib/photos';
-import { PAGE_SIZE, cachedPhotos, deletePhoto, formatUploaded, listPhotos, updateCachedPhotos, uploadPhoto } from '../lib/album';
+import { isStorageFull } from '../lib/photos';
+import { PAGE_SIZE, cachedPhotos, deletePhoto, formatUploaded, listPhotos, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
+import { formatDuration, isVideoFile, mediaErrorMessage } from '../lib/video';
+import StoriesBar from './StoriesBar';
 import schedule from '../data/schedule';
 
 function dateKey(iso) {
@@ -41,6 +43,14 @@ function friendly(err) {
   return 'Something went wrong. Try again.';
 }
 
+/* What the round button says while it works. */
+function uploadLabel(u) {
+  const n = u.total > 1 ? ` (${Math.min(u.done + 1, u.total)} of ${u.total})` : '';
+  if (u.step?.stage === 'shrink') return `Shrinking video ${Math.round(u.step.progress * 100)}%${n}`;
+  if (u.step?.stage === 'upload') return `Uploading video…${n}`;
+  return `Uploading${n}…`;
+}
+
 /* ── Lightbox ─────────────────────────────────────── */
 function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
   const photo = photos[index];
@@ -79,9 +89,13 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
       </div>
 
       <div className="relative flex-1 min-h-0 flex items-center justify-center px-2">
-        {photo.src
-          ? <img src={photo.src} crossOrigin="anonymous" alt={`Photo by ${photo.uploader_name}`} className="max-w-full max-h-full object-contain" />
-          : <p className="text-onscrim text-sm opacity-70">This photo couldn’t load.</p>}
+        {!photo.src
+          ? <p className="text-onscrim text-sm opacity-70">This {photo.kind === 'video' ? 'video' : 'photo'} couldn’t load.</p>
+          : photo.kind === 'video'
+            /* key: a new element per video, so swiping never plays the last one's sound. */
+            ? <video key={photo.id} src={photo.src} poster={photo.thumb ?? undefined} controls autoPlay playsInline preload="metadata"
+                aria-label={`Video by ${photo.uploader_name}`} className="max-w-full max-h-full" />
+            : <img src={photo.src} crossOrigin="anonymous" alt={`Photo by ${photo.uploader_name}`} className="max-w-full max-h-full object-contain" />}
         <button type="button" className={`${navBtn} left-2`} onClick={() => onIndex(index - 1)} disabled={index === 0} aria-label="Previous photo">‹</button>
         <button type="button" className={`${navBtn} right-2`} onClick={() => onIndex(index + 1)} disabled={index === photos.length - 1} aria-label="Next photo">›</button>
       </div>
@@ -96,7 +110,7 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
               setBusy(false);
             }}
             className={`h-10 px-4 rounded-lg text-sm font-medium cursor-pointer ${confirming ? 'bg-red text-paper' : 'text-onscrim/80 border border-white/30 hover:border-white/60'}`}>
-            {busy ? 'Deleting…' : confirming ? 'Tap again to delete' : 'Delete photo'}
+            {busy ? 'Deleting…' : confirming ? 'Tap again to delete' : photo.kind === 'video' ? 'Delete video' : 'Delete photo'}
           </button>
         </div>
       )}
@@ -148,7 +162,7 @@ export default function Album({ userId, isAdmin }) {
   }
 
   async function onFiles(fileList) {
-    const files = [...fileList].filter((f) => f.type.startsWith('image/') || f.name.match(/\.(heic|heif)$/i));
+    const files = [...fileList].filter((f) => f.type.startsWith('image/') || f.name.match(/\.(heic|heif)$/i) || isVideoFile(f));
     if (!files.length) return;
     setError('');
     let failed = 0;
@@ -157,7 +171,7 @@ export default function Album({ userId, isAdmin }) {
     /* One at a time: parallel uploads on a weak signal all time out together. */
     for (let i = 0; i < files.length; i++) {
       try {
-        const row = await uploadPhoto(files[i], userId);
+        const row = await uploadAlbumMedia(files[i], userId, (step) => setUpload((u) => u && { ...u, step }));
         setPhotos((p) => [row, ...(p ?? [])]);
         updateCachedPhotos((rows) => [row, ...rows]);
       } catch (e) {
@@ -169,7 +183,7 @@ export default function Album({ userId, isAdmin }) {
       setUpload({ done: i + 1, total: files.length, failed });
     }
     setUpload(null);
-    if (failed) setError(`${failed} of ${files.length} didn’t upload. ${photoErrorMessage(lastErr)}`);
+    if (failed) setError(`${failed} of ${files.length} didn’t upload. ${mediaErrorMessage(lastErr)}`);
   }
 
   const canDelete = (p) => isAdmin || p.uploader_id === userId;
@@ -192,7 +206,11 @@ export default function Album({ userId, isAdmin }) {
 
   return (
     <section className="pt-9">
-      {error && <p role="alert" className="text-sm text-red">{error}</p>}
+      {/* Stories are separate from the album: their own uploads, their own viewer. */}
+      <StoriesBar userId={userId} isAdmin={isAdmin} />
+
+      <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700">Album</h2>
+      {error && <p role="alert" className="text-sm text-red mt-2">{error}</p>}
 
       {photos === null ? (
         <p className="note mt-8">Loading photos…</p>
@@ -208,7 +226,7 @@ export default function Album({ userId, isAdmin }) {
         </div>
       ) : (
         <>
-          <div className="mt-7 space-y-6">
+          <div className="mt-2.5 space-y-6">
             {groups.map((g) => (
               <div key={g.key}>
                 <p className="text-center font-mono text-[10px] tracking-[.18em] uppercase text-gray-400 mb-2.5">
@@ -218,8 +236,13 @@ export default function Album({ userId, isAdmin }) {
                   {g.photos.map((p) => (
                     <li key={p.id} className="aspect-square min-w-0">
                       <button type="button" onClick={() => setOpen(photos.indexOf(p))}
-                        className="block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
-                        {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                        className="relative block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
+                        {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`${p.kind === 'video' ? 'Video' : 'Photo'} by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                        {p.kind === 'video' && (
+                          <span className="absolute right-1 bottom-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-onscrim">
+                            ▶ {formatDuration(p.duration)}
+                          </span>
+                        )}
                       </button>
                     </li>
                   ))}
@@ -249,14 +272,19 @@ export default function Album({ userId, isAdmin }) {
 
       <div className="fixed inset-x-0 z-40 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 pointer-events-none">
         <div className="max-w-[640px] mx-auto px-4 relative">
+          {uploading && (
+            <p role="status" className="absolute right-20 bottom-3.5 rounded-full bg-ink/85 px-3 py-1.5 text-xs text-paper shadow tick">
+              {uploadLabel(upload)}
+            </p>
+          )}
           <label
-            aria-label={uploading ? `Uploading ${Math.min(upload.done + 1, upload.total)} of ${upload.total}` : 'Add photos'}
+            aria-label={uploading ? uploadLabel(upload) : 'Add photos or videos'}
             className={`absolute right-4 bottom-0 pointer-events-auto w-14 h-14 rounded-full shadow-lg grid place-items-center text-2xl leading-none transition-transform active:scale-95 ${
               uploading ? 'bg-gray-300 text-gray-600 cursor-wait' : 'bg-red text-paper cursor-pointer'
             } focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink`}
           >
             {uploading ? '…' : '+'}
-            <input type="file" accept="image/*" multiple className="sr-only" disabled={uploading}
+            <input type="file" accept="image/*,video/*" multiple className="sr-only" disabled={uploading}
               onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
           </label>
         </div>

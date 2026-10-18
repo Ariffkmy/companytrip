@@ -102,8 +102,15 @@ export default function PhotoCarousel({ onOpenAlbum }) {
             <li key={p.id} className="relative w-full shrink-0 snap-center aspect-[2/1]"
               aria-roledescription="slide" aria-label={`${i + 1} of ${photos.length}`}>
               <button type="button" onClick={onOpenAlbum} className="block w-full h-full cursor-pointer">
-                <img src={p.src} crossOrigin="anonymous" alt={`Photo by ${p.uploader_name}`} loading={i < 2 ? 'eager' : 'lazy'}
+                {/* A video shows its poster frame; it plays in the album. */}
+                <img src={p.kind === 'video' ? p.thumb : p.src} crossOrigin="anonymous"
+                  alt={`${p.kind === 'video' ? 'Video' : 'Photo'} by ${p.uploader_name}`} loading={i < 2 ? 'eager' : 'lazy'}
                   className="w-full h-full object-cover" />
+                {p.kind === 'video' && (
+                  <span aria-hidden="true" className="absolute inset-0 grid place-items-center">
+                    <span className="w-12 h-12 grid place-items-center rounded-full bg-black/50 text-onscrim text-lg pl-0.5">▶</span>
+                  </span>
+                )}
                 <span className="absolute inset-x-0 bottom-0 px-3.5 pt-10 pb-3 text-left bg-gradient-to-t from-black/75 to-transparent">
                   <span className="block text-sm font-medium text-onscrim leading-snug truncate">{p.uploader_name}</span>
                   <span className="block font-mono text-[10px] text-onscrim/80">{formatUploaded(p.created_at)}</span>

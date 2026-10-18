@@ -166,7 +166,8 @@ function ChecklistDayPanel({ day }) {
       {[
         { title: '🧳 Items to bring', list: day.activities },
         { title: '📝 To do before you fly', list: day.todos ?? [] },
-      ].map(({ title, list }) => (
+        { title: '📋 Committee', list: day.committee ?? [] },
+      ].filter(({ list }) => list.length).map(({ title, list }) => (
         <section key={title}>
           <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500 mb-2">{title}</h4>
           <div className="space-y-2">
@@ -191,6 +192,9 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
 
   return (
     <div className="space-y-4">
+      <MealsBox meals={day.meals} />
+      <YenBox transport={day.transport} food={day.food} />
+
       {/* Treasure hunt button for Day 4 */}
       {index === 4 && (
         <button
@@ -240,18 +244,99 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
         </div>
       </div>
 
-      {/* Stamp teaser on Day 4 */}
-      {index === 4 && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 text-center">
-          <p className="font-display text-base tracking-wide">Atami Treasure Hunt</p>
-          <p className="text-sm text-gray-500 mt-1">7 games, any order · 14:10–17:30 · All downhill</p>
-          <div className="flex gap-2 justify-center mt-3">
-            {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="w-8 h-8 rounded-full border border-dashed border-gray-300 grid place-items-center font-mono text-xs text-gray-400">
-                {i + 1}
-              </div>
-            ))}
+    </div>
+  );
+}
+
+/* ── Meals and yen for the day ─────────────────────────
+   The first thing on each day: what you eat and who sorts it, and the
+   yen to have on your Suica for getting around (fares as per the actual
+   receipts). */
+const yenFmt = (n) => `¥${n.toLocaleString('en-US')}`;
+
+function MealsBox({ meals }) {
+  if (!meals) return null;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500 mb-2.5">🍽️ Meals</h4>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        {[['Breakfast', meals.breakfast], ['Lunch', meals.lunch], ['Dinner', meals.dinner]].map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-gray-500">{k}</dt>
+            <dd className={`leading-snug ${/to be confirmed/i.test(v) ? 'text-gray-400 italic' : 'text-ink'}`}>{v}</dd>
           </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+const yenRange = (low, high) => (low === high ? yenFmt(low) : `${yenFmt(low)}–${yenFmt(high)}`);
+
+/* One part of the day's yen: a heading with its total, then the items. */
+function YenPart({ title, total, children, note }) {
+  return (
+    <section>
+      <div className="flex items-baseline gap-3 mb-2">
+        <h5 className="text-sm font-semibold text-ink">{title}</h5>
+        {total && <span className="ml-auto font-mono text-base font-semibold">{total}</span>}
+      </div>
+      <ul className="space-y-1.5">{children}</ul>
+      {note && <p className="text-xs text-gray-400 mt-2 leading-relaxed">{note}</p>}
+    </section>
+  );
+}
+
+/* Transport and food kept apart: transport is what to load on the
+   Suica card, food is spent however you like. */
+function YenBox({ transport = [], food = [] }) {
+  if (!transport.length && !food.length) return null;
+  const base = transport.filter((t) => !t.option).reduce((s, t) => s + t.yen, 0);
+  const options = transport.filter((t) => t.option).map((t) => t.yen);
+  const tLow = base + (options.length ? Math.min(...options) : 0);
+  const tHigh = base + (options.length ? Math.max(...options) : 0);
+  /* A food total only when every meal has an estimate; otherwise it would
+     look complete when it isn't. */
+  const allEstimated = food.length > 0 && food.every((f) => f.yen);
+  const fLow = food.reduce((s, f) => s + (f.yen?.[0] ?? 0), 0);
+  const fHigh = food.reduce((s, f) => s + (f.yen?.[1] ?? 0), 0);
+  const row = 'flex items-baseline gap-3 text-sm';
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+      <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">💴 Yen for the day</h4>
+
+      {transport.length > 0 && (
+        <YenPart title="🚃 Transport · load on your Suica" total={yenRange(tLow, tHigh)}
+          note={`As per the actual receipts${options.length ? '. The way home is option A or B, not both' : ''}.`}>
+          {transport.map((t) => (
+            <li key={t.route} className={row}>
+              <span className="min-w-0 text-gray-600 leading-snug">
+                {t.route}
+                {t.option && <span className="text-xs text-gray-400"> · option {t.option}</span>}
+              </span>
+              <span className="ml-auto shrink-0 font-mono text-gray-700">{yenFmt(t.yen)}</span>
+            </li>
+          ))}
+        </YenPart>
+      )}
+
+      {food.length > 0 && (
+        <div className={transport.length ? 'pt-4 border-t border-gray-100' : ''}>
+          <YenPart title="🍱 Food · your own meals" total={allEstimated ? yenRange(fLow, fHigh) : null}
+            note="Estimates only. Group meals aren’t included.">
+            {food.map((f) => (
+              <li key={f.meal} className={row}>
+                <span className="min-w-0 text-gray-600 leading-snug">
+                  {f.meal}
+                  {f.note && <span className="block text-xs text-gray-400">{f.note}</span>}
+                </span>
+                <span className={`ml-auto shrink-0 font-mono ${f.yen ? 'text-gray-700' : 'text-gray-400 italic'}`}>
+                  {f.yen ? yenRange(f.yen[0], f.yen[1]) : 'Not estimated'}
+                </span>
+              </li>
+            ))}
+          </YenPart>
         </div>
       )}
     </div>

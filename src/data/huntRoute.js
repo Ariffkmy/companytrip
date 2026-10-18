@@ -21,7 +21,13 @@
    particular road, hand-edit that shared edge in both areas that use
    it. [lat, lng] pairs. */
 
-export const HUNT_MAP_LINK = 'https://maps.app.goo.gl/Mkf8ULbmPrUoC4KS8';
+/* The map's "Google Maps" button: the start & finish point, in the
+   documented Maps URLs format, which opens in the Google Maps app or the
+   browser alike. The committee's short link (above, kept for the record)
+   opens walking directions through the old checkpoints, and some
+   phones' Maps app rejected it as an unsupported link. */
+export const OLD_HUNT_MAP_LINK = 'https://maps.app.goo.gl/Mkf8ULbmPrUoC4KS8';
+export const HUNT_MAP_LINK = 'https://www.google.com/maps/search/?api=1&query=35.1033591%2C139.078452';
 
 /* Rough size of the whole playing field, for the map's summary line. */
 export const ROUTE_STATS = { km: 1.1, walkMin: 16 };

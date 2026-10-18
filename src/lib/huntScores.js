@@ -34,6 +34,7 @@ export const SCORED_GAMES = [
 /* Judged at the finish by the committee; one group wins each. */
 export const AWARDS = [
   { key: 'pose', label: 'Best pose photo' },
+  { key: 'bossPhoto', label: 'Funniest group photo (Find the boss)' },
 ];
 
 export const DEFAULT_JUDGED_POINTS = 5;

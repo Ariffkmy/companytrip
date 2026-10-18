@@ -128,7 +128,7 @@ export function PointsTable({ CONFIG, rows, onPick }) {
               </tr>
             ))}
             <tr>
-              <td style={TD}>Best pose / buy awards</td>
+              <td style={TD}>Best pose / funniest boss photo</td>
               {rows.map(({ team, score }) => (
                 <td key={team.id} style={{ ...TD, textAlign: 'center' }}>{cell(score ? score.judged : null)}</td>
               ))}
@@ -151,10 +151,10 @@ export function PointsTable({ CONFIG, rows, onPick }) {
         </table>
       </div>
       <p className="note" style={{ margin: '10px 0 0' }}>
-        Games 1–6: {pts.checkpoint} a stamp, plus bingo {CONFIG.bingo.tilePts} a photo and {CONFIG.bingo.fullPts} for the full card ·
-        Atami quiz {CONFIG.atami.pts} a right answer · Look around you {pts.quizPerAnswer} a right answer ·
-        Know your colleagues {CONFIG.trivia.pts} a right answer. Find the boss: {pts.boss ?? 20} for the selfie.
-        Buy it, try it: {CONFIG.buy?.ratingPts ?? 0} a mark of the bosses’ 1–10 rating. Best pose: {pts.judged ?? 5}. First to complete all 7: {pts.first ?? 15}. – means not played.
+        Games 1–6: {pts.checkpoint} a stamp, plus bingo {CONFIG.bingo.tilePts} for every correct photo ·
+        Atami quiz {CONFIG.atami.pts} for every right answer · Look around you {pts.quizPerAnswer} for every right answer ·
+        Know your colleagues {CONFIG.trivia.pts} for every right answer. Find the boss: {pts.boss ?? 20} for the selfie.
+        Buy it, try it: {CONFIG.buy?.ratingPts ?? 0} a mark of the bosses’ 1–10 rating. Best pose and funniest boss photo: {pts.judged ?? 5} each. First to complete all 7: {pts.first ?? 15}. – means not played.
         {onPick && ' Tap a group or a score to open its game page.'}
       </p>
     </div>
@@ -351,6 +351,7 @@ export function GroupDetails({
             <b style={{ flex: 1, fontSize: 15 }}>
               <span className="note" style={{ marginRight: 4 }}>{gi + 1}.</span>{gameTitleOf(g.key, CONFIG.cp)}
               {g.key === 'cp1' && won('pose') && <Badge>★ Best pose</Badge>}
+              {g.key === 'boss' && won('bossPhoto') && <Badge>★ Funniest photo</Badge>}
             </b>
             {score.games[g.key] == null
               ? <span className="note">not played</span>

@@ -356,7 +356,7 @@ function blankState(team) {
 function bingoPoints(tiles, size, CONFIG) {
   const filled = (i) => !!(tiles || {})[i];
   const n = Array.from({ length: size }).reduce((acc, _, i) => acc + (filled(i) ? 1 : 0), 0);
-  return n * CONFIG.bingo.tilePts + (size && n === size ? CONFIG.bingo.fullPts : 0);
+  return n * CONFIG.bingo.tilePts;
 }
 
 const shuffled = (list) => {
@@ -1001,6 +1001,8 @@ export default function TreasureHunt({
   const [openTile, setOpenTile] = useState(null);
   const [bingoMissing, setBingoMissing] = useState(null);
   const [bingoChecking, setBingoChecking] = useState(false);
+  /* The card locks once collected, so the leader confirms first. */
+  const [bingoConfirm, setBingoConfirm] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const closeMap = useCallback(() => setMapOpen(false), []);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -1368,16 +1370,16 @@ export default function TreasureHunt({
     const judged = Number(p.judged ?? 5) || 0;
     const per4 = Number(p.quizPerAnswer) || 0;
     const n4 = CONFIG.quiz?.questions?.length ?? 0;
-    const { pts: atamiPts, perRound, passMark } = CONFIG.atami;
+    const { pts: atamiPts } = CONFIG.atami;
     const title = (k) => CONFIG.cp[k]?.title ?? k;
     const rows = [
-      [STAMP_NO.bingo, title('bingo'), `${stamp} for the stamp + ${CONFIG.bingo.tilePts} a photo + ${CONFIG.bingo.fullPts} for the full card`],
+      [STAMP_NO.bingo, title('bingo'), `${stamp} for the stamp + ${CONFIG.bingo.tilePts} for every correct photo`],
       [STAMP_NO.cp1, title('cp1'), `${stamp} for the stamp · best pose photo +${judged}`],
-      [STAMP_NO.cp2a, title('cp2a'), `${stamp} for the stamp + ${atamiPts} a right answer (need ${passMark} of ${perRound}; up to ${stamp + atamiPts * perRound})`],
+      [STAMP_NO.cp2a, title('cp2a'), `${stamp} for the stamp + ${atamiPts} for every right answer`],
       [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp + ${CONFIG.buy.ratingPts} a mark of the bosses’ 1–10 rating for your pitch (up to ${stamp + CONFIG.buy.ratingPts * 10})`],
-      [STAMP_NO.cp4, title('cp4'), `${stamp} for the stamp + ${per4} a right answer${n4 ? ` (up to ${stamp + per4 * n4})` : ''}`],
-      [STAMP_NO.guess, title('guess'), `${stamp} for the stamp + ${CONFIG.trivia.pts} a right answer`],
-      [STAMP_NO.boss, title('boss'), `${Number(p.boss ?? 20) || 0} for the selfie with the bosses (no stamp points)`],
+      [STAMP_NO.cp4, title('cp4'), `${stamp} for the stamp + ${per4} for every right answer${n4 ? ` (up to ${stamp + per4 * n4})` : ''}`],
+      [STAMP_NO.guess, title('guess'), `${stamp} for the stamp + ${CONFIG.trivia.pts} for every right answer`],
+      [STAMP_NO.boss, title('boss'), `${Number(p.boss ?? 20) || 0} for the selfie with the bosses · +${judged} for the funniest group photo`],
       ['★', 'First to finish', `+${Number(p.first ?? 15) || 0} for the first group to complete all ${CONFIG.stamps} games`],
     ];
     return (
@@ -1791,7 +1793,9 @@ export default function TreasureHunt({
       padding: '4px 10px', borderRadius: 999, border: '2px solid currentColor',
       background: 'transparent', color: 'inherit', font: '700 12px/1.2 var(--body)', cursor: 'pointer', ...style,
     }}>
-      📍 {stop} <span style={{ opacity: 0.7, fontWeight: 500 }}>· map</span>
+      {/* It hints at the area of the map to play in, so "Checkpoint 3"
+          (as older notes were written) reads as "Area 3". */}
+      📍 {String(stop).replace(/\bcheckpoint(\s*\d+)/gi, 'Area$1')} <span style={{ opacity: 0.7, fontWeight: 500 }}>· map</span>
     </button>
   ) : null);
 
@@ -1876,6 +1880,10 @@ export default function TreasureHunt({
         'Tap “Send answers” — you only send once, so check them first.',
       ],
       guess: [
+        (() => {
+          const n = colleagueRoundSize(colleague, S?.teamId);
+          return `Answer all ${n ? `${n} ` : ''}questions. There’s no minimum score — unlike the Atami quiz, you can’t fail this one: the stamp is yours after the last question, and every right answer scores.`;
+        })(),
         'The questions are about people in the other groups, all mixed up.',
         'Only the leader taps the answers — everyone else sees the same question live on their own phone and helps decide.',
         'Tap the answer you think is right. A wrong pick shows the right one.',
@@ -2707,18 +2715,37 @@ export default function TreasureHunt({
               return;
             }
             setBingoMissing(null);
-            const newS = { ...S };
-            newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(fresh, bingoCard.length, CONFIG), at: Date.now() } };
-            newS.open = null;
-            store.save(newS.teamId, newS);
-            setS(newS);
-            showToast('Stamp collected.');
+            setBingoConfirm(true);
           }}
           type="button"
         >
           {bingoChecking ? 'Checking…' : `Collect the stamp · ${filled}/${bingoCard.length}`}
         </button>
-        <p className="note" style={{ margin: '12px 0 0' }}>The stamp lands once every tile has a photo.</p>
+        {bingoConfirm && !locked && (
+          <div role="alertdialog" aria-label="Collect the bingo stamp?" style={{
+            marginTop: 12, padding: '12px 14px', borderRadius: 8,
+            border: '2px solid var(--red)', background: 'var(--th-parchment)',
+          }}>
+            <p style={{ margin: '0 0 10px', fontWeight: 700 }}>
+              Once you collect the stamp, the card is final — you can’t change or retake any photo after this.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <button className="btn block sea" type="button" onClick={() => setBingoConfirm(false)}>Not yet</button>
+              <button className="btn block" type="button" onClick={() => {
+                setBingoConfirm(false);
+                const newS = { ...S };
+                /* The check above found every tile filled. */
+                const full = Object.fromEntries(bingoCard.map((_, i) => [i, true]));
+                newS.subs = { ...(newS.subs || {}), bingo: { tiles: bingoCard.length, points: bingoPoints(full, bingoCard.length, CONFIG), at: Date.now() } };
+                newS.open = null;
+                store.save(newS.teamId, newS);
+                setS(newS);
+                showToast('Stamp collected.');
+              }}>Collect it</button>
+            </div>
+          </div>
+        )}
+        <p className="note" style={{ margin: '12px 0 0' }}>The stamp lands once every tile has a photo. After that the card can’t be changed.</p>
       </div>
     );
   };
@@ -3095,6 +3122,16 @@ export default function TreasureHunt({
             The committee tallies the results at the finish point.
             {ranOut && ' If the committee restarts the clock, the hunt starts again from the beginning on this screen by itself.'}
           </p>
+        </div>
+        {/* Where to go now: back where the hunt started, together. */}
+        <div className="card">
+          <p style={{ margin: '0 0 10px', fontWeight: 700 }}>
+            Head back to the start point together as a group{CONFIG.finishPoint ? ` — ${CONFIG.finishPoint}` : ''}.
+          </p>
+          <button className="btn block" type="button" onClick={() => setMapOpen(true)}
+            style={{ background: 'var(--gold)', color: 'var(--ink)' }}>
+            🗺️ Show the map
+          </button>
         </div>
         {/* Finishing is the team's own call, so leave a way back in for
             anyone who tapped it early and still has time on the clock. */}

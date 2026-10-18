@@ -18,6 +18,17 @@
       { id: 'act-7', activity: 'Shoes — comfortable for long-distance walking' },
       { id: 'act-8', activity: 'Cash in yen' },
       { id: 'act-10', activity: 'Portable Wi-Fi / eSIM' },
+      { id: 'act-11', activity: 'OLC jacket' },
+      { id: 'act-12', activity: 'New OLC-Macnica shirt' },
+      { id: 'act-13', activity: 'Cards activated for overseas spending' },
+      { id: 'act-14', activity: 'Mask' },
+      { id: 'act-15', activity: 'Fit-to-fly letter', note: 'For pregnant colleagues.' },
+    ],
+    /* The committee's own prep, ticked on the same checklist. */
+    committee: [
+      { id: 'com-souvenirs', activity: 'Souvenir boxes' },
+      { id: 'com-macnica-tshirt', activity: 'Macnica T-shirts' },
+      { id: 'com-atami-printouts', activity: 'Atami group activities print-outs (in case there’s no internet)', note: 'Ariff' },
     ],
     todos: [
       { id: 'todo-vjw', activity: 'Register Visit Japan Web' },
@@ -32,6 +43,8 @@
     label: 'Thu 22 Okt',
     title: 'KUL → Yokohama',
     emoji: '✈️',
+    meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement', dinner: 'In-flight (provided)' },
+    transport: [],
     activities: [
       { time: '08:00', activity: 'Arrive at office → vans to KLIA2', place: 'Orangeleaf Office', note: 'Everybody arrives at the office and boards the vans. You may buy food around the office area and bring it to the airport.' },
       { time: '09:30', activity: 'Arrive KLIA2 · group photos', place: 'Starbucks, Departure Hall, KLIA2', note: 'Gather at Starbucks in the Departure Hall. Group photos before check-in.' },
@@ -63,6 +76,19 @@
     label: 'Fri 23 Okt',
     title: 'Yokohama · Macnica',
     emoji: '🤝',
+    meals: { breakfast: 'Own arrangement', lunch: 'Shin-Yokohama Ramen Museum, with Macnica', dinner: 'Group dinner at Zauo' },
+    /* Suica fares as per the actual receipts. The way home is one or the
+       other, depending on whether you go to the after-party. */
+    transport: [
+      { route: 'MyStays → Macnica', yen: 310 },
+      { route: 'Zauo dinner → MyStays (bus + train)', yen: 500, option: 'A' },
+      { route: 'After-party at GROVE → MyStays', yen: 410, option: 'B' },
+    ],
+    /* Meals you pay for yourself, from the estimates in the notes below;
+       null where there is no estimate yet. */
+    food: [
+      { meal: 'Breakfast', yen: [290, 1100], note: 'Café Sanpopola ¥290–700 or Kohisya set ¥1,100' },
+    ],
     activities: [
       { time: '09:00', activity: 'Breakfast — free & easy', place: 'Around the hotel', note: 'Everyone has breakfast on their own. Option 1: Kohisya Yokohama Bandobashiten (~8 min walk, ¥1,100/pax set). Option 2: Café Sanpopola (~3 min walk, ¥290–700/pax, breakfast 8–11 AM). Allow a 30 min walking buffer.' },
       { time: '11:00', activity: 'Meet-up · depart for Shin-Yokohama', place: 'Bandobashi Station', note: 'Gather at Bandobashi Station. 30 min walking buffer from hotel / breakfast place. Train ~45 min to Shin-Yokohama. ¥260 per trip.' },
@@ -98,6 +124,17 @@
     label: 'Sat 24 Okt',
     title: 'Kamakura & Enoshima',
     emoji: '⛩️',
+    meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement (Hase area)', dinner: 'Group dinner at Shirasu Ya (provided)' },
+    transport: [
+      { route: 'MyStays → Hasedera Temple', yen: 820 },
+      { route: 'Hasedera Temple → Enoshima Aquarium', yen: 260 },
+      { route: 'Enoshima Station → Shirasu Ya', yen: 200 },
+      { route: 'Shirasu Ya → MyStays', yen: 880 },
+    ],
+    food: [
+      { meal: 'Breakfast', yen: null },
+      { meal: 'Lunch (Hase area)', yen: [1000, 2000] },
+    ],
     activities: [
       { time: '08:30', activity: 'Meet in front of hotel', place: 'Hotel MyStays Yokohama', note: 'Group assembles in the lobby. Own breakfast before the meet-up. Prepare ~¥2,500 per pax on your Suica.' },
       { time: '08:40', activity: 'Walk to Koganecho Station', place: '5 min walk · 230 m', note: 'Platform 2. Day total ≈ ¥620 per pax on the outbound legs.' },
@@ -147,18 +184,29 @@
     label: 'Sun 25 Okt',
     title: 'Atami · Treasure Hunt & Fireworks',
     emoji: '🎆',
+    meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement (Nakamise-dōri)', dinner: 'Group dinner at Izutaro (provided)' },
+    /* The Shinkansen is pre-paid, so it isn't on anyone's Suica. */
+    transport: [
+      { route: 'MyStays → Shin-Yokohama Station', yen: 310 },
+      { route: 'Atami Station → Kinomiya Shrine', yen: 160 },
+      { route: 'Kinomiya Shrine → Nakamise-dōri', yen: 290 },
+      { route: 'Atami Sun Beach → MyStays', yen: 1590 },
+    ],
+    food: [
+      { meal: 'Breakfast', yen: null },
+      { meal: 'Lunch (Nakamise-dōri)', yen: null },
+    ],
     activities: [
       { time: '08:00', activity: 'Meet outside MyStays', place: 'Hotel MyStays Yokohama', note: 'Group assembles. Own breakfast before the meet-up.' },
       { time: '08:10', activity: 'Commute to Shin-Yokohama Station', place: '7 min walk + 20 min train', note: 'Departures at 08:18 / 08:19 / 08:25. ¥310 per pax.' },
       { time: '09:00', activity: 'Meet at Shin-Yokohama', place: 'Shin-Yokohama Station', note: 'Group assembles before the Shinkansen.' },
       { time: '09:15', activity: '🚄 Shinkansen to Atami', place: 'Shin-Yokohama → Atami', note: 'Fixed timing, ~27 min. ¥3,193 per pax. Up to 320 km/h.' },
-      { time: '09:50', activity: 'Meet at Atami Station', place: 'Atami Station', note: 'Group assembles. Morning splits into Option 1 or Option 2.' },
-      { time: '10:00', activity: 'Morning Option 1 — Kiunkaku', place: '→ Kiunkaku', note: '2 min walk + 7 min bus + 3 min walk. Buses 10:01 / 10:03 / 10:16, ¥280 per pax. Meet 10:25, on site 10:30–12:00 (1.5 h), ¥610 CASH per pax. 1919 villa, one of Atami\'s "Three Great Villas" — architecture and Japanese garden, mostly indoor, flat and leisurely.' },
-      { time: '10:00', activity: 'Morning Option 2 — Kinomiya Shrine', place: '→ Kinomiya Shrine', note: '2 min train + 4 min walk. Trains 10:10 / 10:16, ¥160 per pax. Meet 10:25, on site 10:30–12:00 (1.5 h), free. 2,100+ year-old sacred camphor tree. Mostly outdoor — stairs, slopes and noticeably hilly.' },
-      { time: '12:00', activity: 'Gather to leave', place: 'Kiunkaku / Kinomiya Shrine', note: 'Group assembles.' },
-      { time: '12:10', activity: 'Commute to Nakamise-dōri', place: '→ Nakamise-dōri shopping street', note: 'Option 1: buses 12:17 / 12:18 / 12:20, ¥280. Option 2: buses 12:20 / 12:32 / 12:34, ¥290.' },
-      { time: '12:45', activity: 'Meet at Nakamise-dōri', place: 'Nakamise-dōri shopping street', note: 'Option 1 meets 12:45, Option 2 meets 13:00.' },
-      { time: '12:50', activity: 'Own lunch at Nakamise-dōri', place: 'Atami Heiwa-dōri / Nakamise-dōri', note: '1 hour, own cost. Shortened to 1 hr so more time goes to the group activity.' },
+      { time: '09:50', activity: 'Meet at Atami Station', place: 'Atami Station', note: 'Group assembles.' },
+      { time: '10:00', activity: 'Morning — Kinomiya Shrine', place: '→ Kinomiya Shrine', note: '2 min train + 4 min walk. Trains 10:10 / 10:16, ¥160 per pax. Meet 10:25, on site 10:30–12:00 (1.5 h), free. 2,100+ year-old sacred camphor tree. Mostly outdoor — stairs, slopes and noticeably hilly.' },
+      { time: '12:00', activity: 'Gather to leave', place: 'Kinomiya Shrine', note: 'Group assembles.' },
+      { time: '12:10', activity: 'Commute to Nakamise-dōri', place: '→ Nakamise-dōri shopping street', note: 'Buses 12:20 / 12:32 / 12:34, ¥290.' },
+      { time: '13:00', activity: 'Meet at Nakamise-dōri', place: 'Nakamise-dōri shopping street', note: 'Group assembles.' },
+      { time: '13:00', activity: 'Own lunch at Nakamise-dōri', place: 'Atami Heiwa-dōri / Nakamise-dōri', note: '1 hour, own cost. Shortened to 1 hr so more time goes to the group activity.' },
       { time: '14:00', activity: 'Meet in front of Lusca Mall', place: 'Lusca Atami (next to the shopping street)', note: 'Group assembles for the treasure hunt.' },
       { time: '14:10', activity: '🗺️ Atami Treasure Hunt starts', place: 'Lusca Atami → Sun Beach', note: '10 min briefing + 3 hours game time. 5 teams, 5 checkpoints, all downhill (~30 min of walking). Runs entirely from your phone.' },
       { time: '17:30', activity: 'End of group activity', place: 'Lusca Atami', note: 'Meet back at Lusca Mall. Scores, creativity bonuses and winners announced.' },
@@ -179,7 +227,7 @@
     ],
     committeePrep: [
       'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
-      'Confirm Shinkansen seats (¥3,193/pax) and the morning option split.',
+      'Confirm Shinkansen seats (¥3,193/pax).',
       'Confirm the group dinner booking at Izutaro.',
       'Treasure hunt: Ariff = Game Master; Carmen & Kevin = facilitators.',
       'Brief teams on the 21:00 walk to the station — no transport after the fireworks.',
@@ -191,6 +239,16 @@
     label: 'Mon 26 Okt',
     title: 'Cup Noodles Museum → Haneda',
     emoji: '🍜',
+    meals: { breakfast: 'Own arrangement', lunch: 'Group lunch at the museum, or own arrangement', dinner: 'To be confirmed' },
+    transport: [
+      { route: 'MyStays → Cup Noodles Museum', yen: 220 },
+      { route: 'Cup Noodles Museum → MyStays', yen: 220 },
+      { route: 'MyStays → Haneda Airport', yen: 400 },
+    ],
+    food: [
+      { meal: 'Breakfast (convenience store)', yen: null },
+      { meal: 'Lunch at the museum', yen: [400, 500], note: 'If the group lunch goes ahead; otherwise own choice' },
+    ],
     activities: [
       { time: '08:30', activity: 'Check-out & luggage drop', place: 'Hotel MyStays Yokohama', note: 'Check out and leave luggage in the designated area. Tip: buy breakfast at a convenience store the day before.' },
       { time: '09:00', activity: 'Meet-up', place: 'Outside the hotel', note: 'Group assembles.' },
@@ -220,6 +278,8 @@
     label: 'Tue 27 Okt',
     title: 'Arrival — KLIA2 → Office',
     emoji: '🏠',
+    meals: { breakfast: 'To be confirmed', lunch: 'Own arrangement', dinner: 'Own arrangement' },
+    transport: [],
     activities: [
       { time: '06:50', activity: 'Arrive KLIA2', place: 'KL International Airport 2', note: 'Welcome home.' },
       { time: '07:20', activity: 'Clear immigration · pick up luggage', place: 'KLIA2', note: 'Autogate, then baggage claim.' },
