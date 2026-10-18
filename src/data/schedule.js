@@ -23,6 +23,7 @@
       { id: 'act-13', activity: 'Cards activated for overseas spending' },
       { id: 'act-14', activity: 'Mask' },
       { id: 'act-15', activity: 'Fit-to-fly letter', note: 'For pregnant colleagues.' },
+      { id: 'act-16', activity: 'Neck pillow', note: 'For the long flight.' },
     ],
     /* The committee's own prep, ticked on the same checklist. */
     committee: [

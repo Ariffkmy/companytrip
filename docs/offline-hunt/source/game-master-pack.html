@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atami Treasure Hunt — Game Master Pack</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+  :root {
+    --ink: #17171C; --soft: #5A5A66; --red: #D7322B; --sea: #1F7A8C; --gold: #E9A82C;
+    --paper: #FFFFFF; --tint: #F6F1E7; --rule: #D9D2C3; --green: #5B7F3E;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 10.5pt/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { page-break-after: always; break-after: page; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  h1, h2, h3 { margin: 0; line-height: 1.15; }
+  h1 { font-size: 30pt; font-weight: 900; letter-spacing: -.01em; }
+  h2 { font-size: 22pt; font-weight: 900; }
+  h3 { font-size: 11pt; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 14px 0 6px; }
+  p { margin: 0 0 7px; }
+  ul, ol { margin: 0 0 6px; padding-left: 18px; }
+  li { margin: 0 0 4px; }
+  b { font-weight: 800; }
+  .eyebrow { font: 700 8.5pt/1 "Consolas", monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--red); }
+  .muted { color: var(--soft); }
+  .small { font-size: 9pt; }
+
+  /* Cover */
+  .cover-band { background: var(--ink); color: #fff; border-radius: 10px; padding: 22px 22px 18px; margin-bottom: 14px; }
+  .cover-band .eyebrow { color: var(--gold); }
+  .cover-band h1 { color: #fff; margin: 6px 0 6px; }
+  .cover-band p { color: #E6E6EA; margin: 0; font-size: 11pt; }
+  .alert { border: 2.5px solid var(--red); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; background: #FFF5F4; }
+  .alert b { color: var(--red); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .box { border: 1.5px solid var(--ink); border-radius: 10px; padding: 10px 13px; }
+  .box.tint { background: var(--tint); border-color: var(--rule); }
+  .box h3:first-child { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.8pt; }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 700 8pt/1.2 "Consolas", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); border-bottom: 1.5px solid var(--ink); }
+  td.n { font-weight: 900; color: var(--red); width: 22px; }
+  td.pts { white-space: nowrap; }
+
+  .msg { font-family: "Consolas", monospace; font-size: 9.5pt; background: #E7F8EC; border: 1px solid #A9DDB8; border-radius: 8px; padding: 6px 10px; margin: 4px 0 8px; white-space: pre-wrap; }
+
+  /* Game pages */
+  .game-head { display: flex; gap: 14px; align-items: center; border-bottom: 3px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
+  .badge { flex: none; width: 58px; height: 58px; border-radius: 50%; background: var(--ink); color: var(--gold);
+    display: grid; place-items: center; font: 900 26pt/1 "Segoe UI", Arial, sans-serif; }
+  .game-head .eyebrow { margin-bottom: 4px; }
+  .tagline { font-size: 11pt; color: var(--soft); margin-top: 3px; }
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 30px; margin-bottom: 8px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 21px; height: 21px; border-radius: 50%;
+    background: var(--red); color: #fff; font: 800 9.5pt/21px "Segoe UI", Arial, sans-serif; text-align: center; }
+  .score { background: var(--ink); color: #fff; border-radius: 10px; padding: 11px 14px; }
+  .score h3 { color: var(--gold); margin-top: 0; }
+  .score .big { font-size: 20pt; font-weight: 900; line-height: 1.1; }
+  .score ul { padding-left: 16px; }
+  .score li { margin-bottom: 3px; }
+  .who { border-left: 4px solid var(--gold); background: var(--tint); padding: 7px 11px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 10pt; }
+  .q { border: 1.5px solid var(--ink); border-radius: 8px; padding: 7px 10px; margin-bottom: 7px; }
+  .q .line { border-bottom: 1px dotted var(--soft); height: 20px; margin-top: 4px; }
+  .tick { display: inline-block; width: 13px; height: 13px; border: 1.5px solid var(--ink); border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  .foot { margin-top: 12px; padding-top: 7px; border-top: 1px solid var(--rule); font-size: 8.5pt; color: var(--soft); display: flex; justify-content: space-between; }
+  .card-row td { height: 26px; }
+  /* The cover carries the most; keep it on one page. */
+  .cover { font-size: 9.6pt; }
+  .cover .cover-band { padding: 16px 20px 14px; margin-bottom: 10px; }
+  .cover h1 { font-size: 24pt; }
+  .cover h3 { margin: 10px 0 5px; }
+  .cover li { margin-bottom: 2px; }
+  .cover table { font-size: 9pt; }
+  .cover th, .cover td { padding: 3px 5px; }
+
+  .ans { width: 32%; }
+  .bank td { padding: 4px 6px; font-size: 9.3pt; }
+  .sheet td, .sheet th { text-align: center; }
+  .sheet td:nth-child(2), .sheet th:nth-child(2) { text-align: left; }
+  .sheet td { height: 24px; }
+  .confidential { background: var(--red); color: #fff; font-weight: 800; border-radius: 6px; padding: 3px 10px; display: inline-block; font-size: 9pt; letter-spacing: .08em; }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <div class="cover-band">
+    <div class="eyebrow">Atami Treasure Hunt · Game Master pack</div>
+    <h1>For Ariff only.</h1>
+    <p>Answer key, setup and score sheet for running the hunt on WhatsApp if the app is down. <b>Don’t share this with the groups.</b></p>
+  </div>
+  <span class="confidential">CONFIDENTIAL · CONTAINS ANSWERS</span>
+
+  <h3>Before the day (while the app still works)</h3>
+  <ul>
+    <li><span class="tick"></span>Fill in your WhatsApp number on page 1 of the players’ manual, then print it or share the PDF with all four leaders.</li>
+    <li><span class="tick"></span>Create four WhatsApp groups: <b>“Find the boss – Group A/B/C/D”</b>, each with that group’s members, <b>Tim, Ellice and you</b>.</li>
+    <li><span class="tick"></span>Save every group’s reference photos to your phone, by group: <b>bingo tiles</b> (numbered), <b>Copy the pose</b> WHERE + POSE (+ Maps link), <b>Atami quiz</b> landmark WHERE photo. They are in Admin → Hunt editor.</li>
+    <li><span class="tick"></span>Export the <b>Know your colleagues</b> questions and answers for each group (they live in the database, so you can’t get them once the server is down). Print or save them.</li>
+    <li><span class="tick"></span>Check the <b>Look around you</b> questions in the editor match the manual; reprint if they were edited.</li>
+    <li><span class="tick"></span>Tell Tim and Ellice: in offline mode they answer yes/no in each group’s chat, post <b>“🚶 We’re moving”</b> in all four chats when they move, and WhatsApp you each pitch rating (group + 1–10).</li>
+  </ul>
+
+  <h3>Switching to offline mode</h3>
+  <ol>
+    <li>Post in the trip group: <b>“Treasure hunt is now OFFLINE. Leaders, open the offline manual.”</b></li>
+    <li>Send each leader their group’s reference photos (bingo card, pose, landmark).</li>
+    <li>Send <b>START</b> (or, mid-hunt, tell everyone how many minutes are left). Note the time: ______</li>
+    <li>Write down the stamps each group already had in the app, if you can still see them.</li>
+  </ol>
+
+  <h3>While it runs</h3>
+  <ul>
+    <li>Reply <b>✅ Stamp N</b> as soon as you accept a game. Log it on the score sheet with the WhatsApp time.</li>
+    <li><b>Bingo:</b> stamp only when every tile has a correct selfie. 1 point per tile.</li>
+    <li><b>Atami quiz:</b> call the leader, read 15 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
+    <li><b>Buy it, try it:</b> stamp needs the video <b>and</b> the bosses’ rating. Points = 2 × rating.</li>
+    <li><b>Look around you:</b> first message only. Mark at the finish.</li>
+    <li><b>Know your colleagues:</b> call the leader, ask all questions, no pass mark. Points = 2 × right.</li>
+    <li><b>Find the boss:</b> 20 for the photo with both bosses. 2 questions per group per spot.</li>
+    <li>Several groups ready for a call? Take them in the order their “Ready” messages arrived. Carmen or Kevin can run a quiz call with this pack.</li>
+  </ul>
+  <div class="foot"><span>Game Master pack</span><span>Setup</span></div>
+</section>
+
+<section class="page">
+  <div class="eyebrow">Score sheet</div>
+  <h2 style="margin:4px 0 10px">Points by group</h2>
+  <table class="sheet">
+    <tr><th>#</th><th>Game</th><th>Scoring</th><th>Group A</th><th>Group B</th><th>Group C</th><th>Group D</th></tr>
+    <tr><td class="n">1</td><td><b>Photo bingo</b></td><td class="small">10 + 1/photo (all tiles)</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">2</td><td><b>Copy the pose</b></td><td class="small">10</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">3</td><td><b>Atami quiz</b></td><td class="small">10 + 2/right</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">4</td><td><b>Buy it, try it</b></td><td class="small">10 + 2 × rating</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">5</td><td><b>Look around you</b></td><td class="small">10 + 2/right</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">6</td><td><b>Know your colleagues</b></td><td class="small">10 + 2/right</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">7</td><td><b>Find the boss</b></td><td class="small">20</td><td></td><td></td><td></td><td></td></tr><tr><td class="n"></td><td><b>Best pose (judged)</b></td><td class="small">+5</td><td></td><td></td><td></td><td></td></tr><tr><td class="n"></td><td><b>Funniest boss photo (judged)</b></td><td class="small">+5</td><td></td><td></td><td></td><td></td></tr><tr><td class="n">★</td><td><b>First to finish</b></td><td class="small">+15</td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td><b>TOTAL</b></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <h3>Stamp log (WhatsApp time of each ✅)</h3>
+  <table class="sheet">
+    <tr><th>Group</th><th>Games done (1–7)</th><th>Time of 7th ✅</th><th>Notes</th></tr>
+    <tr><td><b>A</b></td><td style="text-align:left">☐1 ☐2 ☐3 ☐4 ☐5 ☐6 ☐7</td><td></td><td></td></tr><tr><td><b>B</b></td><td style="text-align:left">☐1 ☐2 ☐3 ☐4 ☐5 ☐6 ☐7</td><td></td><td></td></tr><tr><td><b>C</b></td><td style="text-align:left">☐1 ☐2 ☐3 ☐4 ☐5 ☐6 ☐7</td><td></td><td></td></tr><tr><td><b>D</b></td><td style="text-align:left">☐1 ☐2 ☐3 ☐4 ☐5 ☐6 ☐7</td><td></td><td></td></tr>
+  </table>
+
+  <h3>Atami quiz attempts</h3>
+  <table class="sheet">
+    <tr><th>Group</th><th>Attempt 1 (right / 15)</th><th>Attempt 2</th><th>Attempt 3</th><th>Passed with</th></tr>
+    <tr><td><b>A</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>B</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>C</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>D</b></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <h3>Pitch ratings (from Tim / Ellice)</h3>
+  <table class="sheet">
+    <tr><th>Group</th><th>Video received</th><th>Rating (1–10)</th><th>Rated by</th></tr>
+    <tr><td><b>A</b></td><td>☐</td><td></td><td></td></tr><tr><td><b>B</b></td><td>☐</td><td></td><td></td></tr><tr><td><b>C</b></td><td>☐</td><td></td><td></td></tr><tr><td><b>D</b></td><td>☐</td><td></td><td></td></tr>
+  </table>
+  <div class="foot"><span>Game Master pack</span><span>Score sheet</span></div>
+</section>
+
+<section class="page">
+  <div class="eyebrow">Answer key · 40 questions</div>
+  <h2 style="margin:4px 0 4px">How well do you know Atami?</h2>
+  <p class="muted small">Read the question and the choices. 10 seconds to answer. Tick each one used per group so a retry gets new questions. This is the app’s starting bank; if the committee edited it in Admin, use the edited version.</p>
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th><th>Answer</th></tr>
+    
+  <tr>
+    <td class="n">1</td>
+    <td>In which Japanese prefecture is Atami located?<div class="small muted">A. Hokkaido &nbsp;·&nbsp; B. Shizuoka &nbsp;·&nbsp; C. Osaka &nbsp;·&nbsp; D. Kyoto</div></td>
+    <td class="ans"><b>B</b> Shizuoka</td>
+  </tr>
+  <tr>
+    <td class="n">2</td>
+    <td>What is Atami particularly famous for?<div class="small muted">A. Ski resorts &nbsp;·&nbsp; B. Desert safaris &nbsp;·&nbsp; C. Hot springs &nbsp;·&nbsp; D. Large-scale rice plantations</div></td>
+    <td class="ans"><b>C</b> Hot springs</td>
+  </tr>
+  <tr>
+    <td class="n">3</td>
+    <td>What does the name Atami traditionally refer to?<div class="small muted">A. Hot sea &nbsp;·&nbsp; B. Blue mountain &nbsp;·&nbsp; C. Golden forest &nbsp;·&nbsp; D. Sleeping dragon</div></td>
+    <td class="ans"><b>A</b> Hot sea</td>
+  </tr>
+  <tr>
+    <td class="n">4</td>
+    <td>Which body of water borders Atami?<div class="small muted">A. Sea of Japan &nbsp;·&nbsp; B. Seto Inland Sea &nbsp;·&nbsp; C. East China Sea &nbsp;·&nbsp; D. Sagami Bay</div></td>
+    <td class="ans"><b>D</b> Sagami Bay</td>
+  </tr>
+  <tr>
+    <td class="n">5</td>
+    <td>What is Japan’s currency?<div class="small muted">A. Won &nbsp;·&nbsp; B. Yen &nbsp;·&nbsp; C. Yuan &nbsp;·&nbsp; D. Ringgit</div></td>
+    <td class="ans"><b>B</b> Yen</td>
+  </tr>
+  <tr>
+    <td class="n">6</td>
+    <td>What is the primary language spoken in Atami?<div class="small muted">A. Korean &nbsp;·&nbsp; B. Mandarin &nbsp;·&nbsp; C. Japanese &nbsp;·&nbsp; D. Thai</div></td>
+    <td class="ans"><b>C</b> Japanese</td>
+  </tr>
+  <tr>
+    <td class="n">7</td>
+    <td>Which Japanese high-speed train serves Atami Station?<div class="small muted">A. Tokaido Shinkansen &nbsp;·&nbsp; B. Hokkaido Shinkansen only &nbsp;·&nbsp; C. Yamanote Line &nbsp;·&nbsp; D. Tokyo Metro Ginza Line</div></td>
+    <td class="ans"><b>A</b> Tokaido Shinkansen</td>
+  </tr>
+  <tr>
+    <td class="n">8</td>
+    <td>What kind of destination is Atami best described as?<div class="small muted">A. Industrial port city only &nbsp;·&nbsp; B. Desert resort &nbsp;·&nbsp; C. Ski-only destination &nbsp;·&nbsp; D. Coastal hot-spring resort town</div></td>
+    <td class="ans"><b>D</b> Coastal hot-spring resort town</td>
+  </tr>
+  <tr>
+    <td class="n">9</td>
+    <td>What is the time zone used in Atami?<div class="small muted">A. UTC+7 &nbsp;·&nbsp; B. UTC+9 &nbsp;·&nbsp; C. UTC+10 &nbsp;·&nbsp; D. UTC+8</div></td>
+    <td class="ans"><b>B</b> UTC+9</td>
+  </tr>
+  <tr>
+    <td class="n">10</td>
+    <td>Which season does October fall in in Japan?<div class="small muted">A. Spring &nbsp;·&nbsp; B. Summer &nbsp;·&nbsp; C. Autumn &nbsp;·&nbsp; D. Winter</div></td>
+    <td class="ans"><b>C</b> Autumn</td>
+  </tr>
+  <tr>
+    <td class="n">11</td>
+    <td>Which famous Japanese shogun was associated with Atami’s hot springs?<div class="small muted">A. Tokugawa Ieyasu &nbsp;·&nbsp; B. Toyotomi Hideyoshi &nbsp;·&nbsp; C. Oda Nobunaga &nbsp;·&nbsp; D. Minamoto no Yoritomo</div></td>
+    <td class="ans"><b>A</b> Tokugawa Ieyasu</td>
+  </tr>
+  <tr>
+    <td class="n">12</td>
+    <td>What is an onsen?<div class="small muted">A. A Japanese sword &nbsp;·&nbsp; B. A traditional Japanese hot spring &nbsp;·&nbsp; C. A type of sushi &nbsp;·&nbsp; D. A Japanese train</div></td>
+    <td class="ans"><b>B</b> A traditional Japanese hot spring</td>
+  </tr>
+  <tr>
+    <td class="n">13</td>
+    <td>True or false: Atami Castle is an original medieval castle that has survived unchanged for centuries.<div class="small muted">A. True &nbsp;·&nbsp; B. False</div></td>
+    <td class="ans"><b>B</b> False</td>
+  </tr>
+  <tr>
+    <td class="n">14</td>
+    <td>Which tree is especially famous at Kinomiya Shrine?<div class="small muted">A. Cherry tree &nbsp;·&nbsp; B. Bamboo tree &nbsp;·&nbsp; C. Sacred camphor tree &nbsp;·&nbsp; D. Coconut tree</div></td>
+    <td class="ans"><b>C</b> Sacred camphor tree</td>
+  </tr>
+  <tr>
+    <td class="n">15</td>
+    <td>What traditional Japanese garment is often worn at an onsen resort?<div class="small muted">A. Kimono or yukata &nbsp;·&nbsp; B. Hanbok &nbsp;·&nbsp; C. Cheongsam &nbsp;·&nbsp; D. Ao dai</div></td>
+    <td class="ans"><b>A</b> Kimono or yukata</td>
+  </tr>
+  <tr>
+    <td class="n">16</td>
+    <td>What material is a traditional yukata commonly made from?<div class="small muted">A. Heavy leather &nbsp;·&nbsp; B. Wool &nbsp;·&nbsp; C. Metal mesh &nbsp;·&nbsp; D. Lightweight cotton or similar fabric</div></td>
+    <td class="ans"><b>D</b> Lightweight cotton or similar fabric</td>
+  </tr>
+  <tr>
+    <td class="n">17</td>
+    <td>What is the purpose of purification at a Shinto shrine?<div class="small muted">A. To cool down after walking &nbsp;·&nbsp; B. To perform ritual purification &nbsp;·&nbsp; C. To test water temperature &nbsp;·&nbsp; D. To prepare food</div></td>
+    <td class="ans"><b>B</b> To perform ritual purification</td>
+  </tr>
+  <tr>
+    <td class="n">18</td>
+    <td>What is a torii?<div class="small muted">A. A Japanese dessert &nbsp;·&nbsp; B. A hot-spring bath &nbsp;·&nbsp; C. A traditional gate associated with Shinto shrines &nbsp;·&nbsp; D. A type of bullet train</div></td>
+    <td class="ans"><b>C</b> A traditional gate associated with Shinto shrines</td>
+  </tr>
+  <tr>
+    <td class="n">19</td>
+    <td>True or false: Atami has a history as a hot-spring destination dating back more than 1,000 years.<div class="small muted">A. True &nbsp;·&nbsp; B. False</div></td>
+    <td class="ans"><b>A</b> True</td>
+  </tr>
+  <tr>
+    <td class="n">20</td>
+    <td>What is the Japanese word for a souvenir commonly bought when travelling?<div class="small muted">A. Shinkansen &nbsp;·&nbsp; B. Tatami &nbsp;·&nbsp; C. Onsen &nbsp;·&nbsp; D. Omiyage</div></td>
+    <td class="ans"><b>D</b> Omiyage</td>
+  </tr>
+  <tr>
+    <td class="n">21</td>
+    <td>Which attraction in Atami is known for Japanese and East Asian art?<div class="small muted">A. MOA Museum of Art &nbsp;·&nbsp; B. Tokyo Disneyland &nbsp;·&nbsp; C. Osaka Aquarium &nbsp;·&nbsp; D. Sapporo Beer Museum</div></td>
+    <td class="ans"><b>A</b> MOA Museum of Art</td>
+  </tr>
+  <tr>
+    <td class="n">22</td>
+    <td>What can visitors see at Atami Plum Garden during the appropriate season?<div class="small muted">A. Lavender fields &nbsp;·&nbsp; B. Plum blossoms &nbsp;·&nbsp; C. Giant sunflower farms only &nbsp;·&nbsp; D. Snow-covered pine forests year-round</div></td>
+    <td class="ans"><b>B</b> Plum blossoms</td>
+  </tr>
+  <tr>
+    <td class="n">23</td>
+    <td>What is the main purpose of the Atami Ropeway?<div class="small muted">A. To transport passengers between Tokyo and Osaka &nbsp;·&nbsp; B. To carry cars across the sea &nbsp;·&nbsp; C. To take visitors to an elevated viewpoint &nbsp;·&nbsp; D. To transport passengers underground</div></td>
+    <td class="ans"><b>C</b> To take visitors to an elevated viewpoint</td>
+  </tr>
+  <tr>
+    <td class="n">24</td>
+    <td>What is Atami Sun Beach best known for?<div class="small muted">A. A ski jump &nbsp;·&nbsp; B. A freshwater lake &nbsp;·&nbsp; C. A rice terrace &nbsp;·&nbsp; D. A sandy waterfront and seaside atmosphere</div></td>
+    <td class="ans"><b>D</b> A sandy waterfront and seaside atmosphere</td>
+  </tr>
+  <tr>
+    <td class="n">25</td>
+    <td>What makes the Atami Marine Fireworks Festival distinctive?<div class="small muted">A. It can be held at various times throughout the year &nbsp;·&nbsp; B. It only takes place once every 100 years &nbsp;·&nbsp; C. It is held inside a shopping mall &nbsp;·&nbsp; D. It only happens at sunrise</div></td>
+    <td class="ans"><b>A</b> It can be held at various times throughout the year</td>
+  </tr>
+  <tr>
+    <td class="n">26</td>
+    <td>What type of transport is a ropeway?<div class="small muted">A. A ferry &nbsp;·&nbsp; B. A cable-propelled aerial transport system &nbsp;·&nbsp; C. A bicycle &nbsp;·&nbsp; D. A subway train</div></td>
+    <td class="ans"><b>B</b> A cable-propelled aerial transport system</td>
+  </tr>
+  <tr>
+    <td class="n">27</td>
+    <td>True or false: Atami’s fireworks festival takes place every single night.<div class="small muted">A. True &nbsp;·&nbsp; B. False</div></td>
+    <td class="ans"><b>B</b> False</td>
+  </tr>
+  <tr>
+    <td class="n">28</td>
+    <td>Which activity is most closely associated with a traditional Japanese hot-spring resort?<div class="small muted">A. Sandboarding in a desert &nbsp;·&nbsp; B. Glacier climbing &nbsp;·&nbsp; C. Soaking in an onsen &nbsp;·&nbsp; D. Dog sledding</div></td>
+    <td class="ans"><b>C</b> Soaking in an onsen</td>
+  </tr>
+  <tr>
+    <td class="n">29</td>
+    <td>What is Kiunkaku in Atami known for?<div class="small muted">A. A historic villa and its architecture &nbsp;·&nbsp; B. A Formula One circuit &nbsp;·&nbsp; C. A modern international airport &nbsp;·&nbsp; D. A giant indoor ski resort</div></td>
+    <td class="ans"><b>A</b> A historic villa and its architecture</td>
+  </tr>
+  <tr>
+    <td class="n">30</td>
+    <td>Which location is a practical starting point for exploring shops and eateries around central Atami?<div class="small muted">A. Mount Fuji summit &nbsp;·&nbsp; B. Atami Station &nbsp;·&nbsp; C. Kansai International Airport &nbsp;·&nbsp; D. Tokyo Tower</div></td>
+    <td class="ans"><b>B</b> Atami Station</td>
+  </tr>
+  <tr>
+    <td class="n">31</td>
+    <td>What is himono, a food associated with Atami and the surrounding region?<div class="small muted">A. A sweet rice cake &nbsp;·&nbsp; B. A fermented soybean soup &nbsp;·&nbsp; C. Dried fish &nbsp;·&nbsp; D. A green tea dessert</div></td>
+    <td class="ans"><b>C</b> Dried fish</td>
+  </tr>
+  <tr>
+    <td class="n">32</td>
+    <td>What is onsen manju?<div class="small muted">A. A steamed bun usually filled with sweet red-bean paste &nbsp;·&nbsp; B. A grilled seafood dish &nbsp;·&nbsp; C. A type of Japanese curry &nbsp;·&nbsp; D. A cold noodle salad</div></td>
+    <td class="ans"><b>A</b> A steamed bun usually filled with sweet red-bean paste</td>
+  </tr>
+  <tr>
+    <td class="n">33</td>
+    <td>Which Japanese dish typically consists of rice topped with seafood?<div class="small muted">A. Ramen &nbsp;·&nbsp; B. Tempura udon &nbsp;·&nbsp; C. Okonomiyaki &nbsp;·&nbsp; D. Seafood donburi</div></td>
+    <td class="ans"><b>D</b> Seafood donburi</td>
+  </tr>
+  <tr>
+    <td class="n">34</td>
+    <td>True or false: You should generally wash your body before entering a communal Japanese onsen bath.<div class="small muted">A. True &nbsp;·&nbsp; B. False</div></td>
+    <td class="ans"><b>A</b> True</td>
+  </tr>
+  <tr>
+    <td class="n">35</td>
+    <td>Which is good etiquette when using a communal onsen?<div class="small muted">A. Swim across the bath &nbsp;·&nbsp; B. Keep your hair out of the bathing water &nbsp;·&nbsp; C. Bring food into the bath &nbsp;·&nbsp; D. Wash your clothes in the bath</div></td>
+    <td class="ans"><b>B</b> Keep your hair out of the bathing water</td>
+  </tr>
+  <tr>
+    <td class="n">36</td>
+    <td>What is the time difference between Malaysia and Japan?<div class="small muted">A. Japan is 2 hours behind Malaysia &nbsp;·&nbsp; B. Both countries use the same time &nbsp;·&nbsp; C. Japan is 1 hour ahead of Malaysia &nbsp;·&nbsp; D. Japan is 3 hours ahead of Malaysia</div></td>
+    <td class="ans"><b>C</b> Japan is 1 hour ahead of Malaysia</td>
+  </tr>
+  <tr>
+    <td class="n">37</td>
+    <td>If it is 10:00 a.m. in Malaysia, what time is it in Atami?<div class="small muted">A. 11:00 a.m. &nbsp;·&nbsp; B. 9:00 a.m. &nbsp;·&nbsp; C. 12:00 noon &nbsp;·&nbsp; D. 10:00 p.m.</div></td>
+    <td class="ans"><b>A</b> 11:00 a.m.</td>
+  </tr>
+  <tr>
+    <td class="n">38</td>
+    <td>True or false: Atami is located in Hokkaido, Japan’s northernmost main island.<div class="small muted">A. True &nbsp;·&nbsp; B. False</div></td>
+    <td class="ans"><b>B</b> False</td>
+  </tr>
+  <tr>
+    <td class="n">39</td>
+    <td>What is customary when receiving a Japanese business card?<div class="small muted">A. Immediately fold it into your pocket &nbsp;·&nbsp; B. Write on it without looking at it &nbsp;·&nbsp; C. Hand it back without acknowledging it &nbsp;·&nbsp; D. Receive it respectfully and take a moment to look at it</div></td>
+    <td class="ans"><b>D</b> Receive it respectfully and take a moment to look at it</td>
+  </tr>
+  <tr>
+    <td class="n">40</td>
+    <td>Why should visitors check the weather before outdoor activities in Atami?<div class="small muted">A. Japan has no weather forecasts &nbsp;·&nbsp; B. Coastal weather can affect visibility, comfort and outdoor plans &nbsp;·&nbsp; C. It is always snowing in October &nbsp;·&nbsp; D. The weather never changes near the sea</div></td>
+    <td class="ans"><b>B</b> Coastal weather can affect visibility, comfort and outdoor plans</td>
+  </tr>
+  </table>
+  <div class="foot"><span>Game Master pack</span><span>Atami quiz answer key</span></div>
+</section>
+
+</body>
+</html>

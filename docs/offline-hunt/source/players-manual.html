@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atami Treasure Hunt — Offline Manual</title>
+<style>
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+  :root {
+    --ink: #17171C; --soft: #5A5A66; --red: #D7322B; --sea: #1F7A8C; --gold: #E9A82C;
+    --paper: #FFFFFF; --tint: #F6F1E7; --rule: #D9D2C3; --green: #5B7F3E;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 10.5pt/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { page-break-after: always; break-after: page; }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+  h1, h2, h3 { margin: 0; line-height: 1.15; }
+  h1 { font-size: 30pt; font-weight: 900; letter-spacing: -.01em; }
+  h2 { font-size: 22pt; font-weight: 900; }
+  h3 { font-size: 11pt; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 14px 0 6px; }
+  p { margin: 0 0 7px; }
+  ul, ol { margin: 0 0 6px; padding-left: 18px; }
+  li { margin: 0 0 4px; }
+  b { font-weight: 800; }
+  .eyebrow { font: 700 8.5pt/1 "Consolas", monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--red); }
+  .muted { color: var(--soft); }
+  .small { font-size: 9pt; }
+
+  /* Cover */
+  .cover-band { background: var(--ink); color: #fff; border-radius: 10px; padding: 22px 22px 18px; margin-bottom: 14px; }
+  .cover-band .eyebrow { color: var(--gold); }
+  .cover-band h1 { color: #fff; margin: 6px 0 6px; }
+  .cover-band p { color: #E6E6EA; margin: 0; font-size: 11pt; }
+  .alert { border: 2.5px solid var(--red); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; background: #FFF5F4; }
+  .alert b { color: var(--red); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .box { border: 1.5px solid var(--ink); border-radius: 10px; padding: 10px 13px; }
+  .box.tint { background: var(--tint); border-color: var(--rule); }
+  .box h3:first-child { margin-top: 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 9.8pt; }
+  th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 700 8pt/1.2 "Consolas", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); border-bottom: 1.5px solid var(--ink); }
+  td.n { font-weight: 900; color: var(--red); width: 22px; }
+  td.pts { white-space: nowrap; }
+
+  .msg { font-family: "Consolas", monospace; font-size: 9.5pt; background: #E7F8EC; border: 1px solid #A9DDB8; border-radius: 8px; padding: 6px 10px; margin: 4px 0 8px; white-space: pre-wrap; }
+
+  /* Game pages */
+  .game-head { display: flex; gap: 14px; align-items: center; border-bottom: 3px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
+  .badge { flex: none; width: 58px; height: 58px; border-radius: 50%; background: var(--ink); color: var(--gold);
+    display: grid; place-items: center; font: 900 26pt/1 "Segoe UI", Arial, sans-serif; }
+  .game-head .eyebrow { margin-bottom: 4px; }
+  .tagline { font-size: 11pt; color: var(--soft); margin-top: 3px; }
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 30px; margin-bottom: 8px; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 21px; height: 21px; border-radius: 50%;
+    background: var(--red); color: #fff; font: 800 9.5pt/21px "Segoe UI", Arial, sans-serif; text-align: center; }
+  .score { background: var(--ink); color: #fff; border-radius: 10px; padding: 11px 14px; }
+  .score h3 { color: var(--gold); margin-top: 0; }
+  .score .big { font-size: 20pt; font-weight: 900; line-height: 1.1; }
+  .score ul { padding-left: 16px; }
+  .score li { margin-bottom: 3px; }
+  .who { border-left: 4px solid var(--gold); background: var(--tint); padding: 7px 11px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 10pt; }
+  .q { border: 1.5px solid var(--ink); border-radius: 8px; padding: 7px 10px; margin-bottom: 7px; }
+  .q .line { border-bottom: 1px dotted var(--soft); height: 20px; margin-top: 4px; }
+  .tick { display: inline-block; width: 13px; height: 13px; border: 1.5px solid var(--ink); border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  .foot { margin-top: 12px; padding-top: 7px; border-top: 1px solid var(--rule); font-size: 8.5pt; color: var(--soft); display: flex; justify-content: space-between; }
+  .card-row td { height: 26px; }
+  /* The cover carries the most; keep it on one page. */
+  .cover { font-size: 9.6pt; }
+  .cover .cover-band { padding: 16px 20px 14px; margin-bottom: 10px; }
+  .cover h1 { font-size: 24pt; }
+  .cover h3 { margin: 10px 0 5px; }
+  .cover li { margin-bottom: 2px; }
+  .cover table { font-size: 9pt; }
+  .cover th, .cover td { padding: 3px 5px; }
+</style>
+</head>
+<body>
+
+<!-- ═════════════ COVER & GENERAL RULES ═════════════ -->
+<section class="page cover">
+  <div class="cover-band">
+    <div class="eyebrow">Atami Treasure Hunt · Offline manual · Day 4</div>
+    <h1>If the app is down, play from this.</h1>
+    <p>Same 7 games, same rules, same points as the app. Photos, videos, answers and boss questions go by <b>WhatsApp</b> instead.</p>
+  </div>
+
+  <div class="alert">
+    <b>When to use this manual:</b> only when the Game Master tells you the hunt has switched to <b>offline mode</b> (the app or server is down, or the app keeps crashing). Until then, keep playing in the app.
+  </div>
+
+  <div class="grid2">
+    <div class="box">
+      <h3>Game Master</h3>
+      <p><b>Ariff</b> runs the hunt and keeps every score.</p>
+      <p>WhatsApp: <b>__________________________</b></p>
+      <p class="small muted">Everything you send for a game goes to Ariff in a <b>private WhatsApp chat</b>, not the trip group, so other groups can’t see it. Facilitators on the ground: Carmen and Kevin.</p>
+    </div>
+    <div class="box">
+      <h3>Your group</h3>
+      <table>
+        <tr><th>Group</th><th>Leader</th><th>Members</th></tr>
+        <tr><td><b>A</b></td><td>Jay</td><td>Helmi, Ruby, Aidan, Asma’, Jay</td></tr>
+        <tr><td><b>B</b></td><td>Raf</td><td>Aina, Ashley, Hairul, Raf, Shahrul</td></tr>
+        <tr><td><b>C</b></td><td>Huai Yu</td><td>Aiman, Huai Yu, Ragina, Eleora, Yu Han</td></tr>
+        <tr><td><b>D</b></td><td>Jord</td><td>Nicholas, Amir, Jord, Liyana, Chiew</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>The clock</h3>
+  <ul>
+    <li><b>90 minutes.</b> It starts when Ariff sends <b>“START”</b> on WhatsApp and stops when he sends <b>“TIME’S UP”</b>. Anything sent after that doesn’t count.</li>
+    <li>You can finish early: send <b>“[Group X] FINISHED”</b> to Ariff.</li>
+    <li>If you switched to offline mid-hunt, the time already used still counts. Stamps you already collected in the app still count too; Ariff has them.</li>
+  </ul>
+
+  <h3>How to send things</h3>
+  <p>Start every message with your <b>group and game number</b>, so Ariff can file it fast:</p>
+  <div class="msg">[Group A] Game 2 – Copy the pose   (then attach the photo)</div>
+  <ul>
+    <li>Ariff replies <b>✅ Stamp N</b> when a game is accepted. <b>No ✅ means not collected yet</b>, so tick your stamp card (last page) only after the ✅.</li>
+    <li>The <b>leader</b> sends, except photo bingo and the pitch video, which <b>anyone</b> in the group can send.</li>
+    <li>Ariff goes by the <b>WhatsApp time</b> on each message.</li>
+  </ul>
+
+  <div class="grid2" style="margin-top:10px">
+    <div class="box tint">
+      <h3>Order &amp; area</h3>
+      <ul class="small">
+        <li>Play the games in any order. Skipping is allowed, but a game you never play scores nothing.</li>
+        <li>Stay inside the marked areas on the map. No route to follow.</li>
+        <li>Everyone goes to every spot <b>together</b>. Nobody goes off alone.</li>
+      </ul>
+    </div>
+    <div class="box tint">
+      <h3>Safety</h3>
+      <ul class="small">
+        <li>Count heads before you move on. Watch for cars and bikes on narrow streets.</li>
+        <li>Atami is hilly: walk, don’t run, on slopes and stairs. Drink water.</li>
+        <li><b>Emergency: 119</b> (ambulance, fire) or <b>110</b> (police), then tell Ariff.</li>
+        <li><b>No signal at all?</b> Don’t wander looking for it. Go back to the <b>start point</b> together; the committee will meet you there.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Page 1</span></div>
+</section>
+
+<!-- ═════════════ SCORING SUMMARY ═════════════ -->
+<section class="page">
+  <div class="eyebrow">How it works</div>
+  <h2 style="margin:4px 0 10px">The 7 games and what they score</h2>
+
+  <table>
+    <tr><th>#</th><th>Game</th><th>What you send Ariff on WhatsApp</th><th>Points</th></tr>
+    <tr><td class="n">1</td><td><b>Photo bingo</b></td><td>A team selfie at each tile’s spot (anyone in the group)</td><td class="pts">10 stamp + 1 per photo</td></tr>
+    <tr><td class="n">2</td><td><b>Copy the pose</b></td><td>One group photo copying the pose</td><td class="pts">10 stamp · +5 best pose</td></tr>
+    <tr><td class="n">3</td><td><b>Atami quiz</b></td><td>A team selfie at the landmark, then a quiz on a WhatsApp call</td><td class="pts">10 stamp + 2 per right answer</td></tr>
+    <tr><td class="n">4</td><td><b>Buy it, try it</b></td><td>A video of your pitch to the bosses (anyone in the group)</td><td class="pts">10 stamp + 2 × bosses’ rating (1–10)</td></tr>
+    <tr><td class="n">5</td><td><b>Look around you</b></td><td>One message with all your answers</td><td class="pts">10 stamp + 2 per right answer</td></tr>
+    <tr><td class="n">6</td><td><b>Know your colleagues</b></td><td>Answers on a WhatsApp call</td><td class="pts">10 stamp + 2 per right answer</td></tr>
+    <tr><td class="n">7</td><td><b>Find the boss</b></td><td>Yes/no questions in your boss chat, then a funny photo with the bosses</td><td class="pts">20 selfie · +5 funniest photo</td></tr>
+    <tr><td class="n">★</td><td><b>First to finish</b></td><td>The first group to collect all 7 stamps</td><td class="pts">+15</td></tr>
+  </table>
+
+  <div class="grid2" style="margin-top:14px">
+    <div class="box">
+      <h3>Judged at the finish</h3>
+      <p>The committee picks one winner for each: <b>best pose photo</b> (game 2) and <b>funniest group photo with the bosses</b> (game 7). <b>+5</b> each.</p>
+    </div>
+    <div class="box">
+      <h3>First to finish</h3>
+      <p>The group whose <b>last ✅ stamp</b> from Ariff comes first, by WhatsApp time, gets <b>+15</b>. You need all 7.</p>
+    </div>
+  </div>
+
+  <h3>What WhatsApp replaces</h3>
+  <table>
+    <tr><th>In the app</th><th>Offline</th></tr>
+    <tr><td>Reference photos (bingo tiles, pose, landmark)</td><td>Ariff sends them to your leader on WhatsApp when the hunt switches to offline</td></tr>
+    <tr><td>Send photo / video buttons</td><td>Attach it in your private chat with Ariff</td></tr>
+    <tr><td>Quiz screens (games 3 and 6)</td><td>Ariff asks the questions on a <b>WhatsApp voice call</b> with your leader</td></tr>
+    <tr><td>Boss chat (game 7)</td><td>Your group’s <b>“Find the boss” WhatsApp group</b> with Tim, Ellice and Ariff</td></tr>
+    <tr><td>Bosses rate your pitch in their inbox (game 4)</td><td>The bosses tell Ariff the rating on WhatsApp</td></tr>
+    <tr><td>“Collect the stamp”</td><td>Ariff’s <b>✅ Stamp N</b> reply</td></tr>
+  </table>
+
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Page 2</span></div>
+</section>
+
+<!-- ═════════════ GAME 1 — PHOTO BINGO ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">1</div>
+    <div><div class="eyebrow">Stamp 1 of 7 · All areas</div><h2>Photo bingo</h2>
+      <div class="tagline">Find every spot on your card and take a team selfie there.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>Ariff sends your group its <b>bingo card</b>: one photo per tile, numbered. Each tile is a photo of something around the hunt area.</li>
+        <li>Find the spot in a tile’s photo. The <b>whole team</b> goes there together.</li>
+        <li>Take a <b>selfie of the whole team</b> at that spot.</li>
+        <li><b>Anyone</b> in the group sends it to Ariff, with the tile number.</li>
+        <li>Do the same for every tile. When <b>all tiles</b> are sent, the leader sends <b>“Collect bingo”</b>.</li>
+      </ol>
+      <h3>Send it like this</h3>
+      <div class="msg">[Group B] Game 1 – Tile 4   (attach the selfie)
+[Group B] Game 1 – Collect bingo</div>
+      <div class="who"><b>Who:</b> anyone in the group can send a tile, from their own phone. Only the leader sends “Collect bingo”.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 + 1 per photo</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>1</b> for every correct photo.</li>
+          <li>The stamp needs <b>every tile</b> on your card. A part-filled card scores nothing, so finish it.</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>The spot in your selfie must match the tile.</li>
+        <li>Everyone in the group must be in the selfie.</li>
+        <li>You can leave the card part-filled, play other games and come back to it.</li>
+        <li>Sent the wrong photo? Send the right one with the same tile number; Ariff keeps the latest.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 1 · Photo bingo</span></div>
+</section>
+
+<!-- ═════════════ GAME 2 — COPY THE POSE ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">2</div>
+    <div><div class="eyebrow">Stamp 2 of 7</div><h2>Copy the pose</h2>
+      <div class="tagline">Go to the place in the first photo, then copy the pose in the second.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>Ariff sends your leader two photos: <b>WHERE</b> (the place) and <b>POSE</b> (the pose to copy). If there’s a Google Maps link for the place, he sends that too.</li>
+        <li>Go to the place in the <b>WHERE</b> photo, together.</li>
+        <li>Copy the pose in the <b>POSE</b> photo, <b>the whole team</b>.</li>
+        <li>Take <b>one</b> group photo and the leader sends it to Ariff.</li>
+      </ol>
+      <h3>Send it like this</h3>
+      <div class="msg">[Group C] Game 2 – Copy the pose   (attach the photo)</div>
+      <div class="who"><b>Who:</b> only the group leader takes and sends the pose photo.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 · +5 best pose</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>+5</b> if the committee judges yours the <b>best pose photo</b> of all groups (picked at the finish).</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>Everyone in the frame. Ask a passer-by to hold the phone if you have to.</li>
+        <li>It must be taken at the place in the WHERE photo.</li>
+        <li>One photo per group. If you send a retake, Ariff uses the latest.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 2 · Copy the pose</span></div>
+</section>
+
+<!-- ═════════════ GAME 3 — ATAMI QUIZ ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">3</div>
+    <div><div class="eyebrow">Stamp 3 of 7</div><h2>Atami quiz</h2>
+      <div class="tagline">Find the landmark, take a selfie, then answer the quiz: How well do you know Atami?</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>Part A · The selfie</h3>
+      <ol class="steps">
+        <li>Ariff sends your leader the <b>WHERE</b> photo of a landmark. Work out where it is and go there.</li>
+        <li>Take a <b>team selfie</b> with everyone in it and the landmark behind you. The leader sends it to Ariff.</li>
+        <li>When Ariff replies <b>“Quiz unlocked”</b>, go on to Part B.</li>
+      </ol>
+      <div class="msg">[Group D] Game 3 – Selfie   (attach the selfie)</div>
+      <h3>Part B · The quiz (WhatsApp call)</h3>
+      <ol class="steps">
+        <li>The leader messages <b>“[Group D] Game 3 – Ready for the quiz”</b>. Ariff <b>calls the leader on WhatsApp</b>. Put it on speaker.</li>
+        <li>Ariff reads <b>15 questions</b>, one at a time, with the answer choices.</li>
+        <li>You have <b>10 seconds</b> per question. The leader says the team’s answer. Ariff tells you right or wrong.</li>
+        <li><b>Out of time on a question?</b> The round is over: start again from question 1 with new questions.</li>
+        <li>Get <b>at least 10 of 15</b> right to pass. Fall short (or can’t reach 10 any more) and you get <b>15 new questions</b> to try again.</li>
+        <li>Pass, and Ariff replies <b>✅ Stamp 3</b>.</li>
+      </ol>
+      <div class="who"><b>Who:</b> only the group leader sends the selfie and answers the questions. Decide together first.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 + 2 per right answer</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>2</b> for every right answer in your <b>passing</b> round.</li>
+          <li>Pass mark: <b>10 of 15</b>. So a pass is worth at least 30.</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>Answer as a team.</li>
+        <li><b>No searching, no asking anyone outside the team, no AI.</b></li>
+        <li>Call dropped? Message Ariff; he calls back and carries on from the same question.</li>
+        <li>If Ariff is on another group’s call, wait for his call back. He goes in the order your “Ready” messages arrived.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 3 · Atami quiz</span></div>
+</section>
+
+<!-- ═════════════ GAME 4 — BUY IT, TRY IT ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">4</div>
+    <div><div class="eyebrow">Stamp 4 of 7</div><h2>Buy it, try it</h2>
+      <div class="tagline">Buy anything you like, then sell it to the bosses.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>Buy anything you like. <b>Any amount.</b></li>
+        <li>Take what you bought to <b>Tim and Ellice</b> when you find them (see game 7), and <b>convince them to buy it from you</b>.</li>
+        <li><b>Anyone</b> in the group records the pitch as a <b>video</b> (up to 2 minutes) and sends it to Ariff.</li>
+        <li>The boss who heard your pitch rates how convincing it was, <b>1 to 10</b>, and sends the rating to Ariff on WhatsApp.</li>
+        <li>When Ariff has <b>both the video and the rating</b>, he replies <b>✅ Stamp 4</b> with your rating.</li>
+      </ol>
+      <h3>Send it like this</h3>
+      <div class="msg">[Group A] Game 4 – Pitch video   (attach the video)</div>
+      <div class="who"><b>Who:</b> anyone in the group can record and send the video. The rating comes from the bosses, not from you.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 + 2 × rating</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>2</b> for every mark of the bosses’ 1–10 rating.</li>
+          <li>Up to <b>30</b>.</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>The stamp needs <b>the video and the rating</b>. No video, no stamp.</li>
+        <li>Video too big for WhatsApp? Record a shorter one, or send it as a <b>document</b>.</li>
+        <li>You can pitch while playing game 7, since you’re with the bosses anyway.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 4 · Buy it, try it</span></div>
+</section>
+
+<!-- ═════════════ GAME 5 — LOOK AROUND YOU ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">5</div>
+    <div><div class="eyebrow">Stamp 5 of 7 · Area 3 to Area 4</div><h2>Look around you</h2>
+      <div class="tagline">Notice everything on the walk: the answers are along the way, not on the internet.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>Play it <b>on the walk from Area 3 to Area 4</b>. Every answer is somewhere along that stretch: shop signs, things in windows, what’s on the street and above it.</li>
+        <li>Split the questions between you <b>before</b> you set off. Keep your eyes up: once you reach Area 4 you can’t walk back to check.</li>
+        <li>Work out the answers together and write them below.</li>
+        <li>The leader sends <b>all answers in one message</b>. <b>You only send once</b>, so check them first.</li>
+      </ol>
+      <h3>Send it like this</h3>
+      <div class="msg">[Group B] Game 5 – Look around you
+1. …
+2. …
+3. …
+4. …
+5. …</div>
+      <div class="who"><b>Who:</b> only the group leader sends the answers. Work them out together.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 + 2 per right answer</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>2</b> for every right answer. The committee marks them.</li>
+          <li>Up to <b>20</b>.</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>Phones down: none of this is on the internet.</li>
+        <li>One answer per question.</li>
+        <li>Only your first answer message counts.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>The questions</h3>
+  <div class="q"><b>1.</b> Something that is red. Name the object.<div class="line"></div></div>
+  <div class="q"><b>2.</b> Name a shop or cafe sign you passed on the way.<div class="line"></div></div>
+  <div class="q"><b>3.</b> How many pedestrian crossings did you cross between Area 3 and Area 4?<div class="line"></div></div>
+  <div class="q"><b>4.</b> Something white and floating.<div class="line"></div></div>
+  <div class="q"><b>5.</b> The last shop you passed before reaching Area 4. Name it.<div class="line"></div></div>
+
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 5 · Look around you</span></div>
+</section>
+
+<!-- ═════════════ GAME 6 — KNOW YOUR COLLEAGUES ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">6</div>
+    <div><div class="eyebrow">Stamp 6 of 7</div><h2>Do you know your colleagues?</h2>
+      <div class="tagline">Questions about the people in the other groups, all mixed up.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>The leader messages <b>“[Group C] Game 6 – Ready”</b>. Ariff <b>calls the leader on WhatsApp</b>. Put it on speaker so the whole group hears.</li>
+        <li>Ariff reads each question with its answer choices. The questions are about <b>people in the other groups</b>, all mixed up.</li>
+        <li>Decide together. The leader says the answer. Ariff tells you right or wrong; if it’s wrong, he tells you the right one.</li>
+        <li><b>Answer all 25 questions.</b> After the last one, Ariff replies <b>✅ Stamp 6</b> with your score.</li>
+      </ol>
+      <div class="who"><b>Who:</b> only the group leader answers. Everyone else listens on speaker and helps decide.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">10 + 2 per right answer</div>
+        <ul>
+          <li><b>10</b> for the stamp.</li>
+          <li><b>2</b> for every right answer.</li>
+          <li><b>There’s no minimum score.</b> Unlike the Atami quiz you can’t fail this one: the stamp is yours after the last question.</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li>No asking the people the questions are about.</li>
+        <li>No messaging other groups for answers.</li>
+        <li>Call dropped? Message Ariff; he carries on from the same question.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 6 · Know your colleagues</span></div>
+</section>
+
+<!-- ═════════════ GAME 7 — FIND THE BOSS ═════════════ -->
+<section class="page">
+  <div class="game-head">
+    <div class="badge">7</div>
+    <div><div class="eyebrow">Stamp 7 of 7</div><h2>Find the boss</h2>
+      <div class="tagline">Tim and Ellice are hiding in the hunt area. Ask yes/no questions, then find them.</div></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to play</h3>
+      <ol class="steps">
+        <li>Your group has its own <b>“Find the boss – Group X”</b> WhatsApp group with <b>Tim, Ellice and Ariff</b>. Other groups can’t see it.</li>
+        <li>The <b>leader</b> asks the bosses questions there. They <b>only answer Yes or No</b>, truthfully.</li>
+        <li>Ask <b>one question at a time</b>: wait for the answer before the next.</li>
+        <li>Your group gets only <b>2 questions</b>. When the bosses move to a new spot, they post <b>“🚶 We’re moving”</b> and you get <b>2 more</b>.</li>
+        <li>Use the answers to work out where they are, and go find them.</li>
+        <li>Take <b>one funny-pose photo of the whole team with Tim and Ellice</b>. The leader sends it to Ariff.</li>
+      </ol>
+      <h3>Send it like this</h3>
+      <div class="msg">In “Find the boss – Group D”:  Are you near the water?
+To Ariff:  [Group D] Game 7 – Boss photo   (attach the photo)</div>
+      <div class="who"><b>Who:</b> only the group leader asks the bosses and sends the photo. Everyone in the group sees the answers.</div>
+    </div>
+    <div>
+      <div class="score">
+        <h3>Scoring</h3>
+        <div class="big">20 · +5 funniest</div>
+        <ul>
+          <li><b>20</b> for the selfie with Tim and Ellice (this game has no separate 10-point stamp).</li>
+          <li><b>+5</b> if the committee judges yours the <b>funniest group photo</b> (picked at the finish).</li>
+        </ul>
+      </div>
+      <h3>Rules</h3>
+      <ul>
+        <li><b>Yes/no questions only.</b> “Where are you?” gets no answer, and still uses one of your 2.</li>
+        <li>No hints from the bosses, in the chat or in person.</li>
+        <li>Your whole team must be in the photo, with both bosses.</li>
+        <li>While you’re with them, do your <b>Buy it, try it</b> pitch (game 4).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Game 7 · Find the boss</span></div>
+</section>
+
+<!-- ═════════════ STAMP CARD & FINISH ═════════════ -->
+<section class="page">
+  <div class="eyebrow">Keep track</div>
+  <h2 style="margin:4px 0 4px">Your stamp card</h2>
+  <p class="muted">Tick a game only when Ariff has replied <b>✅ Stamp N</b>. Group: <b>______</b>  Leader: <b>____________________</b></p>
+
+  <table style="margin-top:8px">
+    <tr><th>#</th><th>Game</th><th>Sent (time)</th><th>✅ from Ariff</th><th>Points (if told)</th></tr>
+    <tr class="card-row"><td class="n">1</td><td>Photo bingo (all tiles)</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">2</td><td>Copy the pose</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">3</td><td>Atami quiz (selfie + pass the quiz)</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">4</td><td>Buy it, try it (video + rating)</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">5</td><td>Look around you</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">6</td><td>Know your colleagues</td><td></td><td><span class="tick"></span></td><td></td></tr>
+    <tr class="card-row"><td class="n">7</td><td>Find the boss</td><td></td><td><span class="tick"></span></td><td></td></tr>
+  </table>
+
+  <div class="grid2" style="margin-top:16px">
+    <div class="box">
+      <h3>Bingo tiles sent</h3>
+      <p class="small muted">Tick each tile when sent.</p>
+      <p style="font-size:12pt; letter-spacing:.3em">
+        ☐1 ☐2 ☐3 ☐4 ☐5 ☐6<br>☐7 ☐8 ☐9 ☐10 ☐11 ☐12
+      </p>
+    </div>
+    <div class="box">
+      <h3>Boss questions</h3>
+      <p class="small muted">2 per spot. Reset when the bosses post “We’re moving”.</p>
+      <p style="font-size:12pt; letter-spacing:.3em">☐ ☐ · ☐ ☐ · ☐ ☐ · ☐ ☐</p>
+    </div>
+  </div>
+
+  <div class="box tint" style="margin-top:16px">
+    <h3>At the end</h3>
+    <ol>
+      <li>When you finish (or at <b>TIME’S UP</b>), head back to the <b>start point</b> together, as a group.</li>
+      <li>The committee checks every group’s submissions, judges <b>best pose</b> and <b>funniest boss photo</b>, and marks <b>Look around you</b>.</li>
+      <li>The first group with all 7 ✅ stamps gets <b>+15</b>. Highest total wins.</li>
+    </ol>
+  </div>
+
+  <div class="foot"><span>Atami Treasure Hunt · Offline manual</span><span>Stamp card</span></div>
+</section>
+
+</body>
+</html>

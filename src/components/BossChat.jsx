@@ -18,6 +18,8 @@ import huntGroups, { huntGroupOf } from '../data/huntGroups';
 import {
   QUESTION_LIMIT, QUESTION_MAX, ping, questionsUsed, unlockSound, useBossMoves, useBossQuestions, useWakeLock,
 } from '../lib/bossChat';
+import { usePitchRatings } from '../lib/pitchRatings';
+import { usePitchVideos } from '../lib/pitchVideos';
 
 const ROSTER_SHORT = new Map(groupRoster.flatMap((t) => t.members)
   .filter((m) => m.full).map((m) => [m.full.trim().toUpperCase(), m.name]));
@@ -218,6 +220,100 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
   );
 }
 
+/* ── Buy it, try it: rating a pitch ──────────────────
+   The boss who heard a group's pitch picks the group and a mark; the
+   group's phone collects the stamp with it as soon as it lands. */
+function PitchRating() {
+  const { ratings, ready, loaded, rate } = usePitchRatings();
+  const pv = usePitchVideos();
+  const [team, setTeam] = useState(null);
+  const teamVideos = team ? pv.videos.filter((v) => v.team === team) : [];
+  const [mark, setMark] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const pick = (on) => ({
+    minHeight: 46, borderRadius: 8, border: '2px solid var(--ink)', cursor: 'pointer',
+    font: '800 17px/1 var(--body)',
+    background: on ? 'var(--red)' : 'var(--card)', color: on ? '#fff' : 'var(--ink)',
+  });
+
+  const give = async () => {
+    if (!team || !mark || busy) return;
+    setBusy(true);
+    setNote('');
+    try {
+      await rate(team, mark);
+      setNote(`Sent — ${huntGroupOf(team)?.name ?? team}: ${mark}/10.`);
+      setTeam(null);
+      setMark(null);
+    } catch (err) {
+      setNote(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="card mt-4">
+      <b>Buy it, try it</b>
+      <p className="text-sm text-gray-500 mt-1">After a group’s pitch: pick the group, watch their video, then rate how convincing it was.</p>
+      {loaded && !ready ? (
+        <p className="note" style={{ margin: '10px 0 0' }}>Not switched on yet — groups rate on their leader’s phone instead.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            {huntGroups.map((g) => (
+              <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => setTeam(g.id)} style={pick(team === g.id)}>
+                <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style={{ background: g.colour, border: '1px solid #fff' }} />
+                {g.name}
+              </button>
+            ))}
+          </div>
+          {team && pv.ready && (
+            <div className="mt-3">
+              {teamVideos.length ? teamVideos.map((v) => (
+                <div key={v.id} className="mb-2">
+                  {v.src && (
+                    <video src={v.src} poster={v.thumb ?? undefined} controls playsInline preload="none"
+                      style={{ display: 'block', width: '100%', maxHeight: 320, borderRadius: 8, border: '2px solid var(--ink)', background: '#000' }} />
+                  )}
+                  <span className="text-[11px] text-gray-500">🎥 {shortName(v.uploader_name)} · {clock(v.created_at)}</span>
+                </div>
+              )) : (
+                <p className="note" style={{ margin: 0 }}>🎥 No pitch video from {huntGroupOf(team)?.name ?? team} yet. Their stamp waits for one.</p>
+              )}
+            </div>
+          )}
+          <div role="radiogroup" aria-label="Rating from 1 to 10" className="grid grid-cols-5 gap-2 mt-3">
+            {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={mark === n} onClick={() => setMark(n)} style={pick(mark === n)}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn block mt-3" disabled={!team || !mark || busy} onClick={give}>
+            {busy ? 'Sending…' : team && mark ? `Give ${huntGroupOf(team)?.name ?? team} ${mark}/10` : 'Pick a group and a rating'}
+          </button>
+          {note && <p className="note" style={{ margin: '8px 0 0' }} aria-live="polite">{note}</p>}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {huntGroups.map((g) => {
+              const r = ratings[g.id];
+              return (
+                <span key={g.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border-2 border-ink text-[12px] font-bold"
+                  style={{ opacity: r ? 1 : 0.5 }}>
+                  <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: g.colour }} />
+                  {g.name}: {r ? `${r.rating}/10${r.rater_name ? ` · ${shortName(r.rater_name)}` : ''}` : 'not rated'}
+                  {pv.ready && pv.videos.some((v) => v.team === g.id) ? ' · 🎥' : ''}
+                </span>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── The bosses' inbox ─────────────────────────────── */
 export function BossInbox({ onClose }) {
   const [standby, setStandby] = useState(false);
@@ -312,7 +408,7 @@ export function BossInbox({ onClose }) {
           <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
           <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
           <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
-          <li><b>Buy it, try it:</b> a group may try to sell you something they bought. Hear their pitch, then rate how convincing it was from <b>1 to 10</b> on their leader’s phone.</li>
+          <li><b>Buy it, try it:</b> when a group finds you, they will try to convince you to buy something they have bought. Give their pitch a rating from <b>1 to 10</b> on this page, in <b>Buy it, try it</b> at the bottom.</li>
           <li>Keep the app open on this page. Sound on, phone charged.</li>
         </ol>
       </details>
@@ -414,6 +510,8 @@ export function BossInbox({ onClose }) {
           </li>
         ))}
       </ul>
+
+      <PitchRating />
     </main>
   );
 }

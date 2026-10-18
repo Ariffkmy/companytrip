@@ -161,7 +161,7 @@ export const DEFAULT_HUNT_CONFIG = {
     /* Every tile is needed for the stamp, so a full card is just the
        stamp: no separate bonus for it. */
     bingo: {
-      title: 'Photo bingo', photo: null, stop: '',
+      title: 'Photo bingo', photo: null, stop: 'All areas',
       tilePts: 1,
     },
     /* Stamp 6. Keyed `guess` because it replaced the closest-guess game
@@ -303,6 +303,11 @@ export function withDefaults(stored) {
   delete merged.checkpoints.bingo.size;
   /* Saved while a full bingo card earned a bonus on top of the stamp. */
   delete merged.checkpoints.bingo.fullPts;
+  /* Bingo tiles are spread over the whole field, so a badge naming a
+     single area ("Checkpoint 1", "Area 1") sends teams to the wrong place. */
+  if (/^\s*(?:checkpoint|area)\s*\d+\s*$/i.test(merged.checkpoints.bingo.stop ?? '')) {
+    merged.checkpoints.bingo.stop = 'All areas';
+  }
   /* Saved with the older scoring wording ("2 a right answer"), the
      full-card bingo bonus, and Find the boss without the funniest photo. */
   merged.rules = String(merged.rules ?? '')

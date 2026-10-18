@@ -11,7 +11,10 @@ import { listShots, uploadShot, deleteShot } from '../lib/bingo';
 import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhotoToDataUrl, photoErrorMessage } from '../lib/photos';
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
-import { BossThread } from './BossChat';
+import { BossThread, shortName } from './BossChat';
+import { usePitchRatings } from '../lib/pitchRatings';
+import { usePitchVideos } from '../lib/pitchVideos';
+import PitchVideo from './PitchVideo';
 import { framedImgStyle } from './FramedPhoto';
 import {
   AWARDS, SCORED_GAMES, completedAt, cp4Verdicts, fetchResultsPublished, fetchRun, photoPathsOf, pushRun, runSummary,
@@ -1036,6 +1039,31 @@ export default function TreasureHunt({
   }, []);
   onDeviceFull.current = () => showToast(DEVICE_FULL_MESSAGE, 6000);
 
+  /* Buy it, try it: the bosses rate the pitch in their inbox, and the
+     leader's phone collects the stamp with that rating the moment it
+     lands, whichever page it's on. A changed rating replaces the old
+     one. Before the SQL is run (`ready` false) the bosses rate on the
+     leader's phone instead. */
+  const pitch = usePitchRatings({ team: activeTeamId, enabled: !preview && Boolean(activeTeamId) });
+  const pitchRow = pitch.ratings[activeTeamId] ?? null;
+  /* The pitch video, uploaded by anyone in the group. Once its SQL is
+     run, the stamp also waits for a video. */
+  const pitchVideos = usePitchVideos({ team: activeTeamId, enabled: !preview && Boolean(activeTeamId) });
+  const needVideo = pitchVideos.ready && !pitchVideos.videos.length;
+  useEffect(() => {
+    if (!pitchRow || needVideo || preview || readOnly || !canPlay || !S?.teamId || S.teamId !== activeTeamId || !S.startedAt) return;
+    /* A rating from a rehearsal, before this run began, isn't theirs. */
+    if ((Date.parse(pitchRow.updated_at) || 0) < S.startedAt) return;
+    const ratedBy = shortName(pitchRow.rater_name) || null;
+    const prev = S.subs?.cp3;
+    if (prev && prev.rating === pitchRow.rating && prev.ratedBy === ratedBy) return;
+    const newS = { ...S, subs: { ...(S.subs || {}), cp3: { rating: pitchRow.rating, ratedBy, at: Date.parse(pitchRow.updated_at) || Date.now() } } };
+    delete newS.buy;
+    store.save(newS.teamId, newS);
+    setS(newS);
+    showToast(prev ? `Pitch rating changed to ${pitchRow.rating}/10.` : `Stamp collected — your pitch got ${pitchRow.rating}/10.`, 4000);
+  }, [pitchRow, needVideo, preview, readOnly, canPlay, S, activeTeamId, store, showToast]);
+
   const handleFile = useCallback(async (file) => {
     if (!file) return;
     const dataUrl = await compressImage(file);
@@ -1826,7 +1854,9 @@ export default function TreasureHunt({
   const LEADER_NOTE = {
     [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
-    [STAMP_NO.cp3]: 'the bosses rate your pitch on the group leader’s phone.',
+    [STAMP_NO.cp3]: pitch.ready
+      ? 'the stamp lands on the group leader’s phone when the bosses rate your pitch.'
+      : 'the bosses rate your pitch on the group leader’s phone.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
     [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
     [STAMP_NO.boss]: 'only the leader asks the bosses and sends the photo.',
@@ -1872,7 +1902,10 @@ export default function TreasureHunt({
       cp3: [
         'Buy anything you like — any amount.',
         'Find Tim and Ellice and convince them to buy it from you.',
-        'Hand the leader’s phone to them: they rate your pitch from 1 to 10 and tap “Give”.',
+        ...(pitchVideos.ready ? ['Anyone in the group records the pitch and uploads the video here.'] : []),
+        pitch.ready
+          ? 'They rate your pitch from 1 to 10 in their Boss inbox — the stamp lands here by itself.'
+          : 'Hand the leader’s phone to them: they rate your pitch from 1 to 10 and tap “Give”.',
       ],
       cp4: [
         'Work the answers out together.',
@@ -2211,10 +2244,14 @@ export default function TreasureHunt({
       showToast(`Stamp ${STAMP_NO.cp2b} collected.`);
     };
 
+    /* While a question is on screen the page is just the question: no
+       title, map badge, leader note or how to play. */
+    const inQuiz = Boolean(cur) && !collected;
+
     return (
       <div className="card flag">
-        {renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.stop)}
-        {renderHowTo('cp2b')}
+        {!inQuiz && renderCpHead(STAMP_NO.cp2b, CONFIG.cp.cp2b.title, CONFIG.cp.cp2b.stop)}
+        {!inQuiz && renderHowTo('cp2b')}
         {round.length > 0 && !collected && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 6 }}>
             <span aria-live="polite" aria-label={`${rightCount} right, ${rules.passMark} needed`} style={{
@@ -2228,7 +2265,7 @@ export default function TreasureHunt({
             </span>
           </div>
         )}
-        <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />
+        {!inQuiz && <CheckpointPhoto src={CONFIG.cp.cp2b.photo} />}
 
         {collected ? (
           <p style={{ margin: 0, fontWeight: 700 }}>
@@ -2378,6 +2415,21 @@ export default function TreasureHunt({
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
 
+        {!preview && <PitchVideo pv={pitchVideos} />}
+
+        {pitch.ready ? (
+          <div role="status" style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '3px dashed var(--th-dash)', background: 'var(--th-parchment)', textAlign: 'center' }}>
+            <div style={{ fontSize: 26 }}>⏳</div>
+            <p style={{ margin: '4px 0 4px', fontWeight: 800, fontSize: 17 }}>
+              {pitchRow && needVideo ? `Rated ${pitchRow.rating}/10 — upload the video to collect` : 'Waiting for Tim or Ellice’s rating'}
+            </p>
+            <p className="note" style={{ margin: 0 }}>
+              {needVideo ? 'The stamp needs the pitch video and the bosses’ rating. ' : ''}
+              They rate your pitch 1 to 10 in their Boss inbox; the stamp lands here by itself.
+              {per ? ` Each mark is worth ${per} points.` : ''}
+            </p>
+          </div>
+        ) : (
         <div style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '3px solid var(--red)' }}>
           <div className="eyebrow" style={{ color: 'var(--red)' }}>For Tim or Ellice</div>
           <p style={{ margin: '4px 0 12px', fontWeight: 800, fontSize: 17 }}>How convincing was their pitch?</p>
@@ -2406,6 +2458,7 @@ export default function TreasureHunt({
             Team: hand this phone to the boss. {per ? `Each mark is worth ${per} points.` : ''}
           </p>
         </div>
+        )}
       </div>
     );
   };
@@ -3202,7 +3255,7 @@ export default function TreasureHunt({
           <h2 className="display" style={{ fontSize: 24, margin: '4px 0 8px' }}>Your group leader runs the hunt</h2>
           <p style={{ margin: 0 }}>
             Only the leader{leaderName ? ` (${leaderName})` : ''} can play and submit the games for {S?.teamName ?? 'your group'}.
-            You can still take photo bingo shots and follow the boss chat below.
+            You can still take photo bingo shots{pitchVideos.ready ? ', upload the pitch video' : ''} and follow the boss chat below.
           </p>
         </div>
       ))}
@@ -3217,6 +3270,12 @@ export default function TreasureHunt({
               {renderHowTo('bingo')}
               {renderBingoGrid()}
               {renderBingoTile()}
+            </div>
+          )}
+          {pitchVideos.ready && (
+            <div className="card flag" style={{ marginTop: 14 }}>
+              <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.cp3} · {CONFIG.cp.cp3.title}</div>
+              <PitchVideo pv={pitchVideos} />
             </div>
           )}
           <div className="card flag" style={{ marginTop: 14 }}>
