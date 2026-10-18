@@ -177,9 +177,11 @@ export default function StoriesBar({ userId, isAdmin }) {
           </li>
         ))}
 
+        {/* Yours counts: with only your own story up, say so, rather than
+            "no stories yet" beside it. */}
         {stories !== null && others.length === 0 && (
           <li className="self-center text-xs text-gray-500 pl-1 pb-5">
-            {loadFailed ? 'Stories need internet to load.' : 'No stories yet. Post the first one.'}
+            {loadFailed ? 'Stories need internet to load.' : mine ? 'Only yours so far.' : 'No stories yet. Post the first one.'}
           </li>
         )}
       </ul>

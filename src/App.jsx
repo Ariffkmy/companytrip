@@ -192,10 +192,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
 
   return (
     <div className="space-y-4">
-      <MealsBox meals={day.meals} />
-      <YenBox transport={day.transport} food={day.food} />
-
-      {/* Treasure hunt button for Day 4 */}
+      {/* Treasure hunt button for Day 4, first thing on the day */}
       {index === 4 && (
         <button
           onClick={onOpenTreasureHunt}
@@ -206,6 +203,9 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
           <span><em className="not-italic text-gold dark:text-paper">Atami</em> Treasure Hunt</span>
         </button>
       )}
+
+      <MealsBox meals={day.meals} />
+      <YenBox transport={day.transport} food={day.food} />
 
       {/* Timeline */}
       <div className="relative space-y-2.5 pl-5">

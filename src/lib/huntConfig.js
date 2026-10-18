@@ -98,7 +98,8 @@ export const DEFAULT_HUNT_CONFIG = {
 
   /* Per hunt group (src/data/huntGroups.js), not per trip team. */
   teams: Object.fromEntries(HUNT_GROUP_IDS.map((id) => [id, {
-    pose: { photo: null, place: null, placeHint: '', location: '' },
+    /* area: the map area number the place is in ('' = not set). */
+    pose: { photo: null, place: null, placeHint: '', location: '', area: '' },
     spot: { hint: 'Recce photo goes here.', photo: null },
     bingo: [],
   }])),
@@ -141,14 +142,14 @@ export const DEFAULT_HUNT_CONFIG = {
       questions: ATAMI_QUIZ,
     },
     cp3: {
-      title: 'Buy it, try it', photo: null, stop: '',
+      title: 'Buy it, try it', photo: null, stop: 'All areas',
       brief: 'Buy anything you like — then sell it to the bosses.',
       body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.\n\nYou can do this right after you take the selfie with them for **Find the boss**.',
       /* Points for each mark of the bosses' 1–10 rating. */
       pointsPerRating: 2,
     },
     cp4: {
-      title: 'Look around you', photo: null, stop: '',
+      title: 'Look around you', photo: null, stop: 'All areas',
       body: 'This one is played **on the walk from Checkpoint 3 to Checkpoint 4**. Every answer is somewhere along that stretch — shop signs, things in windows, what is on the street and above it.\n\nKeep your eyes up and notice everything as you go: once you reach Checkpoint 4 you can\'t walk back to check. Split the questions between you before you set off. Phones down — none of this is on the internet.',
       questions: [
         { q: 'Something that is red. Name the object.', accept: [] },
@@ -312,6 +313,18 @@ export function withDefaults(stored) {
   if (/^\s*(?:checkpoint|area)\s*\d+\s*$/i.test(merged.checkpoints.bingo.stop ?? '')) {
     merged.checkpoints.bingo.stop = 'All areas';
   }
+  /* Same for Buy it, try it: shops are everywhere, and the bosses it
+     ends with move around. A saved "Area 3" (or "Checkpoint 3 – …"),
+     or no badge at all, reads All areas. */
+  if (!String(merged.checkpoints.cp3.stop ?? '').trim()
+    || /^\s*(?:checkpoint|area)\s*\d+\b/i.test(merged.checkpoints.cp3.stop)) {
+    merged.checkpoints.cp3.stop = 'All areas';
+  }
+  /* And Look around you, saved as "Area 3 to Area 4" and the like. */
+  if (!String(merged.checkpoints.cp4.stop ?? '').trim()
+    || /^\s*(?:checkpoint|area)\s*\d+\b/i.test(merged.checkpoints.cp4.stop)) {
+    merged.checkpoints.cp4.stop = 'All areas';
+  }
   /* Saved with the older scoring wording ("2 a right answer"), the
      full-card bingo bonus, and Find the boss without the funniest photo. */
   merged.rules = String(merged.rules ?? '')
@@ -345,6 +358,19 @@ export function withDefaults(stored) {
       label: stored[i]?.label ?? fresh.label,
       note: stored[i]?.note ?? fresh.note,
     }));
+  }
+  /* Saved before the start area was called Area 1. */
+  const first = merged.map.areas[0];
+  if (first && /^\s*start\s*(?:&|and)\s*finish\s*$/i.test(first.label ?? '')) {
+    first.label = 'Area 1';
+    if (/^The station block\. Everyone starts and ends here\.$/.test(first.note ?? '')) first.note = DEFAULT_HUNT_CONFIG.map.areas[0].note;
+  }
+  /* Saved before areas 4 and 5 were swapped: the south-west tip, which
+     starts at this corner, was area 4 and is now 5. Their outlines trade
+     places; labels and notes stay with the number. */
+  const [a4, a5] = [merged.map.areas[3], merged.map.areas[4]];
+  if (a4?.polygon?.[0]?.[0] === 35.100396 && a4.polygon[0][1] === 139.076286 && a5?.polygon) {
+    [a4.polygon, a5.polygon] = [a5.polygon, a4.polygon];
   }
   return merged;
 }
@@ -380,7 +406,7 @@ export function toRuntime(config) {
       name: g.name,
       colour: g.colour,
       rival: g.rival,
-      pose: { photo: null, place: null, placeHint: '', location: '', ...config.teams[g.id]?.pose },
+      pose: { photo: null, place: null, placeHint: '', location: '', area: '', ...config.teams[g.id]?.pose },
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),

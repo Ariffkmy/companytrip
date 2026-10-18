@@ -129,6 +129,24 @@ function Area({ label, hint, value, onChange, rows = 3 }) {
   );
 }
 
+/* One of the map's areas, by number ('' = not set). Named as the map
+   names them, so the choice matches what players see on it. */
+function AreaPick({ label, hint, areas, value, onChange }) {
+  const id = useFieldId();
+  return (
+    <Field label={label} hint={hint} id={id}>
+      <select id={id} value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+        className={`${inputCls} h-10`}>
+        <option value="">Not set</option>
+        {areas.map((a, i) => {
+          const n = a.n ?? i + 1;
+          return <option key={n} value={n}>{a.label || `Area ${n}`}</option>;
+        })}
+      </select>
+    </Field>
+  );
+}
+
 function Num({ label, hint, value, onChange, min = 0 }) {
   const id = useFieldId();
   return (
@@ -751,12 +769,12 @@ export default function HuntEditor() {
           {huntGroups.map((g) => (
             <div key={g.id} className="rounded-lg border border-gray-200 p-3 space-y-3">
               <p className="font-display text-base tracking-wide">{g.name}</p>
+              <AreaPick label="Area the place is in" hint="Shown on the game page as a 📍 tag that opens the map. Leave as “Not set” to show the game’s own tag."
+                areas={draft.map?.areas ?? []}
+                value={val(['teams', g.id, 'pose', 'area'])} onChange={set(['teams', g.id, 'pose', 'area'])} />
               <Photo label="Place photo — where to go" value={val(['teams', g.id, 'pose', 'place'])} onChange={set(['teams', g.id, 'pose', 'place'])} />
               <Text label="Caption under the place photo" hint="Optional. Leave blank for “Go to this place”."
                 value={val(['teams', g.id, 'pose', 'placeHint'])} onChange={set(['teams', g.id, 'pose', 'placeHint'])} />
-              <Text label="Location of the place" hint="Optional. A Google Maps link, an address or “35.0961, 139.0753”. Teams get an “Open in Google Maps” button."
-                placeholder="https://maps.app.goo.gl/…"
-                value={val(['teams', g.id, 'pose', 'location'])} onChange={set(['teams', g.id, 'pose', 'location'])} />
               <Photo label="Pose photo — what to copy" value={val(['teams', g.id, 'pose', 'photo'])} onChange={set(['teams', g.id, 'pose', 'photo'])} />
             </div>
           ))}

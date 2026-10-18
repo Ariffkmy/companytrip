@@ -408,14 +408,6 @@ function colleagueRoundSize(rows, teamId) {
   return groups ? Math.ceil(pool.length / groups) : 0;
 }
 
-/* The admin's location for a place: a Google Maps link as it is, or a
-   name / address / "lat, lng" turned into a Maps search. */
-function placeMapLink(location) {
-  const v = String(location ?? '').trim();
-  if (!v) return null;
-  return /^https?:\/\//i.test(v) ? v : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(v)}`;
-}
-
 /* A random row the team hasn't seen this round, with the stored wrong
    options shuffled in. `seen` holds row ids. Once every row has been
    seen, it starts over. */
@@ -1946,9 +1938,7 @@ export default function TreasureHunt({
         'When every tile has a photo, the leader taps “Collect the stamp”.',
       ],
       cp1: [
-        currentTeam && placeMapLink(currentTeam.pose.location)
-          ? 'Go to the place in the WHERE photo — “Open the place in Google Maps” gives directions.'
-          : 'Go to the place in the WHERE photo.',
+        'Go to the place in the WHERE photo.',
         'Copy the pose in the POSE photo — the whole team.',
         'Take one group photo and tap “Send photo”.',
       ],
@@ -1968,7 +1958,7 @@ export default function TreasureHunt({
         'Find Tim and Ellice and convince them to buy it from you.',
         ...(pitchVideos.ready ? ['Anyone in the group records the pitch and uploads the video here.'] : []),
         pitch.ready
-          ? 'They rate your pitch from 1 to 10 in their Boss inbox — the stamp lands here by itself.'
+          ? 'They rate your pitch from 1 to 10 — the stamp lands here by itself.'
           : 'Hand the leader’s phone to them: they rate your pitch from 1 to 10 and tap “Give”.',
       ],
       cp4: [
@@ -2101,6 +2091,15 @@ export default function TreasureHunt({
     </span>
   );
 
+  /* The map area the committee put this group's pose place in, named as
+     the map names it — or '' when it isn't set. */
+  const poseAreaLabel = (t) => {
+    const n = Number(t?.pose?.area);
+    if (!n) return '';
+    const a = (CONFIG.map?.areas ?? []).find((x, i) => (x.n ?? i + 1) === n);
+    return a?.label || `Area ${n}`;
+  };
+
   /* Two photos, in the order you act on them: the place tells you where
      to stand, the pose tells you what to do once you are there. */
   const renderCp1 = () => {
@@ -2108,7 +2107,7 @@ export default function TreasureHunt({
     if (!t) return null;
     return (
       <div className="card flag">
-        {renderCpHead(STAMP_NO.cp1, CONFIG.cp.cp1.title, CONFIG.cp.cp1.stop)}
+        {renderCpHead(STAMP_NO.cp1, CONFIG.cp.cp1.title, poseAreaLabel(t) || CONFIG.cp.cp1.stop)}
         {renderHowTo('cp1')}
         <div className="task">
           <Rich text={CONFIG.cp.cp1.body} />
@@ -2120,12 +2119,6 @@ export default function TreasureHunt({
           tag: 'WHERE',
           missing: missingPhoto('Place'),
         })}
-        {placeMapLink(t.pose.location) && (
-          <a className="btn block sea" href={placeMapLink(t.pose.location)} target="_blank" rel="noopener noreferrer"
-            style={{ margin: '-4px 0 14px', justifyContent: 'center', textDecoration: 'none' }}>
-            📍 Open the place in Google Maps
-          </a>
-        )}
         {renderPlate({
           src: t.pose.photo,
           alt: `The pose for ${t.name} to copy`,
@@ -2492,7 +2485,7 @@ export default function TreasureHunt({
             </p>
             <p className="note" style={{ margin: 0 }}>
               {needVideo ? 'The stamp needs the pitch video and the bosses’ rating. ' : ''}
-              They rate your pitch 1 to 10 in their Boss inbox; the stamp lands here by itself.
+              They rate your pitch 1 to 10; the stamp lands here by itself.
               {per ? ` Each mark is worth ${per} points.` : ''}
             </p>
           </div>
@@ -3219,7 +3212,7 @@ export default function TreasureHunt({
         <div className="card">
           <div className="eyebrow" style={{ color: 'var(--red)' }}>{esc(S.teamName)}</div>
           <h2 className="display" style={{ fontSize: 22, margin: '4px 0 12px' }}>
-            {S.stoppedAt ? 'Game over' : ranOut ? 'Time’s up' : 'Hunt complete'}
+            {S.stoppedAt ? 'Game over' : ranOut ? 'Time’s up · Game over' : 'Hunt complete'}
           </h2>
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {GAMES.map((g, i) => (

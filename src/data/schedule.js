@@ -240,7 +240,7 @@
     label: 'Mon 26 Okt',
     title: 'Cup Noodles Museum → Haneda',
     emoji: '🍜',
-    meals: { breakfast: 'Own arrangement', lunch: 'Group lunch at the museum, or own arrangement', dinner: 'To be confirmed' },
+    meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement', dinner: 'Own arrangement' },
     transport: [
       { route: 'MyStays → Cup Noodles Museum', yen: 220 },
       { route: 'Cup Noodles Museum → MyStays', yen: 220 },
@@ -248,14 +248,14 @@
     ],
     food: [
       { meal: 'Breakfast (convenience store)', yen: null },
-      { meal: 'Lunch at the museum', yen: [400, 500], note: 'If the group lunch goes ahead; otherwise own choice' },
+      { meal: 'Lunch (own arrangement)', yen: [400, 500], note: 'e.g. the museum 4F meal area' },
     ],
     activities: [
       { time: '08:30', activity: 'Check-out & luggage drop', place: 'Hotel MyStays Yokohama', note: 'Check out and leave luggage in the designated area. Tip: buy breakfast at a convenience store the day before.' },
       { time: '09:00', activity: 'Meet-up', place: 'Outside the hotel', note: 'Group assembles.' },
       { time: '09:15', activity: 'Depart', place: 'Bandobashi Station', note: 'Travel time 30 min + 20 min extra buffer.' },
       { time: '10:00', activity: '🍜 Cup Noodles Museum', place: 'Cup Noodles Museum Yokohama', note: 'Sakuragicho Station, then ~1 km walk. My CUPNOODLES Factory workshop (~45 min): design your own cup, pick 1 of 4 soup bases + 4 toppings, seal and inflate to take home. ¥1,000 per pax.' },
-      { time: '11:30', activity: 'Lunch', place: 'Museum 4F meal area', note: 'Option A: group lunch at the museum, ~¥400–500 per pax (go up to 4F together). Option B: free & easy at your own cost.' },
+      { time: '11:30', activity: 'Lunch', place: 'Museum 4F meal area', note: 'Own arrangement, at your own cost. The museum 4F meal area is ~¥400–500 per pax.' },
       { time: '12:30', activity: 'Free & easy', place: 'Yokohama World Porters / Red Brick Warehouse', note: 'Shopping and last souvenirs. 1F World Food Hall for food.' },
       { time: '14:30', activity: 'Head back to the hotel', place: 'Meet at Sakuragicho Station', note: 'Travel time 30 min + 30 min extra buffer.' },
       { time: '15:30', activity: 'Pick up luggage · depart for Haneda', place: '→ Haneda Airport', note: '45 min travel time + 1 hr 30 min extra buffer. Round trip transport for the day ≈ ¥780 per pax.' },
@@ -268,7 +268,6 @@
     committeePrep: [
       'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
       'Reconfirm the Cup Noodles Museum booking and workshop slot for 26 pax.',
-      'Decide Option A vs Option B for lunch and announce it beforehand.',
       'Final headcount at Sakuragicho and again before leaving for Haneda.',
       'Confirm luggage storage at the hotel and the 15:30 pick-up.',
     ],
