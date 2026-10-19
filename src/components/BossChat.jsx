@@ -527,6 +527,9 @@ export function BossInboxCard({ onOpen }) {
       <p className="text-sm text-gray-500 mt-1.5">
         {error || (waiting ? `${waiting} question${waiting === 1 ? '' : 's'} waiting for a Yes or No.` : 'Groups’ yes/no questions to you arrive here live.')}
       </p>
+      <p className="text-sm text-gray-500 mt-1.5">
+        Also rate each group’s <b>Buy it, try it</b> pitch from 1 to 10 here — their stamp lands once you rate.
+      </p>
       <button type="button" onClick={onOpen} className="btn block mt-3">Open inbox</button>
     </section>
   );
