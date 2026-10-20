@@ -346,7 +346,8 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, hu
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
       {isAdmin && <AdminChecklist />}
-      <CashExpenses />
+      {/* Management only: the same people as the Boss inbox. */}
+      {showBossInbox && <CashExpenses />}
       <Nearby />
       <Insurance userEmail={userEmail} />
       {/* Last: who is on which team is looked up once or twice a trip,
