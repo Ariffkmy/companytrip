@@ -5,7 +5,6 @@
 
 import { useEffect, useState } from 'react';
 import WeatherWidget from './Weather';
-import ForexWidget from './ForexWidget';
 import PhotoCarousel from './PhotoCarousel';
 import Nearby from './Nearby';
 import groupRoster from '../data/groupRoster';
@@ -346,13 +345,12 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, hu
       <PublishedHuntResults config={huntConfig} onOpenGroupGame={onOpenGroupGame} />
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
-      <ForexWidget />
       {isAdmin && <AdminChecklist />}
       <CashExpenses />
       <Nearby />
       <Insurance userEmail={userEmail} />
       {/* Last: who is on which team is looked up once or twice a trip,
-          while the weather, the rate and your policy are daily reads. */}
+          while the weather and your policy are daily reads. */}
       <Groups />
 
       <div className="mt-10 pb-4 border-t border-gray-200 pt-4 space-y-1.5">

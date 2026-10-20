@@ -24,12 +24,15 @@
       { id: 'act-14', activity: 'Mask' },
       { id: 'act-15', activity: 'Fit-to-fly letter', note: 'For pregnant colleagues.' },
       { id: 'act-16', activity: 'Neck pillow', note: 'For the long flight.' },
+      { id: 'act-17', activity: 'Umbrella / raincoat' },
     ],
     /* The committee's own prep, ticked on the same checklist. */
     committee: [
-      { id: 'com-souvenirs', activity: 'Souvenir boxes' },
+      { id: 'com-souvenirs', activity: 'Souvenir boxes (4 boxes + 1 luggage)' },
       { id: 'com-macnica-tshirt', activity: 'Macnica T-shirts' },
       { id: 'com-atami-printouts', activity: 'Atami group activities print-outs (in case there’s no internet)', note: 'Ariff' },
+      { id: 'com-shinkansen-qr', activity: 'Shinkansen QR printout', note: 'Chiew' },
+      { id: 'com-bookings-printout', activity: 'Bookings printout', note: 'Chiew' },
     ],
     todos: [
       { id: 'todo-vjw', activity: 'Register Visit Japan Web' },
@@ -53,9 +56,50 @@
       { time: '12:00', activity: 'Everybody completed check-in', place: 'KLIA2', note: 'Headcount checkpoint — confirm nobody is left at the counter.' },
       { time: '13:00', activity: 'Clear immigration & scan passport', place: 'KLIA2', note: 'Autogate / passport scan. Keep boarding pass handy.' },
       { time: '13:30', activity: 'Wait inside zone gate', place: 'KLIA2 boarding zone', note: 'Everyone waits inside the gate zone. Final restroom stop.' },
-      { time: '14:10', activity: '✈️ Onboard flight to Haneda', place: 'KUL → HND', note: 'Set your watch to JST (+1hr). Long haul — sleep if you can, Day 2 starts at 09:00.' },
-      { time: '23:50', activity: 'Arrive Haneda Airport', place: 'Tokyo Haneda (HND)', note: 'Late arrival. Stay with your group through the terminal.' },
-      { time: '00:30', activity: 'Complete immigration · gather', place: 'Haneda Airport', note: 'Clear immigration, collect baggage, gather at the designated meeting point.' },
+      {
+        time: '14:10', activity: '✈️ Onboard flight to Haneda', place: 'KUL → HND',
+        note: 'Set your watch to JST (+1hr). Long haul — sleep if you can, Day 2 starts at 09:00.',
+        details: [{ label: 'Flight', value: 'D7 522' }],
+      },
+      { time: '22:35', activity: 'Arrive Haneda Airport', place: 'Tokyo Haneda (HND)', note: 'Late arrival, Japan time (GMT+9). Stay with your group through the terminal.' },
+      { time: '23:50', activity: 'Complete immigration · gather', place: 'Haneda Airport', note: 'Clear immigration, collect baggage, gather at the designated meeting point.' },
+      {
+        time: '23:50', activity: '🚌 Board chartered bus → MyStays', place: 'Haneda Airport Terminal 3',
+        note: 'Bus pick-up at Terminal 3, drop-off at Hotel MyStays Yokohama.',
+        details: [
+          { label: 'Pick-up', value: 'Haneda Airport Terminal 3' },
+          { label: 'Drop-off', value: 'Hotel MyStays Yokohama' },
+          { label: 'Hotel address', value: '4-81 Sueyoshicho, Naka-ku, Yokohama, Kanagawa 231-0055, Japan' },
+          { label: 'Driver', value: 'Sato' },
+          { label: 'Driver phone', value: '080-3606-0388', tel: '+818036060388', sub: 'For contact on the day of use only — they can’t be called before the service date' },
+          { label: 'Vehicle no.', value: '4602' },
+        ],
+        notes: [
+          {
+            title: 'Find the correct bus boarding area',
+            items: [
+              'The charter bus boarding area is on the first floor, across the connecting walkway in front of the terminal building.',
+              'You cannot reach it directly from the terminal’s first floor — go via the second floor to reach the walkway.',
+              'Meet the driver first, then gather with the rest of the group.',
+              'Be punctual. The bus may leave without the group if everyone has not arrived by 11:50 PM.',
+            ],
+          },
+          {
+            title: 'Flight delays of 90 minutes or more',
+            items: [
+              'If the flight is delayed by 90 minutes or more, the reservation may be cancelled because of the driver’s next assignment.',
+              'If we learn about the delay before boarding the flight, contact the bus company immediately.',
+            ],
+          },
+          {
+            title: 'Being late for pick-up',
+            items: [
+              'A delay of more than 30 minutes may incur additional charges.',
+              'If the delay affects the driver’s next assignment, it may be treated as a No Show, and the bus may leave without the passengers.',
+            ],
+          },
+        ],
+      },
       { time: '01:00', activity: 'Arrive Hotel MyStays Yokohama', place: 'Hotel MyStays Yokohama', note: 'Chartered bus transfer from Haneda. Check in, sleep — breakfast is on your own the next morning.' },
     ],
     participantPrep: [
@@ -77,7 +121,7 @@
     label: 'Fri 23 Okt',
     title: 'Yokohama · Macnica',
     emoji: '🤝',
-    meals: { breakfast: 'Own arrangement', lunch: 'Shin-Yokohama Ramen Museum, with Macnica', dinner: 'Group dinner at Zauo' },
+    meals: { breakfast: 'Own arrangement', lunch: 'Shin-Yokohama Ramen Museum, with Macnica (provided)', dinner: 'Group dinner at Zauo (provided)' },
     /* Suica fares as per the actual receipts. The way home is one or the
        other, depending on whether you go to the after-party. */
     transport: [
@@ -85,26 +129,27 @@
       { route: 'Zauo dinner → MyStays (bus + train)', yen: 500, option: 'A' },
       { route: 'After-party at GROVE → MyStays', yen: 410, option: 'B' },
     ],
-    /* Meals you pay for yourself, from the estimates in the notes below;
-       null where there is no estimate yet. */
-    food: [
-      { meal: 'Breakfast', yen: [290, 1100], note: 'Café Sanpopola ¥290–700 or Kohisya set ¥1,100' },
-    ],
     activities: [
       { time: '09:00', activity: 'Breakfast — free & easy', place: 'Around the hotel', note: 'Everyone has breakfast on their own. Option 1: Kohisya Yokohama Bandobashiten (~8 min walk, ¥1,100/pax set). Option 2: Café Sanpopola (~3 min walk, ¥290–700/pax, breakfast 8–11 AM). Allow a 30 min walking buffer.' },
-      { time: '11:00', activity: 'Meet-up · depart for Shin-Yokohama', place: 'Bandobashi Station', note: 'Gather at Bandobashi Station. 30 min walking buffer from hotel / breakfast place. Train ~45 min to Shin-Yokohama. ¥260 per trip.' },
+      { time: '10:45', activity: 'Meet-up · depart for Shin-Yokohama', place: 'Bandobashi Station', note: 'Gather at Bandobashi Station. 30 min walking buffer from hotel / breakfast place. Train ~45 min to Shin-Yokohama. ¥260 per trip.' },
       { time: '12:00', activity: 'Lunch at Shin-Yokohama Ramen Museum', place: 'Shin-Yokohama Ramen Museum', note: '5 Macnica representatives welcome us. We split into 5 groups, each led by 1 Macnica representative. Muslim colleagues are grouped together — 2 Muslim groups in total.' },
       { time: '13:00', activity: 'Macnica office tour & showcase', place: 'Macnica Building, Shin-Yokohama', note: 'Arrive at the Macnica Building. Office tour, including an office showcase.' },
       { time: '14:00', activity: 'Introductions, games & activities', place: 'Macnica office', note: 'Team member introductions, introduction to Macnica, then games and activities.' },
       { time: '17:30', activity: 'Closing session · bus to dinner', place: 'Macnica office → Tsunashima', note: 'Closing session, then move to the dinner place by bus.' },
       { time: '18:30', activity: '🍽️ Dinner at Zauo', place: 'Tsuribune Chaya Zauo Yokohama Tsunashima', note: 'Fishing restaurant. maps.app.goo.gl/gHhoQ24r6BDXw4Pp6' },
       { time: '21:00', activity: '🎤 After-party & karaoke (optional)', place: 'Beer Pong Bar GROVE Tsunashima', note: 'Interested participants only. Not joining: Amir, Ariff, Helmi, Aiman, Asma’, Liyana.' },
-      { time: '22:30', activity: 'End of the event', place: 'Tsunashima', note: 'Conclusion of the Macnica event.' },
+      {
+        time: '22:30', activity: 'End of the event', place: 'Tsunashima', note: 'Conclusion of the Macnica event. Head home together from the station below.',
+        details: [
+          { label: 'Station', value: 'Tsunashima Station (綱島駅)' },
+          { label: 'Line', value: 'Tokyu Toyoko Line · TY14' },
+        ],
+      },
     ],
     participantPrep: [
       'Dress presentably — this is the Macnica company visit day.',
       'Breakfast is at your own cost; budget ¥290–1,100 depending on the café.',
-      'Be at Bandobashi Station by 11:00 sharp.',
+      'Be at Bandobashi Station by 10:45 sharp.',
       'Keep ~¥520 on your Suica for the round trip to Macnica.',
       'Lunch is at 12:00 — the after-party & karaoke from 21:00 is optional.',
     ],
@@ -132,10 +177,6 @@
       { route: 'Enoshima Station → Shirasu Ya', yen: 200 },
       { route: 'Shirasu Ya → MyStays', yen: 880 },
     ],
-    food: [
-      { meal: 'Breakfast', yen: null },
-      { meal: 'Lunch (Hase area)', yen: [1000, 2000] },
-    ],
     activities: [
       { time: '08:30', activity: 'Meet in front of hotel', place: 'Hotel MyStays Yokohama', note: 'Group assembles in the lobby. Own breakfast before the meet-up. Prepare ~¥2,500 per pax on your Suica.' },
       { time: '08:40', activity: 'Walk to Koganecho Station', place: '5 min walk · 230 m', note: 'Platform 2. Day total ≈ ¥620 per pax on the outbound legs.' },
@@ -146,7 +187,7 @@
       { time: '09:50', activity: 'Kamakura → Hase', place: 'Enoden Line · 3 stops', note: 'Local train, ~4 min, ¥200 per pax.' },
       { time: '10:00', activity: 'Arrive Hase Station', place: 'Hase Station', note: 'Regroup at the station exit.' },
       { time: '10:05', activity: 'Walk to Hasedera', place: '5 min walk · 350 m', note: '' },
-      { time: '10:15', activity: 'Hasedera Temple', place: 'Hasedera, Kamakura', note: '2 hours on site. ¥400 per pax, CASH. Large temple with historic statues, foliage, great Kamakura views and many photo spots.' },
+      { time: '10:15', activity: 'Hasedera Temple', place: 'Hasedera, Kamakura', note: '2 hours on site. Large temple with historic statues, foliage, great Kamakura views and many photo spots.' },
       { time: '12:15', activity: 'Gather to leave', place: 'Temple entrance / ticket office', note: 'Meeting point for the whole group.' },
       { time: '12:25', activity: 'Walk to Hase Station as a group', place: '5 min walk · 350 m', note: 'Group walks down together, then splits for lunch.' },
       { time: '12:35', activity: 'Own lunch in the Hase area', place: 'Daibutsu-dori / Kannon-dori', note: 'Free & easy, ¥1,000–2,000 per pax.' },
@@ -154,11 +195,11 @@
       { time: '13:15', activity: 'Hase → Enoshima', place: 'Enoden Line · 8 stops', note: 'Local, ~20 min, ¥260 per pax. 10 min platform buffer.' },
       { time: '13:45', activity: 'Arrive Enoshima Station', place: 'Enoshima Station', note: 'Regroup at the exit — same point as the evening meet.' },
       { time: '13:50', activity: 'Walk to Enoshima Aquarium', place: '10 min walk', note: '2 Chome-19-1 Katasekaigan, Fujisawa.' },
-      { time: '14:05', activity: 'Enoshima Aquarium (Enosui), then free & easy', place: 'Enoshima Aquarium', note: '¥2,520 per pax. Last entry 4:00 PM. Dolphin show 2:45 PM. Large sardine tank, jellyfish hall, deep-sea exhibits.' },
+      { time: '14:05', activity: 'Enoshima Aquarium (Enosui), then free & easy', place: 'Enoshima Aquarium', note: 'Last entry 4:00 PM. Dolphin show 2:45 PM. Large sardine tank, jellyfish hall, deep-sea exhibits.' },
       { time: '17:20', activity: 'Meet at Enoshima Station', place: 'Fujisawa-bound side, by the ticket office & Tully\'s Coffee', note: 'Headcount before the dinner leg.' },
-      { time: '17:54', activity: 'Enoshima → Koshigoe', place: 'Enoden Line · 1 stop', note: '~3 min, ¥200 per pax.' },
-      { time: '17:57', activity: 'Walk to Shirasu Ya', place: '3 min walk · 95 m', note: '2-10-13 Koshigoe, Kamakura.' },
-      { time: '18:00', activity: '🍽️ Group dinner at Shirasu Ya', place: 'しらすや 腰越漁港前店', note: '90 min. ¥1,000–1,999 per pax; approved budget ¥2,000/pax (¥3,000 proposed). Shirasu (whitebait) sets ¥1,150–2,500. 26 pax booking to be confirmed.' },
+      { time: '17:40', activity: 'Enoshima → Koshigoe', place: 'Enoden Line · 1 stop', note: '~3 min, ¥200 per pax.' },
+      { time: '17:50', activity: 'Walk to Shirasu Ya', place: '3 min walk · 95 m', note: '2-10-13 Koshigoe, Kamakura.' },
+      { time: '18:00', activity: '🍽️ Group dinner at Shirasu Ya', place: 'しらすや 腰越漁港前店', note: '90 min. Known for shirasu (whitebait).' },
       { time: '19:30', activity: 'Leave, walk to Koshigoe Station', place: 'Koshigoe Station', note: 'Prepare ~¥880 per pax for the return legs.' },
       { time: '19:40', activity: 'Koshigoe → Kamakura', place: 'Enoden Line · 8 stops', note: '~19 min, ¥260 per pax. 14 min headway buffer. Kamakura-bound platform.' },
       { time: '20:13', activity: 'Arrive Kamakura, transfer to JR', place: '5 min walk', note: 'Enoden platform to the JR gates.' },
@@ -175,7 +216,7 @@
     ],
     committeePrep: [
       'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
-      'Confirm the 26 pax booking at Shirasu Ya and the budget (¥2,000 vs ¥3,000/pax).',
+      { text: 'Prepare / bring printouts of bookings (if available):', items: ['Enoshima Aquarium (Chiew)', 'Group dinner booking meal list (Chiew)'] },
       'Note: Keikyu LOCAL only at Koganecho on the way back.',
     ],
   },
@@ -193,15 +234,11 @@
       { route: 'Kinomiya Shrine → Nakamise-dōri', yen: 290 },
       { route: 'Atami Sun Beach → MyStays', yen: 1590 },
     ],
-    food: [
-      { meal: 'Breakfast', yen: null },
-      { meal: 'Lunch (Nakamise-dōri)', yen: null },
-    ],
     activities: [
       { time: '08:00', activity: 'Meet outside MyStays', place: 'Hotel MyStays Yokohama', note: 'Group assembles. Own breakfast before the meet-up.' },
       { time: '08:10', activity: 'Commute to Shin-Yokohama Station', place: '7 min walk + 20 min train', note: 'Departures at 08:18 / 08:19 / 08:25. ¥310 per pax.' },
       { time: '09:00', activity: 'Meet at Shin-Yokohama', place: 'Shin-Yokohama Station', note: 'Group assembles before the Shinkansen.' },
-      { time: '09:15', activity: '🚄 Shinkansen to Atami', place: 'Shin-Yokohama → Atami', note: 'Fixed timing, ~27 min. ¥3,193 per pax. Up to 320 km/h.' },
+      { time: '09:15', activity: '🚄 Shinkansen to Atami', place: 'Shin-Yokohama → Atami', note: 'Fixed timing, ~27 min. Up to 320 km/h.' },
       { time: '09:50', activity: 'Meet at Atami Station', place: 'Atami Station', note: 'Group assembles.' },
       { time: '10:00', activity: 'Morning — Kinomiya Shrine', place: '→ Kinomiya Shrine', note: '2 min train + 4 min walk. Trains 10:10 / 10:16, ¥160 per pax. Meet 10:25, on site 10:30–12:00 (1.5 h), free. 2,100+ year-old sacred camphor tree. Mostly outdoor — stairs, slopes and noticeably hilly.' },
       { time: '12:00', activity: 'Gather to leave', place: 'Kinomiya Shrine', note: 'Group assembles.' },
@@ -209,10 +246,10 @@
       { time: '13:00', activity: 'Meet at Nakamise-dōri', place: 'Nakamise-dōri shopping street', note: 'Group assembles.' },
       { time: '13:00', activity: 'Own lunch at Nakamise-dōri', place: 'Atami Heiwa-dōri / Nakamise-dōri', note: '1 hour, own cost. Shortened to 1 hr so more time goes to the group activity.' },
       { time: '14:00', activity: 'Meet in front of Lusca Mall', place: 'Lusca Atami (next to the shopping street)', note: 'Group assembles for the treasure hunt.' },
-      { time: '14:10', activity: '🗺️ Atami Treasure Hunt starts', place: 'Lusca Atami → Sun Beach', note: '10 min briefing + 3 hours game time. 5 teams, 5 checkpoints, all downhill (~30 min of walking). Runs entirely from your phone.' },
+      { time: '14:10', activity: '🗺️ Atami Treasure Hunt starts', place: 'Lusca Atami → Sun Beach', note: '10 min briefing + 3 hours game time. 4 teams, 7 checkpoints, all downhill (~30 min of walking). Runs entirely from your phone.' },
       { time: '17:30', activity: 'End of group activity', place: 'Lusca Atami', note: 'Meet back at Lusca Mall. Scores, creativity bonuses and winners announced.' },
-      { time: '17:40', activity: 'Walk to group dinner', place: '3 min walk', note: 'Dinner is either inside Lusca Mall or on the shopping street.' },
-      { time: '18:00', activity: '🍽️ Group dinner', place: 'Izutaro Lusca Atami (伊豆太郎 ラスカ熱海店)', note: '1.5 hours. Approved budget ¥3,000 per pax. Seafood sets ¥2,180–2,480. 66 seats, inside the mall next to Atami Station, credit card accepted. Alternatives: Uotami Atami Ekimae (137 seats, wider selection) or Irorichaya (PayPay, private room ¥3,000/90 min).' },
+      { time: '17:40', activity: 'Walk to group dinner', place: '3 min walk', note: 'The restaurant is inside Lusca Mall.' },
+      { time: '18:00', activity: '🍽️ Group dinner', place: 'Izutaro Lusca Atami (伊豆太郎 ラスカ熱海店)', note: '1.5 hours. Inside Lusca Mall, next to Atami Station.' },
       { time: '19:30', activity: 'Gather to leave', place: 'Restaurant', note: 'Group assembles.' },
       { time: '19:40', activity: 'Walk to Atami Beach', place: '9 min walk', note: 'Bring a jacket — bay area gets cold at night.' },
       { time: '20:00', activity: 'Arrive at Atami Sun Beach', place: 'Atami Sun Beach', note: 'Settle into the viewing area before the show.' },
@@ -228,7 +265,7 @@
     ],
     committeePrep: [
       'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
-      'Confirm Shinkansen seats (¥3,193/pax).',
+      { text: 'Prepare / bring printouts of bookings (if available):', items: ['Shinkansen QR (Chiew)', 'Group dinner booking meal list (Chiew)', 'Atami group activity print-out (Ariff)'] },
       'Confirm the group dinner booking at Izutaro.',
       'Treasure hunt: Ariff = Game Master; Carmen & Kevin = facilitators.',
       'Brief teams on the 21:00 walk to the station — no transport after the fireworks.',
@@ -246,28 +283,27 @@
       { route: 'Cup Noodles Museum → MyStays', yen: 220 },
       { route: 'MyStays → Haneda Airport', yen: 400 },
     ],
-    food: [
-      { meal: 'Breakfast (convenience store)', yen: null },
-      { meal: 'Lunch (own arrangement)', yen: [400, 500], note: 'e.g. the museum 4F meal area' },
-    ],
     activities: [
       { time: '08:30', activity: 'Check-out & luggage drop', place: 'Hotel MyStays Yokohama', note: 'Check out and leave luggage in the designated area. Tip: buy breakfast at a convenience store the day before.' },
       { time: '09:00', activity: 'Meet-up', place: 'Outside the hotel', note: 'Group assembles.' },
       { time: '09:15', activity: 'Depart', place: 'Bandobashi Station', note: 'Travel time 30 min + 20 min extra buffer.' },
-      { time: '10:00', activity: '🍜 Cup Noodles Museum', place: 'Cup Noodles Museum Yokohama', note: 'Sakuragicho Station, then ~1 km walk. My CUPNOODLES Factory workshop (~45 min): design your own cup, pick 1 of 4 soup bases + 4 toppings, seal and inflate to take home. ¥1,000 per pax.' },
+      { time: '10:00', activity: '🍜 Cup Noodles Museum', place: 'Cup Noodles Museum Yokohama', note: 'Sakuragicho Station, then ~1 km walk. My CUPNOODLES Factory workshop (~45 min): design your own cup, pick 1 of 4 soup bases + 4 toppings, seal and inflate to take home.' },
       { time: '11:30', activity: 'Lunch', place: 'Museum 4F meal area', note: 'Own arrangement, at your own cost. The museum 4F meal area is ~¥400–500 per pax.' },
       { time: '12:30', activity: 'Free & easy', place: 'Yokohama World Porters / Red Brick Warehouse', note: 'Shopping and last souvenirs. 1F World Food Hall for food.' },
       { time: '14:30', activity: 'Head back to the hotel', place: 'Meet at Sakuragicho Station', note: 'Travel time 30 min + 30 min extra buffer.' },
       { time: '15:30', activity: 'Pick up luggage · depart for Haneda', place: '→ Haneda Airport', note: '45 min travel time + 1 hr 30 min extra buffer. Round trip transport for the day ≈ ¥780 per pax.' },
       { time: 'Evening', activity: 'Check-in & immigration', place: 'Haneda Airport', note: 'Group check-in for 26+1 pax. Mind the baggage allowance after shopping.' },
-      { time: 'Night', activity: '✈️ Fly to Kuala Lumpur', place: 'HND → KUL', note: 'Red-eye. Keep essentials in your cabin bag.' },
+      {
+        time: 'Night', activity: '✈️ Fly to Kuala Lumpur', place: 'HND → KUL', note: 'Red-eye. Keep essentials in your cabin bag.',
+        details: [{ label: 'Flight', value: 'D7 523' }],
+      },
     ],
     participantPrep: [
       'Pack and be checked out by 08:30 — luggage goes to the storage area.',
     ],
     committeePrep: [
       'Always keep in touch with Ellice and Tim on where they are — some visits need cash from them, and some days need them to join.',
-      'Reconfirm the Cup Noodles Museum booking and workshop slot for 26 pax.',
+      { text: 'Prepare / bring printouts of bookings (if available):', items: ['Cup Noodles Museum booking confirmation (Chiew)'] },
       'Final headcount at Sakuragicho and again before leaving for Haneda.',
       'Confirm luggage storage at the hotel and the 15:30 pick-up.',
     ],

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { Fragment, useState, useCallback, useEffect } from 'react';
 import schedule from './data/schedule';
 import TreasureHunt from './components/TreasureHunt';
 import Safety from './components/Safety';
@@ -118,6 +118,29 @@ function ActivityCard({ act }) {
           <div className="px-3.5 pb-3.5 pl-[72px] text-sm text-gray-500 leading-relaxed space-y-1">
             <p className="font-medium text-gray-700 text-xs">{act.place}</p>
             <p>{act.note}</p>
+            {act.details && (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 pt-2 text-xs">
+                {act.details.map((d) => (
+                  <Fragment key={d.label}>
+                    <dt className="text-gray-400">{d.label}</dt>
+                    <dd className="text-gray-700">
+                      {d.tel
+                        ? <a href={`tel:${d.tel}`} className="text-ink underline underline-offset-2 decoration-red">{d.value}</a>
+                        : d.value}
+                      {d.sub && <span className="block text-gray-400">{d.sub}</span>}
+                    </dd>
+                  </Fragment>
+                ))}
+              </dl>
+            )}
+            {act.notes?.map((n) => (
+              <div key={n.title} className="pt-2.5">
+                <p className="font-medium text-gray-700 text-xs">{n.title}</p>
+                <ul className="list-disc pl-4 text-xs space-y-1 mt-1">
+                  {n.items.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -205,7 +228,7 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
       )}
 
       <MealsBox meals={day.meals} />
-      <YenBox transport={day.transport} food={day.food} />
+      <YenBox transport={day.transport} />
 
       {/* Timeline */}
       <div className="relative space-y-2.5 pl-5">
@@ -234,10 +257,18 @@ function DayPanel({ day, index, active, onOpenTreasureHunt }) {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <h4 className="text-[11px] font-semibold tracking-wider uppercase text-red mb-2.5">📋 Committee</h4>
           <ul className="space-y-2">
+            {/* A note is text, or { text, items } for one with a sub-list. */}
             {day.committeePrep.map((item, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-gray-600 leading-relaxed">
                 <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-red shrink-0" />
-                <span>{item}</span>
+                {typeof item === 'string' ? <span>{item}</span> : (
+                  <span>
+                    {item.text}
+                    <ul className="list-disc pl-4 mt-0.5">
+                      {item.items.map((sub) => <li key={sub}>{sub}</li>)}
+                    </ul>
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -287,58 +318,32 @@ function YenPart({ title, total, children, note }) {
   );
 }
 
-/* Transport and food kept apart: transport is what to load on the
-   Suica card, food is spent however you like. */
-function YenBox({ transport = [], food = [] }) {
-  if (!transport.length && !food.length) return null;
+/* Transport only: what to load on the Suica card. Own meals vary too
+   much from person to person to estimate. */
+function YenBox({ transport = [] }) {
+  if (!transport.length) return null;
   const base = transport.filter((t) => !t.option).reduce((s, t) => s + t.yen, 0);
   const options = transport.filter((t) => t.option).map((t) => t.yen);
   const tLow = base + (options.length ? Math.min(...options) : 0);
   const tHigh = base + (options.length ? Math.max(...options) : 0);
-  /* A food total only when every meal has an estimate; otherwise it would
-     look complete when it isn't. */
-  const allEstimated = food.length > 0 && food.every((f) => f.yen);
-  const fLow = food.reduce((s, f) => s + (f.yen?.[0] ?? 0), 0);
-  const fHigh = food.reduce((s, f) => s + (f.yen?.[1] ?? 0), 0);
   const row = 'flex items-baseline gap-3 text-sm';
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
       <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">💴 Yen for the day</h4>
 
-      {transport.length > 0 && (
-        <YenPart title="🚃 Transport · load on your Suica" total={yenRange(tLow, tHigh)}
-          note={`As per the actual receipts${options.length ? '. The way home is option A or B, not both' : ''}.`}>
-          {transport.map((t) => (
-            <li key={t.route} className={row}>
-              <span className="min-w-0 text-gray-600 leading-snug">
-                {t.route}
-                {t.option && <span className="text-xs text-gray-400"> · option {t.option}</span>}
-              </span>
-              <span className="ml-auto shrink-0 font-mono text-gray-700">{yenFmt(t.yen)}</span>
-            </li>
-          ))}
-        </YenPart>
-      )}
-
-      {food.length > 0 && (
-        <div className={transport.length ? 'pt-4 border-t border-gray-100' : ''}>
-          <YenPart title="🍱 Food · your own meals" total={allEstimated ? yenRange(fLow, fHigh) : null}
-            note="Estimates only. Group meals aren’t included.">
-            {food.map((f) => (
-              <li key={f.meal} className={row}>
-                <span className="min-w-0 text-gray-600 leading-snug">
-                  {f.meal}
-                  {f.note && <span className="block text-xs text-gray-400">{f.note}</span>}
-                </span>
-                <span className={`ml-auto shrink-0 font-mono ${f.yen ? 'text-gray-700' : 'text-gray-400 italic'}`}>
-                  {f.yen ? yenRange(f.yen[0], f.yen[1]) : 'Not estimated'}
-                </span>
-              </li>
-            ))}
-          </YenPart>
-        </div>
-      )}
+      <YenPart title="🚃 Transport · load on your Suica" total={yenRange(tLow, tHigh)}
+        note={`As per the actual receipts${options.length ? '. The way home is option A or B, not both' : ''}.`}>
+        {transport.map((t) => (
+          <li key={t.route} className={row}>
+            <span className="min-w-0 text-gray-600 leading-snug">
+              {t.route}
+              {t.option && <span className="text-xs text-gray-400"> · option {t.option}</span>}
+            </span>
+            <span className="ml-auto shrink-0 font-mono text-gray-700">{yenFmt(t.yen)}</span>
+          </li>
+        ))}
+      </YenPart>
     </div>
   );
 }
@@ -507,7 +512,10 @@ export default function App() {
             onClose={closeTreasureHunt}
             teamId={auth.member.huntGroup}
             config={huntConfig}
-            isOpen={huntOpen}
+            /* Admins can play while it's closed, to test the real game
+               before it opens for everyone. */
+            isOpen={huntOpen || auth.isAdmin}
+            closedForOthers={!huntOpen && auth.isAdmin}
             huntLeader={auth.member.huntLeader}
             viewTeamId={huntView?.teamId ?? null}
             viewGame={huntView?.game ?? null}

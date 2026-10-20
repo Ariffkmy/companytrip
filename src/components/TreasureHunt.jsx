@@ -958,7 +958,7 @@ export function HuntOrganiser({ config }) {
    touching: nothing is saved, synced or uploaded from a read-only page. */
 export default function TreasureHunt({
   onClose, teamId, config, isOpen = true, preview = false, huntLeader = null,
-  viewTeamId = null, viewGame = null,
+  viewTeamId = null, viewGame = null, closedForOthers = false,
 }) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   const ownLivePage = viewTeamId != null && viewTeamId === teamId && huntLeader !== false;
@@ -1679,6 +1679,16 @@ export default function TreasureHunt({
                 : 'The committee opens it at the briefing. Come back to this screen then — you don’t need to do anything now.'}
             </p>
             {CONFIG.helpNote && <p className="note" style={{ marginTop: 12 }}>{CONFIG.helpNote}</p>}
+          </div>
+        )}
+        {/* An admin playing before the committee opens it: a real run,
+            saved like anyone's, so it wants a reset before the day. */}
+        {closedForOthers && !preview && !readOnly && (
+          <div className="card flag">
+            <div className="eyebrow" style={{ color: 'var(--red)' }}>Admin test</div>
+            <p style={{ margin: '4px 0 0' }}>
+              The hunt is still closed for everyone else. You can play because you’re an admin. This run is saved like a real one, so use Reset for the real game (Admin → Organiser) before the day.
+            </p>
           </div>
         )}
         {/* Until the committee opens it, that card is all there is. */}

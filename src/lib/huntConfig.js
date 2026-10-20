@@ -88,7 +88,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '- 10 a stamp, games 1 to 6.',
     '- Photo bingo: 1 for every correct photo.',
     '- Copy the pose: best pose photo, 5 more.',
-    '- Atami quiz: 2 for every right answer, at least 10 of 15 right for the stamp, 10 seconds a question.',
+    '- Atami quiz: 2 for every right answer, at least 10 of 20 right for the stamp, 10 seconds a question.',
     '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.',
     '- Look around you: 2 for every right answer.',
     '- Know your colleagues: questions about the other groups, mixed; 2 for every right answer.',
@@ -134,8 +134,8 @@ export const DEFAULT_HUNT_CONFIG = {
        restarts the round from question 1 with a fresh deal. */
     cp2b: {
       title: 'How Well Do You Know Atami?', photo: null, stop: '',
-      body: 'Answer as a team. You have **10 seconds** for each question — run out of time and you start again from the beginning with new questions. Get at least **10 of 15** right to collect the stamp; fall short and you get 15 new questions to try again. No searching, no asking anyone outside the team, no AI.',
-      perRound: 15,
+      body: 'Answer as a team. You have **10 seconds** for each question — run out of time and you start again from the beginning with new questions. Get at least **10 of 20** right to collect the stamp; fall short and you get 20 new questions to try again. No searching, no asking anyone outside the team, no AI.',
+      perRound: 20,
       secondsPerQuestion: 10,
       passMark: 10,
       pointsPerRight: 2,
@@ -224,7 +224,7 @@ export function withDefaults(stored) {
     merged.checkpoints.cp2a.body = String(merged.checkpoints.cp2a.body ?? '').replace(/The riddle unlocks/, 'The Atami quiz unlocks');
     merged.rules = String(merged.rules ?? '')
       .replace(/^- Riddle: /m, '- Atami quiz: ')
-      .replace(/^(- Observation quiz: .*)$/m, '$1\n- Atami quiz: 2 a right answer, at least 10 of 15 right for the stamp, 10 seconds a question');
+      .replace(/^(- Observation quiz: .*)$/m, '$1\n- Atami quiz: 2 a right answer, at least 10 of 20 right for the stamp, 10 seconds a question');
   }
   delete merged.checkpoints.cp2b.riddles;
   /* Saved while Buy it, try it had a budget and one team photo: any
@@ -242,6 +242,14 @@ export function withDefaults(stored) {
   /* Game 3 was called Find the place; it is the Atami quiz now. A title
      the committee changed to something else is left alone. */
   if (merged.checkpoints.cp2a.title === 'Find the place') merged.checkpoints.cp2a.title = 'Atami quiz';
+  /* Saved while an Atami round was 15 questions: it is 20 now, and the
+     text that says "of 15" follows. */
+  if (Number(merged.checkpoints.cp2b.perRound) === 15) {
+    merged.checkpoints.cp2b.perRound = 20;
+    merged.checkpoints.cp2b.body = String(merged.checkpoints.cp2b.body ?? '')
+      .replace(/\b(\d+) of 15\b/g, '$1 of 20').replace(/\b15 new questions\b/g, '20 new questions');
+    merged.rules = String(merged.rules ?? '').replace(/^(- Atami quiz: .*?\b\d+) of 15\b/m, '$1 of 20');
+  }
   /* Saved while every award was 5 at the finish, first back included,
      and Find the boss earned a stamp: the points table changed, so the
      "What scores" section is replaced with the current one. */
@@ -381,7 +389,7 @@ export function atamiRules(c) {
   const questions = (c?.questions ?? []).filter((x) => String(x?.q ?? '').trim()
     && (x.options ?? []).filter((o) => String(o ?? '').trim()).length >= 2
     && String(x.options?.[x.a] ?? '').trim());
-  const perRound = Math.min(questions.length, Math.max(1, Number(c?.perRound) || 15));
+  const perRound = Math.min(questions.length, Math.max(1, Number(c?.perRound) || 20));
   return {
     questions,
     perRound,

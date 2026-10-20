@@ -6,78 +6,49 @@
 <style>
   @page { size: A4; margin: 14mm 14mm 16mm; }
   :root {
-    --ink: #17171C; --soft: #5A5A66; --red: #D7322B; --sea: #1F7A8C; --gold: #E9A82C;
-    --paper: #FFFFFF; --tint: #F6F1E7; --rule: #D9D2C3; --green: #5B7F3E;
+    --ink: #17171C; --soft: #5A5A66; --red: #D7322B; --gold: #E9A82C;
+    --paper: #FFFFFF; --tint: #F6F1E7; --rule: #D9D2C3;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--paper); color: var(--ink);
-    font: 10.5pt/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font: 11pt/1.45 "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .page { page-break-after: always; break-after: page; }
   .page:last-child { page-break-after: auto; break-after: auto; }
   h1, h2, h3 { margin: 0; line-height: 1.15; }
-  h1 { font-size: 30pt; font-weight: 900; letter-spacing: -.01em; }
-  h2 { font-size: 22pt; font-weight: 900; }
-  h3 { font-size: 11pt; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 14px 0 6px; }
-  p { margin: 0 0 7px; }
-  ul, ol { margin: 0 0 6px; padding-left: 18px; }
+  h1 { font-size: 26pt; font-weight: 900; }
+  h2 { font-size: 18pt; font-weight: 900; margin: 0 0 8px; }
+  h3 { font-size: 10.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--red); margin: 14px 0 6px; }
+  p { margin: 0 0 6px; }
+  ul, ol { margin: 0 0 6px; padding-left: 20px; }
   li { margin: 0 0 4px; }
   b { font-weight: 800; }
   .eyebrow { font: 700 8.5pt/1 "Consolas", monospace; letter-spacing: .18em; text-transform: uppercase; color: var(--red); }
   .muted { color: var(--soft); }
   .small { font-size: 9pt; }
 
-  /* Cover */
-  .cover-band { background: var(--ink); color: #fff; border-radius: 10px; padding: 22px 22px 18px; margin-bottom: 14px; }
+  .cover-band { background: var(--ink); color: #fff; border-radius: 10px; padding: 14px 20px; margin-bottom: 8px; }
   .cover-band .eyebrow { color: var(--gold); }
-  .cover-band h1 { color: #fff; margin: 6px 0 6px; }
-  .cover-band p { color: #E6E6EA; margin: 0; font-size: 11pt; }
-  .alert { border: 2.5px solid var(--red); border-radius: 10px; padding: 10px 14px; margin: 0 0 12px; background: #FFF5F4; }
-  .alert b { color: var(--red); }
+  .cover-band h1 { color: #fff; margin: 6px 0; }
+  .cover-band p { color: #E6E6EA; margin: 0; }
 
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .box { border: 1.5px solid var(--ink); border-radius: 10px; padding: 10px 13px; }
-  .box.tint { background: var(--tint); border-color: var(--rule); }
-  .box h3:first-child { margin-top: 0; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 9.8pt; }
+  table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--rule); vertical-align: top; }
   th { font: 700 8pt/1.2 "Consolas", monospace; letter-spacing: .1em; text-transform: uppercase; color: var(--soft); border-bottom: 1.5px solid var(--ink); }
-  td.n { font-weight: 900; color: var(--red); width: 22px; }
-  td.pts { white-space: nowrap; }
-
-  .msg { font-family: "Consolas", monospace; font-size: 9.5pt; background: #E7F8EC; border: 1px solid #A9DDB8; border-radius: 8px; padding: 6px 10px; margin: 4px 0 8px; white-space: pre-wrap; }
-
-  /* Game pages */
-  .game-head { display: flex; gap: 14px; align-items: center; border-bottom: 3px solid var(--ink); padding-bottom: 10px; margin-bottom: 12px; }
-  .badge { flex: none; width: 58px; height: 58px; border-radius: 50%; background: var(--ink); color: var(--gold);
-    display: grid; place-items: center; font: 900 26pt/1 "Segoe UI", Arial, sans-serif; }
-  .game-head .eyebrow { margin-bottom: 4px; }
-  .tagline { font-size: 11pt; color: var(--soft); margin-top: 3px; }
-  .cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; }
-  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
-  .steps li { counter-increment: s; position: relative; padding-left: 30px; margin-bottom: 8px; }
-  .steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 21px; height: 21px; border-radius: 50%;
-    background: var(--red); color: #fff; font: 800 9.5pt/21px "Segoe UI", Arial, sans-serif; text-align: center; }
-  .score { background: var(--ink); color: #fff; border-radius: 10px; padding: 11px 14px; }
-  .score h3 { color: var(--gold); margin-top: 0; }
-  .score .big { font-size: 20pt; font-weight: 900; line-height: 1.1; }
-  .score ul { padding-left: 16px; }
-  .score li { margin-bottom: 3px; }
-  .who { border-left: 4px solid var(--gold); background: var(--tint); padding: 7px 11px; border-radius: 0 8px 8px 0; margin: 10px 0; font-size: 10pt; }
-  .q { border: 1.5px solid var(--ink); border-radius: 8px; padding: 7px 10px; margin-bottom: 7px; }
-  .q .line { border-bottom: 1px dotted var(--soft); height: 20px; margin-top: 4px; }
-  .tick { display: inline-block; width: 13px; height: 13px; border: 1.5px solid var(--ink); border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  td.n { font-weight: 900; color: var(--red); width: 24px; }
+  .tick { display: inline-block; width: 14px; height: 14px; border: 1.5px solid var(--ink); border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
   .foot { margin-top: 12px; padding-top: 7px; border-top: 1px solid var(--rule); font-size: 8.5pt; color: var(--soft); display: flex; justify-content: space-between; }
-  .card-row td { height: 26px; }
-  /* The cover carries the most; keep it on one page. */
-  .cover { font-size: 9.6pt; }
-  .cover .cover-band { padding: 16px 20px 14px; margin-bottom: 10px; }
-  .cover h1 { font-size: 24pt; }
-  .cover h3 { margin: 10px 0 5px; }
-  .cover li { margin-bottom: 2px; }
-  .cover table { font-size: 9pt; }
-  .cover th, .cover td { padding: 3px 5px; }
+
+  .rules { font-size: 11pt; }
+  .rules li { margin-bottom: 3px; }
+  .game { border: 1.5px solid var(--ink); border-radius: 10px; padding: 7px 12px; margin-bottom: 6px; display: flex; gap: 12px; align-items: flex-start; break-inside: avoid; }
+  .game .num { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: var(--gold); display: grid; place-items: center; font: 900 15pt/1 "Segoe UI", Arial, sans-serif; }
+  .game .body { flex: 1; }
+  .game .title { font-weight: 900; font-size: 12pt; }
+  .game .pts { flex: none; font-weight: 800; color: var(--red); white-space: nowrap; font-size: 10pt; }
+  .game p { margin: 2px 0 0; }
+  .q { border-bottom: 1px dotted var(--soft); padding: 8px 0 18px; }
+  .card td { height: 30px; vertical-align: middle; }
 
   .ans { width: 32%; }
   .bank td { padding: 4px 6px; font-size: 9.3pt; }
@@ -119,7 +90,7 @@
   <ul>
     <li>Reply <b>✅ Stamp N</b> as soon as you accept a game. Log it on the score sheet with the WhatsApp time.</li>
     <li><b>Bingo:</b> stamp only when every tile has a correct selfie. 1 point per tile.</li>
-    <li><b>Atami quiz:</b> call the leader, read 15 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
+    <li><b>Atami quiz:</b> call the leader, read 20 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
     <li><b>Buy it, try it:</b> stamp needs the video <b>and</b> the bosses’ rating. Points = 2 × rating.</li>
     <li><b>Look around you:</b> first message only. Mark at the finish.</li>
     <li><b>Know your colleagues:</b> call the leader, ask all questions, no pass mark. Points = 2 × right.</li>
@@ -146,7 +117,7 @@
 
   <h3>Atami quiz attempts</h3>
   <table class="sheet">
-    <tr><th>Group</th><th>Attempt 1 (right / 15)</th><th>Attempt 2</th><th>Attempt 3</th><th>Passed with</th></tr>
+    <tr><th>Group</th><th>Attempt 1 (right / 20)</th><th>Attempt 2</th><th>Attempt 3</th><th>Passed with</th></tr>
     <tr><td><b>A</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>B</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>C</b></td><td></td><td></td><td></td><td></td></tr><tr><td><b>D</b></td><td></td><td></td><td></td><td></td></tr>
   </table>
 
@@ -159,7 +130,7 @@
 </section>
 
 <section class="page">
-  <div class="eyebrow">Answer key · 40 questions</div>
+  <div class="eyebrow">Answer key · 80 questions</div>
   <h2 style="margin:4px 0 4px">How well do you know Atami?</h2>
   <p class="muted small">Read the question and the choices. 10 seconds to answer. Tick each one used per group so a retry gets new questions. This is the app’s starting bank; if the committee edited it in Admin, use the edited version.</p>
   <table class="bank">
@@ -364,6 +335,206 @@
     <td class="n">40</td>
     <td>Why should visitors check the weather before outdoor activities in Atami?<div class="small muted">A. Japan has no weather forecasts &nbsp;·&nbsp; B. Coastal weather can affect visibility, comfort and outdoor plans &nbsp;·&nbsp; C. It is always snowing in October &nbsp;·&nbsp; D. The weather never changes near the sea</div></td>
     <td class="ans"><b>B</b> Coastal weather can affect visibility, comfort and outdoor plans</td>
+  </tr>
+  <tr>
+    <td class="n">41</td>
+    <td>Why did Atami begin holding its sea fireworks festival in 1952?<div class="small muted">A. To celebrate the Tokaido Shinkansen opening &nbsp;·&nbsp; B. To mark Japan's first seaside Olympics &nbsp;·&nbsp; C. To celebrate a newly built castle &nbsp;·&nbsp; D. To encourage recovery after a typhoon and major fires</div></td>
+    <td class="ans"><b>D</b> To encourage recovery after a typhoon and major fires</td>
+  </tr>
+  <tr>
+    <td class="n">42</td>
+    <td>Why does Atami Bay produce such powerful echoes during fireworks?<div class="small muted">A. The fireworks are mainly launched inside a tunnel &nbsp;·&nbsp; B. Mountains surround the bay on three sides, reflecting the sound &nbsp;·&nbsp; C. Submerged speakers amplify each explosion &nbsp;·&nbsp; D. The bay's shallow water prevents sound from escaping</div></td>
+    <td class="ans"><b>B</b> Mountains surround the bay on three sides, reflecting the sound</td>
+  </tr>
+  <tr>
+    <td class="n">43</td>
+    <td>Despite its name, what is the 'Dai-Kuchu Niagara' finale at Atami's fireworks festival?<div class="small muted">A. A broad aerial display of synchronised silver starmines &nbsp;·&nbsp; B. A waterfall of fireworks hanging from a bridge &nbsp;·&nbsp; C. A series of floating firework wheels pulled by boats &nbsp;·&nbsp; D. A row of fountains spraying water and light</div></td>
+    <td class="ans"><b>A</b> A broad aerial display of synchronised silver starmines</td>
+  </tr>
+  <tr>
+    <td class="n">44</td>
+    <td>For the scheduled Atami fireworks on Sunday, 25 October 2026, which plan best matches the published information?<div class="small muted">A. Arrive for a 19:00–19:30 show that is cancelled for any rain &nbsp;·&nbsp; B. Expect a 21:00–21:30 show only if skies are clear &nbsp;·&nbsp; C. Plan around 20:20–20:40; rain alone does not normally cancel it &nbsp;·&nbsp; D. Watch a 20:20–21:20 show from inside Atami Castle</div></td>
+    <td class="ans"><b>C</b> Plan around 20:20–20:40; rain alone does not normally cancel it</td>
+  </tr>
+  <tr>
+    <td class="n">45</td>
+    <td>What makes Hashiriyu, one of Atami's oldest hot springs, geologically unusual?<div class="small muted">A. It flows directly out of an underwater coral reef &nbsp;·&nbsp; B. It emerges through a horizontal cave in the hillside &nbsp;·&nbsp; C. It is powered by artificial steam boilers &nbsp;·&nbsp; D. It appears only during high tide</div></td>
+    <td class="ans"><b>B</b> It emerges through a horizontal cave in the hillside</td>
+  </tr>
+  <tr>
+    <td class="n">46</td>
+    <td>What is unusual about the visible eruptions at the historic Oyu Geyser today?<div class="small muted">A. They now consist entirely of cold seawater &nbsp;·&nbsp; B. They occur naturally at exactly 12-hour intervals &nbsp;·&nbsp; C. The geyser has been replaced by a public bath &nbsp;·&nbsp; D. They are recreated artificially after natural eruptions declined</div></td>
+    <td class="ans"><b>D</b> They are recreated artificially after natural eruptions declined</td>
+  </tr>
+  <tr>
+    <td class="n">47</td>
+    <td>At Ozawa no Yu, one of the Atami Seven Hot Springs, what can visitors traditionally prepare using geothermal steam?<div class="small muted">A. Steamed eggs &nbsp;·&nbsp; B. Grilled mochi &nbsp;·&nbsp; C. Tofu made with seawater &nbsp;·&nbsp; D. Salted dried fish</div></td>
+    <td class="ans"><b>A</b> Steamed eggs</td>
+  </tr>
+  <tr>
+    <td class="n">48</td>
+    <td>According to local tradition, what does walking once around Kinomiya Shrine's great camphor tree symbolise?<div class="small muted">A. A wish for a safe sea crossing &nbsp;·&nbsp; B. Cleansing bad luck for seven generations &nbsp;·&nbsp; C. Gaining one extra year of life &nbsp;·&nbsp; D. Completing a formal Shinto wedding ritual</div></td>
+    <td class="ans"><b>C</b> Gaining one extra year of life</td>
+  </tr>
+  <tr>
+    <td class="n">49</td>
+    <td>Which historical couple is closely connected with Izusan Shrine's reputation as a place for romantic bonds?<div class="small muted">A. Minamoto no Yoritomo and Hojo Masako &nbsp;·&nbsp; B. Tokugawa Ieyasu and Lady Tsukiyama &nbsp;·&nbsp; C. Emperor Meiji and Empress Shoken &nbsp;·&nbsp; D. Emperor Taisho and Empress Teimei</div></td>
+    <td class="ans"><b>A</b> Minamoto no Yoritomo and Hojo Masako</td>
+  </tr>
+  <tr>
+    <td class="n">50</td>
+    <td>Which sequence correctly describes Kiunkaku's history?<div class="small muted">A. Opened as a museum in 1919, became a ryokan in 1947 &nbsp;·&nbsp; B. Founded as a shrine in 1919, rebuilt as a castle in 1947 &nbsp;·&nbsp; C. Built as a private villa in 1919, became a ryokan in 1947 &nbsp;·&nbsp; D. Built as a station hotel in 1947, became a private villa in 1919</div></td>
+    <td class="ans"><b>C</b> Built as a private villa in 1919, became a ryokan in 1947</td>
+  </tr>
+  <tr>
+    <td class="n">51</td>
+    <td>What combination of architectural influences makes Kiunkaku particularly distinctive?<div class="small muted">A. Only classical Japanese temple architecture &nbsp;·&nbsp; B. Japanese, Chinese and European elements &nbsp;·&nbsp; C. Austrian, Russian and Scandinavian styles &nbsp;·&nbsp; D. Modern concrete and American Art Deco only</div></td>
+    <td class="ans"><b>B</b> Japanese, Chinese and European elements</td>
+  </tr>
+  <tr>
+    <td class="n">52</td>
+    <td>Apart from early-blooming plum trees, which seasonal display is Atami Plum Garden noted for?<div class="small muted">A. Hydrangeas that bloom throughout late winter &nbsp;·&nbsp; B. A late-spring wisteria festival &nbsp;·&nbsp; C. Camellias that flower throughout summer &nbsp;·&nbsp; D. Autumn leaves that turn relatively late in the year</div></td>
+    <td class="ans"><b>D</b> Autumn leaves that turn relatively late in the year</td>
+  </tr>
+  <tr>
+    <td class="n">53</td>
+    <td>What idea helped inspire the establishment of Atami Plum Garden in 1886?<div class="small muted">A. Gentle exercise can complement the health benefits of hot-spring treatment &nbsp;·&nbsp; B. The town needed a defensive hilltop lookout &nbsp;·&nbsp; C. Merchants wanted a permanent outdoor fish market &nbsp;·&nbsp; D. The government planned to build a new railway terminus</div></td>
+    <td class="ans"><b>A</b> Gentle exercise can complement the health benefits of hot-spring treatment</td>
+  </tr>
+  <tr>
+    <td class="n">54</td>
+    <td>Which island is reached by passenger boat from Atami Port in roughly 25–30 minutes?<div class="small muted">A. Enoshima &nbsp;·&nbsp; B. Izu Oshima &nbsp;·&nbsp; C. Hatsushima &nbsp;·&nbsp; D. Miyakejima</div></td>
+    <td class="ans"><b>C</b> Hatsushima</td>
+  </tr>
+  <tr>
+    <td class="n">55</td>
+    <td>The Atami Ropeway's approximately three-minute ride brings visitors to a viewpoint on which hill?<div class="small muted">A. Mount Omuro &nbsp;·&nbsp; B. Hachiman-yama &nbsp;·&nbsp; C. Mount Takao &nbsp;·&nbsp; D. Mount Komagatake</div></td>
+    <td class="ans"><b>B</b> Hachiman-yama</td>
+  </tr>
+  <tr>
+    <td class="n">56</td>
+    <td>What usually happens to the decorative lighting at Atami Sun Beach during a fireworks display?<div class="small muted">A. It changes to bright red for the full show &nbsp;·&nbsp; B. It stays at full brightness to illuminate the sea &nbsp;·&nbsp; C. It is switched on only after the final fireworks &nbsp;·&nbsp; D. It is switched off during the launch period</div></td>
+    <td class="ans"><b>D</b> It is switched off during the launch period</td>
+  </tr>
+  <tr>
+    <td class="n">57</td>
+    <td>Which Japanese artist created the famous 'Red and White Plum Blossoms' folding screens held by Atami's MOA Museum of Art?<div class="small muted">A. Hokusai Katsushika &nbsp;·&nbsp; B. Tawaraya Sotatsu &nbsp;·&nbsp; C. Ogata Korin &nbsp;·&nbsp; D. Hasegawa Tohaku</div></td>
+    <td class="ans"><b>C</b> Ogata Korin</td>
+  </tr>
+  <tr>
+    <td class="n">58</td>
+    <td>Which citrus fruit is an Atami speciality and has a name associated with a family prospering for generations?<div class="small muted">A. Daidai &nbsp;·&nbsp; B. Sudachi &nbsp;·&nbsp; C. Kabosu &nbsp;·&nbsp; D. Yuzu</div></td>
+    <td class="ans"><b>A</b> Daidai</td>
+  </tr>
+  <tr>
+    <td class="n">59</td>
+    <td>Why can Atami-zakura cherry blossoms often remain in bloom for around a month?<div class="small muted">A. The trees are covered with snow-proof nets &nbsp;·&nbsp; B. Each branch forms both early- and later-opening flower buds &nbsp;·&nbsp; C. Artificial lighting keeps the blossoms open all night &nbsp;·&nbsp; D. Gardeners attach new blossoms to branches each week</div></td>
+    <td class="ans"><b>B</b> Each branch forms both early- and later-opening flower buds</td>
+  </tr>
+  <tr>
+    <td class="n">60</td>
+    <td>What traditional art can visitors see performed at the Atami Geigi Kenban, which has been used by local geigi (geisha)?<div class="small muted">A. Kabuki with full theatrical stage sets &nbsp;·&nbsp; B. Sumo wrestling demonstrations &nbsp;·&nbsp; C. Classical Noh theatre by monks &nbsp;·&nbsp; D. Geigi dance performances</div></td>
+    <td class="ans"><b>D</b> Geigi dance performances</td>
+  </tr>
+  <tr>
+    <td class="n">61</td>
+    <td>Which Japanese novel inspired the Kanichi-and-Omiya statue along Atami’s waterfront?<div class="small muted">A. Kokoro &nbsp;·&nbsp; B. The Golden Demon (Konjiki Yasha) &nbsp;·&nbsp; C. The Tale of Genji &nbsp;·&nbsp; D. Snow Country</div></td>
+    <td class="ans"><b>B</b> The Golden Demon (Konjiki Yasha)</td>
+  </tr>
+  <tr>
+    <td class="n">62</td>
+    <td>Why are the jacaranda trees near Atami’s seafront an unusual sight in Japan?<div class="small muted">A. They are an alpine species that blooms above the snowline &nbsp;·&nbsp; B. They are a native plum variety whose flowers turn purple &nbsp;·&nbsp; C. They are a coastal pine variety that produces purple cones &nbsp;·&nbsp; D. They originated in South America, and outdoor flowering on Japan’s mainland is uncommon</div></td>
+    <td class="ans"><b>D</b> They originated in South America, and outdoor flowering on Japan’s mainland is uncommon</td>
+  </tr>
+  <tr>
+    <td class="n">63</td>
+    <td>What should visitors know about Kiunkaku’s Roman-style bathroom today?<div class="small muted">A. It is preserved for viewing, not available for bathing &nbsp;·&nbsp; B. It opens for public bathing during the winter festival &nbsp;·&nbsp; C. It is now the source of Atami’s Oyu geyser &nbsp;·&nbsp; D. It was converted into an outdoor swimming pool</div></td>
+    <td class="ans"><b>A</b> It is preserved for viewing, not available for bathing</td>
+  </tr>
+  <tr>
+    <td class="n">64</td>
+    <td>Which description of Kinomiya Shrine’s famous camphor tree matches its official heritage status?<div class="small muted">A. About 500 years old and protected only by the city &nbsp;·&nbsp; B. About 1,000 years old and planted in the Edo period &nbsp;·&nbsp; C. More than 2,000 years old and designated a National Natural Monument &nbsp;·&nbsp; D. More than 4,000 years old and preserved as a museum exhibit</div></td>
+    <td class="ans"><b>C</b> More than 2,000 years old and designated a National Natural Monument</td>
+  </tr>
+  <tr>
+    <td class="n">65</td>
+    <td>Atami’s Shinsui Park and Moon Terrace evoke a Mediterranean resort partly because of a sister-city link with which city?<div class="small muted">A. Cannes, France &nbsp;·&nbsp; B. Sanremo, Italy &nbsp;·&nbsp; C. Dubrovnik, Croatia &nbsp;·&nbsp; D. Valletta, Malta</div></td>
+    <td class="ans"><b>B</b> Sanremo, Italy</td>
+  </tr>
+  <tr>
+    <td class="n">66</td>
+    <td>What distinction is associated with the night-time lighting at Atami Sun Beach?<div class="small muted">A. It is illuminated solely by lanterns from fishing boats &nbsp;·&nbsp; B. It changes colour according to the tide level &nbsp;·&nbsp; C. It is a replica of the lighting used at Tokyo Bay in 1964 &nbsp;·&nbsp; D. It is described as Japan’s first illuminated beach, with lighting designed by Motoko Ishii</div></td>
+    <td class="ans"><b>D</b> It is described as Japan’s first illuminated beach, with lighting designed by Motoko Ishii</td>
+  </tr>
+  <tr>
+    <td class="n">67</td>
+    <td>The cliffs and unusual rock formations of Nishikigaura are linked to which geological history?<div class="small muted">A. An ancient coral reef exposed after sea levels fell &nbsp;·&nbsp; B. A valley carved by glaciers during the last ice age &nbsp;·&nbsp; C. Remnants of the Atami–Taga volcano, later shaped by waves &nbsp;·&nbsp; D. Sediment deposited on the bed of a former inland lake</div></td>
+    <td class="ans"><b>C</b> Remnants of the Atami–Taga volcano, later shaped by waves</td>
+  </tr>
+  <tr>
+    <td class="n">68</td>
+    <td>Why was the Ieyasu no Yu footbath installed near Atami Station in 2004?<div class="small muted">A. To mark 400 years since Tokugawa Ieyasu visited Atami &nbsp;·&nbsp; B. To celebrate the 100th anniversary of Atami Station &nbsp;·&nbsp; C. To commemorate the reopening of the Oyu geyser &nbsp;·&nbsp; D. To celebrate the opening of the Tokaido Shinkansen</div></td>
+    <td class="ans"><b>A</b> To mark 400 years since Tokugawa Ieyasu visited Atami</td>
+  </tr>
+  <tr>
+    <td class="n">69</td>
+    <td>What is the main connection between Yumae Shrine and Atami’s local history?<div class="small muted">A. It was built to bless deep-sea fishing vessels &nbsp;·&nbsp; B. It honours and protects the hot springs that supported the town &nbsp;·&nbsp; C. It was established for merchants crossing the Tokaido road &nbsp;·&nbsp; D. It marks the former location of an imperial mint</div></td>
+    <td class="ans"><b>B</b> It honours and protects the hot springs that supported the town</td>
+  </tr>
+  <tr>
+    <td class="n">70</td>
+    <td>Which of Atami’s historic hot-spring sources was once especially important because ordinary villagers could use it?<div class="small muted">A. Oyu Geyser &nbsp;·&nbsp; B. Sajiro no Yu &nbsp;·&nbsp; C. Seizaemon no Yu &nbsp;·&nbsp; D. Kawara-yu</div></td>
+    <td class="ans"><b>D</b> Kawara-yu</td>
+  </tr>
+  <tr>
+    <td class="n">71</td>
+    <td>Which description is used by the official Atami tourism website for Hatsushima island?<div class="small muted">A. Japan’s largest island in the Seto Inland Sea &nbsp;·&nbsp; B. The only island in Japan with hot springs &nbsp;·&nbsp; C. Shizuoka Prefecture’s only inhabited offshore island &nbsp;·&nbsp; D. The birthplace of the Tokaido Shinkansen</div></td>
+    <td class="ans"><b>C</b> Shizuoka Prefecture’s only inhabited offshore island</td>
+  </tr>
+  <tr>
+    <td class="n">72</td>
+    <td>Which attraction on Hatsushima offers visitors an elevated coastal panorama from a climbable structure?<div class="small muted">A. Hatsushima Lighthouse &nbsp;·&nbsp; B. Hatsushima Aquarium Tower &nbsp;·&nbsp; C. Hatsushima Ropeway &nbsp;·&nbsp; D. Hatsushima Castle</div></td>
+    <td class="ans"><b>A</b> Hatsushima Lighthouse</td>
+  </tr>
+  <tr>
+    <td class="n">73</td>
+    <td>Which Atami attraction includes themed gardens and the COEDA HOUSE café designed by architect Kengo Kuma?<div class="small muted">A. Atami Plum Garden &nbsp;·&nbsp; B. Himenosawa Park &nbsp;·&nbsp; C. MOA Museum of Art &nbsp;·&nbsp; D. ACAO FOREST</div></td>
+    <td class="ans"><b>D</b> ACAO FOREST</td>
+  </tr>
+  <tr>
+    <td class="n">74</td>
+    <td>You want to see MOA Museum’s famous Red and White Plum Blossoms folding screens. What is the best approach?<div class="small muted">A. Assume they are always displayed at the main entrance &nbsp;·&nbsp; B. Look for them in the museum’s permanent outdoor garden &nbsp;·&nbsp; C. Check the exhibition calendar because the original screens are shown for limited periods &nbsp;·&nbsp; D. Visit only after sunset when the originals are unveiled</div></td>
+    <td class="ans"><b>C</b> Check the exhibition calendar because the original screens are shown for limited periods</td>
+  </tr>
+  <tr>
+    <td class="n">75</td>
+    <td>In addition to its art collections, MOA Museum of Art contains a venue for which Japanese stage tradition?<div class="small muted">A. Sumo wrestling &nbsp;·&nbsp; B. Noh theatre &nbsp;·&nbsp; C. Bunraku puppet theatre &nbsp;·&nbsp; D. Kabuki theatre</div></td>
+    <td class="ans"><b>B</b> Noh theatre</td>
+  </tr>
+  <tr>
+    <td class="n">76</td>
+    <td>Which German architect designed the distinctive basement interiors of Atami’s Old Hyuga Villa?<div class="small muted">A. Bruno Taut &nbsp;·&nbsp; B. Frank Lloyd Wright &nbsp;·&nbsp; C. Antonin Raymond &nbsp;·&nbsp; D. Togo Murano</div></td>
+    <td class="ans"><b>A</b> Bruno Taut</td>
+  </tr>
+  <tr>
+    <td class="n">77</td>
+    <td>Which fruit-picking activity does Atami promote as a seasonal experience from roughly October to December?<div class="small muted">A. Peach picking &nbsp;·&nbsp; B. Strawberry picking &nbsp;·&nbsp; C. Blueberry picking &nbsp;·&nbsp; D. Mikan (mandarin orange) picking</div></td>
+    <td class="ans"><b>D</b> Mikan (mandarin orange) picking</td>
+  </tr>
+  <tr>
+    <td class="n">78</td>
+    <td>What is the most accurate description of the “Atami Seven Hot Springs” (Atami Nanayu)?<div class="small muted">A. Seven modern public bathhouses with a shared admission ticket &nbsp;·&nbsp; B. Seven historic hot-spring sources found around the town &nbsp;·&nbsp; C. Seven underwater geysers reached by boat &nbsp;·&nbsp; D. Seven mountain spas operating only in winter</div></td>
+    <td class="ans"><b>B</b> Seven historic hot-spring sources found around the town</td>
+  </tr>
+  <tr>
+    <td class="n">79</td>
+    <td>At a Japanese shrine, what is a goshuin?<div class="small muted">A. A distinctive calligraphic stamp or inscription collected in a special book &nbsp;·&nbsp; B. A small protective charm kept in a handbag &nbsp;·&nbsp; C. A wooden plaque on which visitors write wishes &nbsp;·&nbsp; D. A paper slip giving a written fortune</div></td>
+    <td class="ans"><b>A</b> A distinctive calligraphic stamp or inscription collected in a special book</td>
+  </tr>
+  <tr>
+    <td class="n">80</td>
+    <td>If someone buys an omamori at Kinomiya Shrine, what have they purchased?<div class="small muted">A. An omikuji paper fortune &nbsp;·&nbsp; B. An ema wooden wish plaque &nbsp;·&nbsp; C. A protective amulet associated with blessings or good luck &nbsp;·&nbsp; D. A goshuin shrine stamp</div></td>
+    <td class="ans"><b>C</b> A protective amulet associated with blessings or good luck</td>
   </tr>
   </table>
   <div class="foot"><span>Game Master pack</span><span>Atami quiz answer key</span></div>

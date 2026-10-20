@@ -81,7 +81,7 @@ const html = `<!doctype html>
   <ul>
     <li>Reply <b>✅ Stamp N</b> as soon as you accept a game. Log it on the score sheet with the WhatsApp time.</li>
     <li><b>Bingo:</b> stamp only when every tile has a correct selfie. 1 point per tile.</li>
-    <li><b>Atami quiz:</b> call the leader, read 15 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
+    <li><b>Atami quiz:</b> call the leader, read 20 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
     <li><b>Buy it, try it:</b> stamp needs the video <b>and</b> the bosses’ rating. Points = 2 × rating.</li>
     <li><b>Look around you:</b> first message only. Mark at the finish.</li>
     <li><b>Know your colleagues:</b> call the leader, ask all questions, no pass mark. Points = 2 × right.</li>
@@ -108,7 +108,7 @@ const html = `<!doctype html>
 
   <h3>Atami quiz attempts</h3>
   <table class="sheet">
-    <tr><th>Group</th><th>Attempt 1 (right / 15)</th><th>Attempt 2</th><th>Attempt 3</th><th>Passed with</th></tr>
+    <tr><th>Group</th><th>Attempt 1 (right / 20)</th><th>Attempt 2</th><th>Attempt 3</th><th>Passed with</th></tr>
     ${groups.map((g) => `<tr><td><b>${g}</b></td><td></td><td></td><td></td><td></td></tr>`).join('')}
   </table>
 

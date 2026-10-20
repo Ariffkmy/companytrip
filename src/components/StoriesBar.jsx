@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STORY_MAX_SECONDS, deleteStory, groupByPerson, listStories, rememberSeenStories, seenStoryIds, uploadStory } from '../lib/stories';
 import { mediaErrorMessage } from '../lib/video';
+import { supabase } from '../lib/supabase';
 import StoriesViewer from './StoriesViewer';
 
 /* ── Stories bar ─────────────────────────────────────
@@ -26,7 +27,11 @@ function postingLabel(p) {
   return 'Posting…';
 }
 
-export default function StoriesBar({ userId, isAdmin }) {
+/* `onChange` runs when a story is posted or deleted, here or (live)
+   anywhere, so the album grid below, which lists stories too, follows. */
+export default function StoriesBar({ userId, isAdmin, onChange }) {
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const [stories, setStories] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [seen, setSeen] = useState(seenStoryIds);
@@ -52,16 +57,39 @@ export default function StoriesBar({ userId, isAdmin }) {
     }
   }, []);
 
-  /* Load now, and again whenever the app comes back to the front, but
-     not mid-story: fresh signed URLs would restart the video playing. */
+  /* Load now, live whenever anyone posts or deletes a story
+     (20261030000000_stories_realtime.sql), and again whenever the app
+     comes back to the front or online. Never mid-story: fresh signed URLs
+     would restart the video playing, so a change that lands while one is
+     open waits until the viewer closes. */
   const watching = useRef(false);
   watching.current = Boolean(viewer);
+  const pending = useRef(false);
   useEffect(() => {
+    const refresh = () => {
+      if (watching.current) { pending.current = true; return; }
+      load();
+    };
     load();
-    const onVis = () => { if (!document.hidden && !watching.current) load(); };
+    const channel = supabase
+      ?.channel(`stories:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, () => {
+        refresh();
+        onChangeRef.current?.();
+      })
+      .subscribe();
+    const onVis = () => { if (!document.hidden) refresh(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    window.addEventListener('online', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('online', refresh);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [load]);
+  useEffect(() => {
+    if (!viewer && pending.current) { pending.current = false; load(); }
+  }, [viewer, load]);
 
   const markSeen = useCallback((id) => {
     setSeen((s) => {
@@ -85,6 +113,7 @@ export default function StoriesBar({ userId, isAdmin }) {
         const row = await uploadStory(file, userId, (step) => setPosting({ step }));
         setStories((s) => [...(s ?? []), row]);
         markSeen(row.id); // your own story is never "new" to you
+        onChangeRef.current?.();
       } catch (e) {
         failed++;
         lastErr = e;
@@ -122,6 +151,7 @@ export default function StoriesBar({ userId, isAdmin }) {
     try {
       await deleteStory(story);
       setStories((s) => s.filter((x) => x.id !== story.id));
+      onChangeRef.current?.();
     } catch (e) {
       setError(/not allowed|row-level|permission/i.test(e?.message ?? '') ? 'You can only delete your own stories.' : 'That story didn’t delete. Try again.');
       throw e;

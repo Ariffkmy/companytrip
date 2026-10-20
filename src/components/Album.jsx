@@ -247,7 +247,7 @@ export default function Album({ userId, isAdmin }) {
   return (
     <section className="pt-9">
       {/* Stories are separate from the album: their own uploads, their own viewer. */}
-      <StoriesBar userId={userId} isAdmin={isAdmin} />
+      <StoriesBar userId={userId} isAdmin={isAdmin} onChange={load} />
 
       <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700">Album</h2>
       {error && <p role="alert" className="text-sm text-red mt-2">{error}</p>}

@@ -18,6 +18,11 @@ import { PHOTO_PRESETS, compressPhoto, loadImage } from './photos';
 import { isVideoFile, prepareVideo } from './video';
 
 const ALBUM = { bucket: 'album', table: 'album_photos' };
+/* Stories show in the album too, every one ever posted, not only the
+   last day's (src/lib/stories.js lists those). Each row carries
+   `source`, so saving and deleting go to the right place. */
+const STORIES = { bucket: 'stories', table: 'stories' };
+const targetOf = (item) => (item.source === 'story' ? STORIES : ALBUM);
 export const MEDIA_COLUMNS = 'id, path, thumb_path, width, height, kind, duration, uploader_id, uploader_name, created_at';
 const URL_TTL = 60 * 60; // 1h — long enough to browse, short enough to not leak
 export const PAGE_SIZE = 48;
@@ -50,17 +55,30 @@ export async function withUrls(bucket, rows) {
   return rows.map((r) => ({ ...r, src: url[r.path] ?? null, thumb: url[r.thumb_path] ?? url[r.path] ?? null }));
 }
 
-/** Newest first. Pass the last photo's created_at to get the next page. */
-export async function listPhotos({ before = null, limit = PAGE_SIZE } = {}) {
+/* One table's newest `limit` rows before `before`, signed and tagged. */
+async function listFrom({ bucket, table }, source, before, limit) {
   let q = supabase
-    .from(ALBUM.table)
+    .from(table)
     .select(MEDIA_COLUMNS)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (before) q = q.lt('created_at', before);
   const { data, error } = await q;
   if (error) throw error;
-  const rows = await withUrls(ALBUM.bucket, data);
+  return (await withUrls(bucket, data)).map((r) => ({ ...r, source }));
+}
+
+/** Album photos and stories together, newest first. Pass the last
+    item's created_at to get the next page. */
+export async function listPhotos({ before = null, limit = PAGE_SIZE } = {}) {
+  /* The newest `limit` of both is within the newest `limit` of each. */
+  const [album, stories] = await Promise.all([
+    listFrom(ALBUM, 'album', before, limit),
+    listFrom(STORIES, 'story', before, limit),
+  ]);
+  const rows = [...album, ...stories]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limit);
   /* Only a full first page is a trustworthy "newest" snapshot. */
   if (!before && limit >= PAGE_SIZE) remember(rows);
   return rows;
@@ -135,7 +153,7 @@ export async function deleteMedia({ bucket, table }, item) {
     save. Fetched through the API rather than the signed URL, which may
     have expired on a cached row. */
 export async function fetchAlbumFile(item) {
-  const { data, error } = await supabase.storage.from(ALBUM.bucket).download(item.path);
+  const { data, error } = await supabase.storage.from(targetOf(item).bucket).download(item.path);
   if (error) throw error;
   const ext = item.path.split('.').pop();
   const d = new Date(item.created_at);
@@ -170,8 +188,10 @@ export async function saveFile(file) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export const uploadAlbumMedia =(file, userId, onProgress) => uploadMedia(ALBUM, file, userId, { onProgress });
-export const deletePhoto = (photo) => deleteMedia(ALBUM, photo);
+export const uploadAlbumMedia = async (file, userId, onProgress) =>
+  ({ ...(await uploadMedia(ALBUM, file, userId, { onProgress })), source: 'album' });
+/* A story deleted here is gone from Stories too. */
+export const deletePhoto = (photo) => deleteMedia(targetOf(photo), photo);
 
 export function formatUploaded(iso) {
   const d = new Date(iso);

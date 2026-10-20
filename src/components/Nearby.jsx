@@ -38,10 +38,10 @@ const TONE = {
 
 /* ── Navigation links ───────────────────────────────
    Coordinates, not addresses: several of these are a mall floor or a
-   street, which the apps geocode badly. Walking, because everything
-   here is on foot from the hotel. */
+   street, which the apps geocode badly. Walking, because nearly
+   everything here is on foot from the hotel; a place can say otherwise. */
 const googleUrl = (p) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}&travelmode=walking`;
+  `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}&travelmode=${p.travelmode ?? 'walking'}`;
 const wazeUrl = (p) => `https://waze.com/ul?ll=${p.latitude}%2C${p.longitude}&navigate=yes`;
 
 const commonsFile = (file) => `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replace(/ /g, '_'))}`;
@@ -105,7 +105,7 @@ function NavButtons({ place, compact }) {
   return (
     <div className="flex gap-2">
       <a href={googleUrl(place)} target="_blank" rel="noopener noreferrer" className={cls}
-        aria-label={`Walk to ${place.name} with Google Maps`}>
+        aria-label={`${place.travelmode === 'transit' ? 'Directions' : 'Walk'} to ${place.name} with Google Maps`}>
         <Icon name="map-pin" className="w-3.5 h-3.5 text-red" />Google Maps
       </a>
       <a href={wazeUrl(place)} target="_blank" rel="noopener noreferrer" className={cls}
@@ -174,7 +174,7 @@ function PlaceCard({ place, now }) {
         {place.name_jp && <p className="text-xs text-gray-500 leading-snug">{place.name_jp}</p>}
 
         <p className="text-xs mt-2 flex flex-wrap gap-x-2 gap-y-0.5">
-          <span className="font-medium text-ink">{mins} min walk</span>
+          <span className="font-medium text-ink">{place.travel ?? `${mins} min walk`}</span>
           {status && (
             <span className={status.open ? 'text-green font-medium' : 'text-red font-medium'}>{status.label}</span>
           )}
