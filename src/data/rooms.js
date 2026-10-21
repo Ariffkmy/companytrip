@@ -3,8 +3,8 @@
 
    Short names, matched to groupRoster by name to show each person's
    team — case and apostrophes are ignored, so "Asma" finds "Asma'".
-   Room 12 is the last room booked, not a lesser one. Jay has room 8
-   to themselves.
+   Room 12 is the last room booked, not a lesser one. Nicholas has
+   room 11 to themselves.
    ═══════════════════════════════════════════════════ */
 
 const rooms = [
@@ -15,10 +15,10 @@ const rooms = [
   ['Chiew', 'Aina'],
   ['Aidan', 'Aiman'],
   ['Ariff', 'Kevin'],
-  ['Jay'],
+  ['Jay', 'Shahrul'],
   ['Helmi', 'Jord'],
   ['Raf', 'Huai Yu'],
-  ['Nicholas', 'Shahrul'],
+  ['Nicholas'],
   ['Amir', 'Hairul'],
 ];
 

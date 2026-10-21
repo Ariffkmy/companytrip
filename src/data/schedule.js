@@ -1,4 +1,6 @@
-﻿const schedule = [
+﻿import rooms from './rooms';
+
+const schedule = [
   {
     day: 'D0',
     date: '2026-10-21',
@@ -33,6 +35,7 @@
       { id: 'com-atami-printouts', activity: 'Atami group activities print-outs (in case there’s no internet)', note: 'Ariff' },
       { id: 'com-shinkansen-qr', activity: 'Shinkansen QR printout', note: 'Chiew' },
       { id: 'com-bookings-printout', activity: 'Bookings printout', note: 'Chiew' },
+      { id: 'com-lanyards', activity: 'Lanyard 30pcs' },
     ],
     todos: [
       { id: 'todo-vjw', activity: 'Register Visit Japan Web' },
@@ -100,7 +103,16 @@
           },
         ],
       },
-      { time: '01:00', activity: 'Arrive Hotel MyStays Yokohama', place: 'Hotel MyStays Yokohama', note: 'Chartered bus transfer from Haneda. Check in, sleep — breakfast is on your own the next morning.' },
+      {
+        time: '01:00', activity: 'Arrive Hotel MyStays Yokohama', place: 'Hotel MyStays Yokohama',
+        note: 'Chartered bus transfer from Haneda. Check in, sleep — breakfast is on your own the next morning.',
+        // Same list the Admin tab shows, so a re-pairing only changes rooms.js.
+        details: rooms.map((pair, i) => ({
+          label: `Room ${i + 1}`,
+          value: pair.join(' & '),
+          sub: pair.length === 1 ? 'Single' : undefined,
+        })),
+      },
     ],
     participantPrep: [
       'Be at the office by 8:00 AM — vans leave for KLIA2 right after.',
@@ -314,7 +326,7 @@
     label: 'Tue 27 Okt',
     title: 'Arrival — KLIA2 → Office',
     emoji: '🏠',
-    meals: { breakfast: 'To be confirmed', lunch: 'Own arrangement', dinner: 'Own arrangement' },
+    meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement', dinner: 'Own arrangement' },
     transport: [],
     activities: [
       { time: '06:50', activity: 'Arrive KLIA2', place: 'KL International Airport 2', note: 'Welcome home.' },
