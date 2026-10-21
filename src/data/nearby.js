@@ -76,7 +76,6 @@ export const PLACES = [
     line: 'Tokaido Shinkansen · Blue Line · JR Yokohama Line',
     station_code: 'B25 / JH16',
     travel: '~20 min by Blue Line from Bandobashi',
-    travelmode: 'transit',
     priority: 'essential',
   },
   {

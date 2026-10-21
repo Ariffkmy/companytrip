@@ -36,13 +36,13 @@ const TONE = {
   hotel: 'bg-gray-100 text-gray-500',
 };
 
-/* ── Navigation links ───────────────────────────────
-   Coordinates, not addresses: several of these are a mall floor or a
-   street, which the apps geocode badly. Walking, because nearly
-   everything here is on foot from the hotel; a place can say otherwise. */
+/* ── Map links ──────────────────────────────────────
+   Open the place itself, not a route: no start point, no travel mode.
+   Google gets the name and address so it lands on the place's own page;
+   Waze only takes coordinates, and shows the spot without navigating. */
 const googleUrl = (p) =>
-  `https://www.google.com/maps/dir/?api=1&destination=${p.latitude},${p.longitude}&travelmode=${p.travelmode ?? 'walking'}`;
-const wazeUrl = (p) => `https://waze.com/ul?ll=${p.latitude}%2C${p.longitude}&navigate=yes`;
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.name}, ${p.address}`)}`;
+const wazeUrl = (p) => `https://waze.com/ul?ll=${p.latitude}%2C${p.longitude}`;
 
 const commonsFile = (file) => `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file.replace(/ /g, '_'))}`;
 const commonsImage = (file) =>
@@ -105,11 +105,11 @@ function NavButtons({ place, compact }) {
   return (
     <div className="flex gap-2">
       <a href={googleUrl(place)} target="_blank" rel="noopener noreferrer" className={cls}
-        aria-label={`${place.travelmode === 'transit' ? 'Directions' : 'Walk'} to ${place.name} with Google Maps`}>
+        aria-label={`Open ${place.name} in Google Maps`}>
         <Icon name="map-pin" className="w-3.5 h-3.5 text-red" />Google Maps
       </a>
       <a href={wazeUrl(place)} target="_blank" rel="noopener noreferrer" className={cls}
-        aria-label={`Navigate to ${place.name} with Waze`}>
+        aria-label={`Open ${place.name} in Waze`}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
           className="w-3.5 h-3.5 text-sea" aria-hidden="true">
           <path d="M5 16a3 3 0 01-2-3c0-5 4-9 9-9s9 4 9 8-3 7-7 7h-4M9 10h.01M15 10h.01M9.5 13.5c1.5 1 3.5 1 5 0" />
