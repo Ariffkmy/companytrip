@@ -8,9 +8,10 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      // The trip app is read-mostly; pushing updates silently avoids a
-      // "reload?" prompt nobody will read on a train platform.
-      registerType: 'autoUpdate',
+      // 'prompt' so UpdateBanner decides when a new deploy is swapped in:
+      // by itself at a safe moment, or when someone taps Update. 'autoUpdate'
+      // only checked on a full page load and could reload mid-upload.
+      registerType: 'prompt',
       includeAssets: ['apple-touch-icon.png', 'favicon.svg'],
 
       manifest: {
