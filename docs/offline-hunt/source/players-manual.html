@@ -47,69 +47,123 @@
   .game .title { font-weight: 900; font-size: 12pt; }
   .game .pts { flex: none; font-weight: 800; color: var(--red); white-space: nowrap; font-size: 10pt; }
   .game p { margin: 2px 0 0; }
+  .game ol { margin: 2px 0 0; font-size: 9.8pt; line-height: 1.38; }
+  .game li { margin-bottom: 0; }
   .q { border-bottom: 1px dotted var(--soft); padding: 8px 0 18px; }
   .card td { height: 30px; vertical-align: middle; }
+  code { font: 700 9.5pt/1 "Consolas", monospace; background: var(--tint); border-radius: 4px; padding: 2px 5px; white-space: nowrap; }
+  .codes td { padding: 4px 7px; font-size: 10pt; }
+  .bank td { padding: 2px 6px; font-size: 9pt; line-height: 1.25; break-inside: avoid; }
+  .bank .opts { color: var(--soft); font-size: 8.5pt; }
 </style>
 </head>
 <body>
 
-<!-- ═════════════ PAGE 1: BASICS + THE 7 GAMES ═════════════ -->
+<!-- ═════════════ PAGE 1: BASICS + HOW TO SEND ═════════════ -->
 <section class="page">
   <div class="cover-band">
     <div class="eyebrow">Atami Treasure Hunt · Paper version</div>
     <h1>No app? No problem.</h1>
-    <p>Use this only when Ariff says the app is down. Everything goes through WhatsApp.</p>
+    <p>Use this only when Ariff says the app is down. Every game is played through WhatsApp with the Game Master.</p>
   </div>
 
   <h3>The basics</h3>
   <ol class="rules">
-    <li><b>90 minutes.</b> Starts when Ariff sends <b>START</b>, ends at <b>TIME’S UP</b>.</li>
-    <li><b>Send everything to Ariff</b> in a private WhatsApp chat: <b>__________________</b>. Begin with your group and game, e.g. <i>“Group A – Game 2”</i>.</li>
+    <li><b>90 minutes.</b> Starts when Ariff sends <b>START</b>, ends at <b>TIME’S UP</b>. Anything sent after TIME’S UP doesn’t count.</li>
+    <li><b>Game Master: Ariff.</b> Send everything to him in a private WhatsApp chat: <b>__________________</b>.</li>
+    <li><b>Caption every message with its code</b> (table below). No code, no points.</li>
     <li><b>A game counts when Ariff replies ✅.</b> Play the 7 games in any order. First group to finish all 7 gets <b>+15</b>.</li>
-    <li><b>Stay together.</b> Emergency: <b>119</b> (ambulance) or <b>110</b> (police), then tell Ariff.</li>
+    <li><b>Stay together.</b> The whole group goes to every spot. Emergency: <b>119</b> (ambulance) or <b>110</b> (police), then tell Ariff.</li>
   </ol>
 
-  <h3>The 7 games</h3>
+  <h3>How to caption: group + game code</h3>
+  <p>Start with your group, then the code. Example for Group A’s third bingo photo: <code>GroupA_photobingo_3</code></p>
+  <table class="codes">
+    <tr><th>#</th><th>Game</th><th>What you send</th><th>Caption</th></tr>
+    <tr><td class="n">1</td><td>Photo bingo</td><td>One team selfie per bingo spot</td><td><code>GroupA_photobingo_1</code>, <code>_2</code>, <code>_3</code> …</td></tr>
+    <tr><td class="n">2</td><td>Copy the pose</td><td>One photo of the pose</td><td><code>GroupA_copythepose</code></td></tr>
+    <tr><td class="n">3</td><td>Atami quiz</td><td>Landmark selfie, then your answers</td><td><code>GroupA_atamiquiz_landmark</code><br><code>GroupA_atamiquiz_round1</code></td></tr>
+    <tr><td class="n">4</td><td>Buy it, try it</td><td>Video of your pitch</td><td><code>GroupA_buyittryit</code></td></tr>
+    <tr><td class="n">5</td><td>Look around you</td><td>All 5 answers, one message</td><td><code>GroupA_lookaround</code></td></tr>
+    <tr><td class="n">6</td><td>Know your colleagues</td><td>A “ready” text, then a phone call</td><td><code>GroupA_colleagues_ready</code></td></tr>
+    <tr><td class="n">7</td><td>Find the boss</td><td>Funny team photo with Tim and Ellice</td><td><code>GroupA_findtheboss</code></td></tr>
+  </table>
+  <p class="small muted" style="margin-top:6px">Replace <b>GroupA</b> with your own group: GroupB, GroupC or GroupD. Send photos and videos as they are; don’t edit or filter them.</p>
+
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Basics</span></div>
+</section>
+
+<!-- ═════════════ PAGE 2: THE 7 GAMES, STEP BY STEP ═════════════ -->
+<section class="page">
+  <h2>The 7 games, step by step</h2>
 
   <div class="game"><div class="num">1</div><div class="body">
     <div class="title">Photo bingo</div>
-    <p>Ariff sends your bingo photos. Go to each spot and send a team selfie there. Finish every spot.</p>
+    <ol>
+      <li>Ariff sends your group’s bingo photos, numbered 1, 2, 3 …</li>
+      <li>Find each spot and take a team selfie there, everyone in the shot.</li>
+      <li>Send each selfie as you take it, captioned with its number: <code>GroupA_photobingo_1</code>.</li>
+      <li>Ariff replies ✅ when every spot is done.</li>
+    </ol>
   </div><div class="pts">10 + 1 per photo</div></div>
 
   <div class="game"><div class="num">2</div><div class="body">
     <div class="title">Copy the pose</div>
-    <p>Ariff sends a place and a pose. Go there, copy the pose as a team, send one photo.</p>
+    <ol>
+      <li>Ariff sends a place and a pose photo.</li>
+      <li>Go to that place and copy the pose as a whole group.</li>
+      <li>Send one photo: <code>GroupA_copythepose</code>.</li>
+    </ol>
   </div><div class="pts">10 · +5 best pose</div></div>
 
   <div class="game"><div class="num">3</div><div class="body">
     <div class="title">Atami quiz</div>
-    <p>Find the landmark in Ariff’s photo and send a team selfie. Then Ariff calls your leader: 20 questions, 10 seconds each. Get 10 right to pass, or try again with new questions.</p>
+    <ol>
+      <li>Ariff sends a landmark photo. Find it and send a team selfie: <code>GroupA_atamiquiz_landmark</code>.</li>
+      <li>Ariff replies with <b>20 question numbers</b> from the quiz pages at the back of this manual.</li>
+      <li>You have <b>5 minutes</b>. Send all 20 answers in one message: <code>GroupA_atamiquiz_round1</code>, then one line each, e.g. <i>12 B</i>.</li>
+      <li>10 or more right is a pass. Fewer than 10? Ariff sends 20 new numbers: reply <code>GroupA_atamiquiz_round2</code>. No searching online.</li>
+    </ol>
   </div><div class="pts">10 + 2 per right answer</div></div>
 
   <div class="game"><div class="num">4</div><div class="body">
     <div class="title">Buy it, try it</div>
-    <p>Buy anything. Sell it to Tim and Ellice and video your pitch. Send the video to Ariff. The bosses score it 1 to 10.</p>
+    <ol>
+      <li>Buy anything from a shop in Atami.</li>
+      <li>Find Tim and Ellice and sell it to them. Record your pitch as a video.</li>
+      <li>Send the video: <code>GroupA_buyittryit</code>. The bosses score it 1 to 10 and tell Ariff.</li>
+    </ol>
   </div><div class="pts">10 + 2 × score</div></div>
 
   <div class="game"><div class="num">5</div><div class="body">
     <div class="title">Look around you</div>
-    <p>Answer the 5 questions on page 2 on the walk from Area 3 to Area 4. Send all answers in one message, once.</p>
+    <ol>
+      <li>On the walk from Area 3 to Area 4, answer the 5 questions on the next page.</li>
+      <li>Send all 5 answers in one message, once: <code>GroupA_lookaround</code>, then lines 1 to 5. Only your first message counts.</li>
+    </ol>
   </div><div class="pts">10 + 2 per right answer</div></div>
 
   <div class="game"><div class="num">6</div><div class="body">
     <div class="title">Know your colleagues</div>
-    <p>Ariff calls your leader and asks 25 questions about people in the other groups.</p>
+    <ol>
+      <li>When your group is together and somewhere quiet, text <code>GroupA_colleagues_ready</code>.</li>
+      <li>Ariff calls your leader and asks 25 questions about people in the other groups. Answer together.</li>
+    </ol>
   </div><div class="pts">10 + 2 per right answer</div></div>
 
   <div class="game"><div class="num">7</div><div class="body">
     <div class="title">Find the boss</div>
-    <p>In your “Find the boss” WhatsApp group, ask Tim and Ellice yes/no questions (2 each time they move). Find them and send a funny team photo with them.</p>
+    <ol>
+      <li>In your “Find the boss – Group A” WhatsApp group, ask Tim and Ellice yes/no questions. You get 2 questions each time they post “🚶 We’re moving”.</li>
+      <li>Find them and take a funny team photo with both of them.</li>
+      <li>Send it to Ariff: <code>GroupA_findtheboss</code>.</li>
+    </ol>
   </div><div class="pts">20 · +5 funniest</div></div>
 
-  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Page 1 of 2</span></div>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Games</span></div>
 </section>
 
-<!-- ═════════════ PAGE 2: LOOK AROUND YOU + SCORE CARD ═════════════ -->
+<!-- ═════════════ PAGE 3: LOOK AROUND YOU + SCORE CARD ═════════════ -->
 <section class="page">
   <h2>Game 5 · Look around you</h2>
   <p class="muted">Walk from Area 3 to Area 4 and keep your eyes open. No phones, no internet.</p>
@@ -135,8 +189,46 @@
   <h3>When you’re done</h3>
   <p>Go back to the start point together. Highest total wins.</p>
 
-  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Page 2 of 2</span></div>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Look around you · Score card</span></div>
 </section>
+
+<!-- Quiz pages: filled in by build-gm-pack.mjs from src/data/atamiQuiz.js -->
+<!-- quiz:start -->
+<section class="page">
+  <div class="eyebrow">Game 3 · Atami quiz · 80 questions</div>
+  <h2 style="margin:4px 0 4px">How well do you know Atami?</h2>
+  <p class="muted small">Answer only the 20 numbers Ariff sends you. Reply with the number and the letter, one per line, e.g. <i>12 B</i>. No searching online.</p>
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th></tr>
+    <tr><td class="n">1</td><td>In which Japanese prefecture is Atami located?<div class="opts"><b>A.</b> Hokkaido &nbsp;·&nbsp; <b>B.</b> Shizuoka &nbsp;·&nbsp; <b>C.</b> Osaka &nbsp;·&nbsp; <b>D.</b> Kyoto</div></td></tr><tr><td class="n">2</td><td>What is Atami particularly famous for?<div class="opts"><b>A.</b> Ski resorts &nbsp;·&nbsp; <b>B.</b> Desert safaris &nbsp;·&nbsp; <b>C.</b> Hot springs &nbsp;·&nbsp; <b>D.</b> Large-scale rice plantations</div></td></tr><tr><td class="n">3</td><td>What does the name Atami traditionally refer to?<div class="opts"><b>A.</b> Hot sea &nbsp;·&nbsp; <b>B.</b> Blue mountain &nbsp;·&nbsp; <b>C.</b> Golden forest &nbsp;·&nbsp; <b>D.</b> Sleeping dragon</div></td></tr><tr><td class="n">4</td><td>Which body of water borders Atami?<div class="opts"><b>A.</b> Sea of Japan &nbsp;·&nbsp; <b>B.</b> Seto Inland Sea &nbsp;·&nbsp; <b>C.</b> East China Sea &nbsp;·&nbsp; <b>D.</b> Sagami Bay</div></td></tr><tr><td class="n">5</td><td>What is Japan’s currency?<div class="opts"><b>A.</b> Won &nbsp;·&nbsp; <b>B.</b> Yen &nbsp;·&nbsp; <b>C.</b> Yuan &nbsp;·&nbsp; <b>D.</b> Ringgit</div></td></tr><tr><td class="n">6</td><td>What is the primary language spoken in Atami?<div class="opts"><b>A.</b> Korean &nbsp;·&nbsp; <b>B.</b> Mandarin &nbsp;·&nbsp; <b>C.</b> Japanese &nbsp;·&nbsp; <b>D.</b> Thai</div></td></tr><tr><td class="n">7</td><td>Which Japanese high-speed train serves Atami Station?<div class="opts"><b>A.</b> Tokaido Shinkansen &nbsp;·&nbsp; <b>B.</b> Hokkaido Shinkansen only &nbsp;·&nbsp; <b>C.</b> Yamanote Line &nbsp;·&nbsp; <b>D.</b> Tokyo Metro Ginza Line</div></td></tr><tr><td class="n">8</td><td>What kind of destination is Atami best described as?<div class="opts"><b>A.</b> Industrial port city only &nbsp;·&nbsp; <b>B.</b> Desert resort &nbsp;·&nbsp; <b>C.</b> Ski-only destination &nbsp;·&nbsp; <b>D.</b> Coastal hot-spring resort town</div></td></tr><tr><td class="n">9</td><td>What is the time zone used in Atami?<div class="opts"><b>A.</b> UTC+7 &nbsp;·&nbsp; <b>B.</b> UTC+9 &nbsp;·&nbsp; <b>C.</b> UTC+10 &nbsp;·&nbsp; <b>D.</b> UTC+8</div></td></tr><tr><td class="n">10</td><td>Which season does October fall in in Japan?<div class="opts"><b>A.</b> Spring &nbsp;·&nbsp; <b>B.</b> Summer &nbsp;·&nbsp; <b>C.</b> Autumn &nbsp;·&nbsp; <b>D.</b> Winter</div></td></tr><tr><td class="n">11</td><td>Which famous Japanese shogun was associated with Atami’s hot springs?<div class="opts"><b>A.</b> Tokugawa Ieyasu &nbsp;·&nbsp; <b>B.</b> Toyotomi Hideyoshi &nbsp;·&nbsp; <b>C.</b> Oda Nobunaga &nbsp;·&nbsp; <b>D.</b> Minamoto no Yoritomo</div></td></tr><tr><td class="n">12</td><td>What is an onsen?<div class="opts"><b>A.</b> A Japanese sword &nbsp;·&nbsp; <b>B.</b> A traditional Japanese hot spring &nbsp;·&nbsp; <b>C.</b> A type of sushi &nbsp;·&nbsp; <b>D.</b> A Japanese train</div></td></tr><tr><td class="n">13</td><td>True or false: Atami Castle is an original medieval castle that has survived unchanged for centuries.<div class="opts"><b>A.</b> True &nbsp;·&nbsp; <b>B.</b> False</div></td></tr><tr><td class="n">14</td><td>Which tree is especially famous at Kinomiya Shrine?<div class="opts"><b>A.</b> Cherry tree &nbsp;·&nbsp; <b>B.</b> Bamboo tree &nbsp;·&nbsp; <b>C.</b> Sacred camphor tree &nbsp;·&nbsp; <b>D.</b> Coconut tree</div></td></tr><tr><td class="n">15</td><td>What traditional Japanese garment is often worn at an onsen resort?<div class="opts"><b>A.</b> Kimono or yukata &nbsp;·&nbsp; <b>B.</b> Hanbok &nbsp;·&nbsp; <b>C.</b> Cheongsam &nbsp;·&nbsp; <b>D.</b> Ao dai</div></td></tr><tr><td class="n">16</td><td>What material is a traditional yukata commonly made from?<div class="opts"><b>A.</b> Heavy leather &nbsp;·&nbsp; <b>B.</b> Wool &nbsp;·&nbsp; <b>C.</b> Metal mesh &nbsp;·&nbsp; <b>D.</b> Lightweight cotton or similar fabric</div></td></tr><tr><td class="n">17</td><td>What is the purpose of purification at a Shinto shrine?<div class="opts"><b>A.</b> To cool down after walking &nbsp;·&nbsp; <b>B.</b> To perform ritual purification &nbsp;·&nbsp; <b>C.</b> To test water temperature &nbsp;·&nbsp; <b>D.</b> To prepare food</div></td></tr><tr><td class="n">18</td><td>What is a torii?<div class="opts"><b>A.</b> A Japanese dessert &nbsp;·&nbsp; <b>B.</b> A hot-spring bath &nbsp;·&nbsp; <b>C.</b> A traditional gate associated with Shinto shrines &nbsp;·&nbsp; <b>D.</b> A type of bullet train</div></td></tr><tr><td class="n">19</td><td>True or false: Atami has a history as a hot-spring destination dating back more than 1,000 years.<div class="opts"><b>A.</b> True &nbsp;·&nbsp; <b>B.</b> False</div></td></tr><tr><td class="n">20</td><td>What is the Japanese word for a souvenir commonly bought when travelling?<div class="opts"><b>A.</b> Shinkansen &nbsp;·&nbsp; <b>B.</b> Tatami &nbsp;·&nbsp; <b>C.</b> Onsen &nbsp;·&nbsp; <b>D.</b> Omiyage</div></td></tr>
+  </table>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Atami quiz 1–20</span></div>
+</section>
+<section class="page">
+  <div class="eyebrow">Game 3 · Atami quiz · continued</div>
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th></tr>
+    <tr><td class="n">21</td><td>Which attraction in Atami is known for Japanese and East Asian art?<div class="opts"><b>A.</b> MOA Museum of Art &nbsp;·&nbsp; <b>B.</b> Tokyo Disneyland &nbsp;·&nbsp; <b>C.</b> Osaka Aquarium &nbsp;·&nbsp; <b>D.</b> Sapporo Beer Museum</div></td></tr><tr><td class="n">22</td><td>What can visitors see at Atami Plum Garden during the appropriate season?<div class="opts"><b>A.</b> Lavender fields &nbsp;·&nbsp; <b>B.</b> Plum blossoms &nbsp;·&nbsp; <b>C.</b> Giant sunflower farms only &nbsp;·&nbsp; <b>D.</b> Snow-covered pine forests year-round</div></td></tr><tr><td class="n">23</td><td>What is the main purpose of the Atami Ropeway?<div class="opts"><b>A.</b> To transport passengers between Tokyo and Osaka &nbsp;·&nbsp; <b>B.</b> To carry cars across the sea &nbsp;·&nbsp; <b>C.</b> To take visitors to an elevated viewpoint &nbsp;·&nbsp; <b>D.</b> To transport passengers underground</div></td></tr><tr><td class="n">24</td><td>What is Atami Sun Beach best known for?<div class="opts"><b>A.</b> A ski jump &nbsp;·&nbsp; <b>B.</b> A freshwater lake &nbsp;·&nbsp; <b>C.</b> A rice terrace &nbsp;·&nbsp; <b>D.</b> A sandy waterfront and seaside atmosphere</div></td></tr><tr><td class="n">25</td><td>What makes the Atami Marine Fireworks Festival distinctive?<div class="opts"><b>A.</b> It can be held at various times throughout the year &nbsp;·&nbsp; <b>B.</b> It only takes place once every 100 years &nbsp;·&nbsp; <b>C.</b> It is held inside a shopping mall &nbsp;·&nbsp; <b>D.</b> It only happens at sunrise</div></td></tr><tr><td class="n">26</td><td>What type of transport is a ropeway?<div class="opts"><b>A.</b> A ferry &nbsp;·&nbsp; <b>B.</b> A cable-propelled aerial transport system &nbsp;·&nbsp; <b>C.</b> A bicycle &nbsp;·&nbsp; <b>D.</b> A subway train</div></td></tr><tr><td class="n">27</td><td>True or false: Atami’s fireworks festival takes place every single night.<div class="opts"><b>A.</b> True &nbsp;·&nbsp; <b>B.</b> False</div></td></tr><tr><td class="n">28</td><td>Which activity is most closely associated with a traditional Japanese hot-spring resort?<div class="opts"><b>A.</b> Sandboarding in a desert &nbsp;·&nbsp; <b>B.</b> Glacier climbing &nbsp;·&nbsp; <b>C.</b> Soaking in an onsen &nbsp;·&nbsp; <b>D.</b> Dog sledding</div></td></tr><tr><td class="n">29</td><td>What is Kiunkaku in Atami known for?<div class="opts"><b>A.</b> A historic villa and its architecture &nbsp;·&nbsp; <b>B.</b> A Formula One circuit &nbsp;·&nbsp; <b>C.</b> A modern international airport &nbsp;·&nbsp; <b>D.</b> A giant indoor ski resort</div></td></tr><tr><td class="n">30</td><td>Which location is a practical starting point for exploring shops and eateries around central Atami?<div class="opts"><b>A.</b> Mount Fuji summit &nbsp;·&nbsp; <b>B.</b> Atami Station &nbsp;·&nbsp; <b>C.</b> Kansai International Airport &nbsp;·&nbsp; <b>D.</b> Tokyo Tower</div></td></tr><tr><td class="n">31</td><td>What is himono, a food associated with Atami and the surrounding region?<div class="opts"><b>A.</b> A sweet rice cake &nbsp;·&nbsp; <b>B.</b> A fermented soybean soup &nbsp;·&nbsp; <b>C.</b> Dried fish &nbsp;·&nbsp; <b>D.</b> A green tea dessert</div></td></tr><tr><td class="n">32</td><td>What is onsen manju?<div class="opts"><b>A.</b> A steamed bun usually filled with sweet red-bean paste &nbsp;·&nbsp; <b>B.</b> A grilled seafood dish &nbsp;·&nbsp; <b>C.</b> A type of Japanese curry &nbsp;·&nbsp; <b>D.</b> A cold noodle salad</div></td></tr><tr><td class="n">33</td><td>Which Japanese dish typically consists of rice topped with seafood?<div class="opts"><b>A.</b> Ramen &nbsp;·&nbsp; <b>B.</b> Tempura udon &nbsp;·&nbsp; <b>C.</b> Okonomiyaki &nbsp;·&nbsp; <b>D.</b> Seafood donburi</div></td></tr><tr><td class="n">34</td><td>True or false: You should generally wash your body before entering a communal Japanese onsen bath.<div class="opts"><b>A.</b> True &nbsp;·&nbsp; <b>B.</b> False</div></td></tr><tr><td class="n">35</td><td>Which is good etiquette when using a communal onsen?<div class="opts"><b>A.</b> Swim across the bath &nbsp;·&nbsp; <b>B.</b> Keep your hair out of the bathing water &nbsp;·&nbsp; <b>C.</b> Bring food into the bath &nbsp;·&nbsp; <b>D.</b> Wash your clothes in the bath</div></td></tr><tr><td class="n">36</td><td>What is the time difference between Malaysia and Japan?<div class="opts"><b>A.</b> Japan is 2 hours behind Malaysia &nbsp;·&nbsp; <b>B.</b> Both countries use the same time &nbsp;·&nbsp; <b>C.</b> Japan is 1 hour ahead of Malaysia &nbsp;·&nbsp; <b>D.</b> Japan is 3 hours ahead of Malaysia</div></td></tr><tr><td class="n">37</td><td>If it is 10:00 a.m. in Malaysia, what time is it in Atami?<div class="opts"><b>A.</b> 11:00 a.m. &nbsp;·&nbsp; <b>B.</b> 9:00 a.m. &nbsp;·&nbsp; <b>C.</b> 12:00 noon &nbsp;·&nbsp; <b>D.</b> 10:00 p.m.</div></td></tr><tr><td class="n">38</td><td>True or false: Atami is located in Hokkaido, Japan’s northernmost main island.<div class="opts"><b>A.</b> True &nbsp;·&nbsp; <b>B.</b> False</div></td></tr><tr><td class="n">39</td><td>What is customary when receiving a Japanese business card?<div class="opts"><b>A.</b> Immediately fold it into your pocket &nbsp;·&nbsp; <b>B.</b> Write on it without looking at it &nbsp;·&nbsp; <b>C.</b> Hand it back without acknowledging it &nbsp;·&nbsp; <b>D.</b> Receive it respectfully and take a moment to look at it</div></td></tr><tr><td class="n">40</td><td>Why should visitors check the weather before outdoor activities in Atami?<div class="opts"><b>A.</b> Japan has no weather forecasts &nbsp;·&nbsp; <b>B.</b> Coastal weather can affect visibility, comfort and outdoor plans &nbsp;·&nbsp; <b>C.</b> It is always snowing in October &nbsp;·&nbsp; <b>D.</b> The weather never changes near the sea</div></td></tr>
+  </table>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Atami quiz 21–40</span></div>
+</section>
+<section class="page">
+  <div class="eyebrow">Game 3 · Atami quiz · continued</div>
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th></tr>
+    <tr><td class="n">41</td><td>Why did Atami begin holding its sea fireworks festival in 1952?<div class="opts"><b>A.</b> To celebrate the Tokaido Shinkansen opening &nbsp;·&nbsp; <b>B.</b> To mark Japan's first seaside Olympics &nbsp;·&nbsp; <b>C.</b> To celebrate a newly built castle &nbsp;·&nbsp; <b>D.</b> To encourage recovery after a typhoon and major fires</div></td></tr><tr><td class="n">42</td><td>Why does Atami Bay produce such powerful echoes during fireworks?<div class="opts"><b>A.</b> The fireworks are mainly launched inside a tunnel &nbsp;·&nbsp; <b>B.</b> Mountains surround the bay on three sides, reflecting the sound &nbsp;·&nbsp; <b>C.</b> Submerged speakers amplify each explosion &nbsp;·&nbsp; <b>D.</b> The bay's shallow water prevents sound from escaping</div></td></tr><tr><td class="n">43</td><td>Despite its name, what is the 'Dai-Kuchu Niagara' finale at Atami's fireworks festival?<div class="opts"><b>A.</b> A broad aerial display of synchronised silver starmines &nbsp;·&nbsp; <b>B.</b> A waterfall of fireworks hanging from a bridge &nbsp;·&nbsp; <b>C.</b> A series of floating firework wheels pulled by boats &nbsp;·&nbsp; <b>D.</b> A row of fountains spraying water and light</div></td></tr><tr><td class="n">44</td><td>For the scheduled Atami fireworks on Sunday, 25 October 2026, which plan best matches the published information?<div class="opts"><b>A.</b> Arrive for a 19:00–19:30 show that is cancelled for any rain &nbsp;·&nbsp; <b>B.</b> Expect a 21:00–21:30 show only if skies are clear &nbsp;·&nbsp; <b>C.</b> Plan around 20:20–20:40; rain alone does not normally cancel it &nbsp;·&nbsp; <b>D.</b> Watch a 20:20–21:20 show from inside Atami Castle</div></td></tr><tr><td class="n">45</td><td>What makes Hashiriyu, one of Atami's oldest hot springs, geologically unusual?<div class="opts"><b>A.</b> It flows directly out of an underwater coral reef &nbsp;·&nbsp; <b>B.</b> It emerges through a horizontal cave in the hillside &nbsp;·&nbsp; <b>C.</b> It is powered by artificial steam boilers &nbsp;·&nbsp; <b>D.</b> It appears only during high tide</div></td></tr><tr><td class="n">46</td><td>What is unusual about the visible eruptions at the historic Oyu Geyser today?<div class="opts"><b>A.</b> They now consist entirely of cold seawater &nbsp;·&nbsp; <b>B.</b> They occur naturally at exactly 12-hour intervals &nbsp;·&nbsp; <b>C.</b> The geyser has been replaced by a public bath &nbsp;·&nbsp; <b>D.</b> They are recreated artificially after natural eruptions declined</div></td></tr><tr><td class="n">47</td><td>At Ozawa no Yu, one of the Atami Seven Hot Springs, what can visitors traditionally prepare using geothermal steam?<div class="opts"><b>A.</b> Steamed eggs &nbsp;·&nbsp; <b>B.</b> Grilled mochi &nbsp;·&nbsp; <b>C.</b> Tofu made with seawater &nbsp;·&nbsp; <b>D.</b> Salted dried fish</div></td></tr><tr><td class="n">48</td><td>According to local tradition, what does walking once around Kinomiya Shrine's great camphor tree symbolise?<div class="opts"><b>A.</b> A wish for a safe sea crossing &nbsp;·&nbsp; <b>B.</b> Cleansing bad luck for seven generations &nbsp;·&nbsp; <b>C.</b> Gaining one extra year of life &nbsp;·&nbsp; <b>D.</b> Completing a formal Shinto wedding ritual</div></td></tr><tr><td class="n">49</td><td>Which historical couple is closely connected with Izusan Shrine's reputation as a place for romantic bonds?<div class="opts"><b>A.</b> Minamoto no Yoritomo and Hojo Masako &nbsp;·&nbsp; <b>B.</b> Tokugawa Ieyasu and Lady Tsukiyama &nbsp;·&nbsp; <b>C.</b> Emperor Meiji and Empress Shoken &nbsp;·&nbsp; <b>D.</b> Emperor Taisho and Empress Teimei</div></td></tr><tr><td class="n">50</td><td>Which sequence correctly describes Kiunkaku's history?<div class="opts"><b>A.</b> Opened as a museum in 1919, became a ryokan in 1947 &nbsp;·&nbsp; <b>B.</b> Founded as a shrine in 1919, rebuilt as a castle in 1947 &nbsp;·&nbsp; <b>C.</b> Built as a private villa in 1919, became a ryokan in 1947 &nbsp;·&nbsp; <b>D.</b> Built as a station hotel in 1947, became a private villa in 1919</div></td></tr><tr><td class="n">51</td><td>What combination of architectural influences makes Kiunkaku particularly distinctive?<div class="opts"><b>A.</b> Only classical Japanese temple architecture &nbsp;·&nbsp; <b>B.</b> Japanese, Chinese and European elements &nbsp;·&nbsp; <b>C.</b> Austrian, Russian and Scandinavian styles &nbsp;·&nbsp; <b>D.</b> Modern concrete and American Art Deco only</div></td></tr><tr><td class="n">52</td><td>Apart from early-blooming plum trees, which seasonal display is Atami Plum Garden noted for?<div class="opts"><b>A.</b> Hydrangeas that bloom throughout late winter &nbsp;·&nbsp; <b>B.</b> A late-spring wisteria festival &nbsp;·&nbsp; <b>C.</b> Camellias that flower throughout summer &nbsp;·&nbsp; <b>D.</b> Autumn leaves that turn relatively late in the year</div></td></tr><tr><td class="n">53</td><td>What idea helped inspire the establishment of Atami Plum Garden in 1886?<div class="opts"><b>A.</b> Gentle exercise can complement the health benefits of hot-spring treatment &nbsp;·&nbsp; <b>B.</b> The town needed a defensive hilltop lookout &nbsp;·&nbsp; <b>C.</b> Merchants wanted a permanent outdoor fish market &nbsp;·&nbsp; <b>D.</b> The government planned to build a new railway terminus</div></td></tr><tr><td class="n">54</td><td>Which island is reached by passenger boat from Atami Port in roughly 25–30 minutes?<div class="opts"><b>A.</b> Enoshima &nbsp;·&nbsp; <b>B.</b> Izu Oshima &nbsp;·&nbsp; <b>C.</b> Hatsushima &nbsp;·&nbsp; <b>D.</b> Miyakejima</div></td></tr><tr><td class="n">55</td><td>The Atami Ropeway's approximately three-minute ride brings visitors to a viewpoint on which hill?<div class="opts"><b>A.</b> Mount Omuro &nbsp;·&nbsp; <b>B.</b> Hachiman-yama &nbsp;·&nbsp; <b>C.</b> Mount Takao &nbsp;·&nbsp; <b>D.</b> Mount Komagatake</div></td></tr><tr><td class="n">56</td><td>What usually happens to the decorative lighting at Atami Sun Beach during a fireworks display?<div class="opts"><b>A.</b> It changes to bright red for the full show &nbsp;·&nbsp; <b>B.</b> It stays at full brightness to illuminate the sea &nbsp;·&nbsp; <b>C.</b> It is switched on only after the final fireworks &nbsp;·&nbsp; <b>D.</b> It is switched off during the launch period</div></td></tr><tr><td class="n">57</td><td>Which Japanese artist created the famous 'Red and White Plum Blossoms' folding screens held by Atami's MOA Museum of Art?<div class="opts"><b>A.</b> Hokusai Katsushika &nbsp;·&nbsp; <b>B.</b> Tawaraya Sotatsu &nbsp;·&nbsp; <b>C.</b> Ogata Korin &nbsp;·&nbsp; <b>D.</b> Hasegawa Tohaku</div></td></tr><tr><td class="n">58</td><td>Which citrus fruit is an Atami speciality and has a name associated with a family prospering for generations?<div class="opts"><b>A.</b> Daidai &nbsp;·&nbsp; <b>B.</b> Sudachi &nbsp;·&nbsp; <b>C.</b> Kabosu &nbsp;·&nbsp; <b>D.</b> Yuzu</div></td></tr><tr><td class="n">59</td><td>Why can Atami-zakura cherry blossoms often remain in bloom for around a month?<div class="opts"><b>A.</b> The trees are covered with snow-proof nets &nbsp;·&nbsp; <b>B.</b> Each branch forms both early- and later-opening flower buds &nbsp;·&nbsp; <b>C.</b> Artificial lighting keeps the blossoms open all night &nbsp;·&nbsp; <b>D.</b> Gardeners attach new blossoms to branches each week</div></td></tr><tr><td class="n">60</td><td>What traditional art can visitors see performed at the Atami Geigi Kenban, which has been used by local geigi (geisha)?<div class="opts"><b>A.</b> Kabuki with full theatrical stage sets &nbsp;·&nbsp; <b>B.</b> Sumo wrestling demonstrations &nbsp;·&nbsp; <b>C.</b> Classical Noh theatre by monks &nbsp;·&nbsp; <b>D.</b> Geigi dance performances</div></td></tr>
+  </table>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Atami quiz 41–60</span></div>
+</section>
+<section class="page">
+  <div class="eyebrow">Game 3 · Atami quiz · continued</div>
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th></tr>
+    <tr><td class="n">61</td><td>Which Japanese novel inspired the Kanichi-and-Omiya statue along Atami’s waterfront?<div class="opts"><b>A.</b> Kokoro &nbsp;·&nbsp; <b>B.</b> The Golden Demon (Konjiki Yasha) &nbsp;·&nbsp; <b>C.</b> The Tale of Genji &nbsp;·&nbsp; <b>D.</b> Snow Country</div></td></tr><tr><td class="n">62</td><td>Why are the jacaranda trees near Atami’s seafront an unusual sight in Japan?<div class="opts"><b>A.</b> They are an alpine species that blooms above the snowline &nbsp;·&nbsp; <b>B.</b> They are a native plum variety whose flowers turn purple &nbsp;·&nbsp; <b>C.</b> They are a coastal pine variety that produces purple cones &nbsp;·&nbsp; <b>D.</b> They originated in South America, and outdoor flowering on Japan’s mainland is uncommon</div></td></tr><tr><td class="n">63</td><td>What should visitors know about Kiunkaku’s Roman-style bathroom today?<div class="opts"><b>A.</b> It is preserved for viewing, not available for bathing &nbsp;·&nbsp; <b>B.</b> It opens for public bathing during the winter festival &nbsp;·&nbsp; <b>C.</b> It is now the source of Atami’s Oyu geyser &nbsp;·&nbsp; <b>D.</b> It was converted into an outdoor swimming pool</div></td></tr><tr><td class="n">64</td><td>Which description of Kinomiya Shrine’s famous camphor tree matches its official heritage status?<div class="opts"><b>A.</b> About 500 years old and protected only by the city &nbsp;·&nbsp; <b>B.</b> About 1,000 years old and planted in the Edo period &nbsp;·&nbsp; <b>C.</b> More than 2,000 years old and designated a National Natural Monument &nbsp;·&nbsp; <b>D.</b> More than 4,000 years old and preserved as a museum exhibit</div></td></tr><tr><td class="n">65</td><td>Atami’s Shinsui Park and Moon Terrace evoke a Mediterranean resort partly because of a sister-city link with which city?<div class="opts"><b>A.</b> Cannes, France &nbsp;·&nbsp; <b>B.</b> Sanremo, Italy &nbsp;·&nbsp; <b>C.</b> Dubrovnik, Croatia &nbsp;·&nbsp; <b>D.</b> Valletta, Malta</div></td></tr><tr><td class="n">66</td><td>What distinction is associated with the night-time lighting at Atami Sun Beach?<div class="opts"><b>A.</b> It is illuminated solely by lanterns from fishing boats &nbsp;·&nbsp; <b>B.</b> It changes colour according to the tide level &nbsp;·&nbsp; <b>C.</b> It is a replica of the lighting used at Tokyo Bay in 1964 &nbsp;·&nbsp; <b>D.</b> It is described as Japan’s first illuminated beach, with lighting designed by Motoko Ishii</div></td></tr><tr><td class="n">67</td><td>The cliffs and unusual rock formations of Nishikigaura are linked to which geological history?<div class="opts"><b>A.</b> An ancient coral reef exposed after sea levels fell &nbsp;·&nbsp; <b>B.</b> A valley carved by glaciers during the last ice age &nbsp;·&nbsp; <b>C.</b> Remnants of the Atami–Taga volcano, later shaped by waves &nbsp;·&nbsp; <b>D.</b> Sediment deposited on the bed of a former inland lake</div></td></tr><tr><td class="n">68</td><td>Why was the Ieyasu no Yu footbath installed near Atami Station in 2004?<div class="opts"><b>A.</b> To mark 400 years since Tokugawa Ieyasu visited Atami &nbsp;·&nbsp; <b>B.</b> To celebrate the 100th anniversary of Atami Station &nbsp;·&nbsp; <b>C.</b> To commemorate the reopening of the Oyu geyser &nbsp;·&nbsp; <b>D.</b> To celebrate the opening of the Tokaido Shinkansen</div></td></tr><tr><td class="n">69</td><td>What is the main connection between Yumae Shrine and Atami’s local history?<div class="opts"><b>A.</b> It was built to bless deep-sea fishing vessels &nbsp;·&nbsp; <b>B.</b> It honours and protects the hot springs that supported the town &nbsp;·&nbsp; <b>C.</b> It was established for merchants crossing the Tokaido road &nbsp;·&nbsp; <b>D.</b> It marks the former location of an imperial mint</div></td></tr><tr><td class="n">70</td><td>Which of Atami’s historic hot-spring sources was once especially important because ordinary villagers could use it?<div class="opts"><b>A.</b> Oyu Geyser &nbsp;·&nbsp; <b>B.</b> Sajiro no Yu &nbsp;·&nbsp; <b>C.</b> Seizaemon no Yu &nbsp;·&nbsp; <b>D.</b> Kawara-yu</div></td></tr><tr><td class="n">71</td><td>Which description is used by the official Atami tourism website for Hatsushima island?<div class="opts"><b>A.</b> Japan’s largest island in the Seto Inland Sea &nbsp;·&nbsp; <b>B.</b> The only island in Japan with hot springs &nbsp;·&nbsp; <b>C.</b> Shizuoka Prefecture’s only inhabited offshore island &nbsp;·&nbsp; <b>D.</b> The birthplace of the Tokaido Shinkansen</div></td></tr><tr><td class="n">72</td><td>Which attraction on Hatsushima offers visitors an elevated coastal panorama from a climbable structure?<div class="opts"><b>A.</b> Hatsushima Lighthouse &nbsp;·&nbsp; <b>B.</b> Hatsushima Aquarium Tower &nbsp;·&nbsp; <b>C.</b> Hatsushima Ropeway &nbsp;·&nbsp; <b>D.</b> Hatsushima Castle</div></td></tr><tr><td class="n">73</td><td>Which Atami attraction includes themed gardens and the COEDA HOUSE café designed by architect Kengo Kuma?<div class="opts"><b>A.</b> Atami Plum Garden &nbsp;·&nbsp; <b>B.</b> Himenosawa Park &nbsp;·&nbsp; <b>C.</b> MOA Museum of Art &nbsp;·&nbsp; <b>D.</b> ACAO FOREST</div></td></tr><tr><td class="n">74</td><td>You want to see MOA Museum’s famous Red and White Plum Blossoms folding screens. What is the best approach?<div class="opts"><b>A.</b> Assume they are always displayed at the main entrance &nbsp;·&nbsp; <b>B.</b> Look for them in the museum’s permanent outdoor garden &nbsp;·&nbsp; <b>C.</b> Check the exhibition calendar because the original screens are shown for limited periods &nbsp;·&nbsp; <b>D.</b> Visit only after sunset when the originals are unveiled</div></td></tr><tr><td class="n">75</td><td>In addition to its art collections, MOA Museum of Art contains a venue for which Japanese stage tradition?<div class="opts"><b>A.</b> Sumo wrestling &nbsp;·&nbsp; <b>B.</b> Noh theatre &nbsp;·&nbsp; <b>C.</b> Bunraku puppet theatre &nbsp;·&nbsp; <b>D.</b> Kabuki theatre</div></td></tr><tr><td class="n">76</td><td>Which German architect designed the distinctive basement interiors of Atami’s Old Hyuga Villa?<div class="opts"><b>A.</b> Bruno Taut &nbsp;·&nbsp; <b>B.</b> Frank Lloyd Wright &nbsp;·&nbsp; <b>C.</b> Antonin Raymond &nbsp;·&nbsp; <b>D.</b> Togo Murano</div></td></tr><tr><td class="n">77</td><td>Which fruit-picking activity does Atami promote as a seasonal experience from roughly October to December?<div class="opts"><b>A.</b> Peach picking &nbsp;·&nbsp; <b>B.</b> Strawberry picking &nbsp;·&nbsp; <b>C.</b> Blueberry picking &nbsp;·&nbsp; <b>D.</b> Mikan (mandarin orange) picking</div></td></tr><tr><td class="n">78</td><td>What is the most accurate description of the “Atami Seven Hot Springs” (Atami Nanayu)?<div class="opts"><b>A.</b> Seven modern public bathhouses with a shared admission ticket &nbsp;·&nbsp; <b>B.</b> Seven historic hot-spring sources found around the town &nbsp;·&nbsp; <b>C.</b> Seven underwater geysers reached by boat &nbsp;·&nbsp; <b>D.</b> Seven mountain spas operating only in winter</div></td></tr><tr><td class="n">79</td><td>At a Japanese shrine, what is a goshuin?<div class="opts"><b>A.</b> A distinctive calligraphic stamp or inscription collected in a special book &nbsp;·&nbsp; <b>B.</b> A small protective charm kept in a handbag &nbsp;·&nbsp; <b>C.</b> A wooden plaque on which visitors write wishes &nbsp;·&nbsp; <b>D.</b> A paper slip giving a written fortune</div></td></tr><tr><td class="n">80</td><td>If someone buys an omamori at Kinomiya Shrine, what have they purchased?<div class="opts"><b>A.</b> An omikuji paper fortune &nbsp;·&nbsp; <b>B.</b> An ema wooden wish plaque &nbsp;·&nbsp; <b>C.</b> A protective amulet associated with blessings or good luck &nbsp;·&nbsp; <b>D.</b> A goshuin shrine stamp</div></td></tr>
+  </table>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Atami quiz 61–80</span></div>
+</section>
+<!-- quiz:end -->
 
 </body>
 </html>

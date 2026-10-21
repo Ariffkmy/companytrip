@@ -1,5 +1,7 @@
 /* Builds game-master-pack.html from the app's own data, so the offline
-   answer key can't drift from the game. Run from the repo root:
+   answer key can't drift from the game, and refills the quiz pages of
+   players-manual.html (questions only, no answers) from the same bank.
+   Run from the repo root:
      node docs/offline-hunt/source/build-gm-pack.mjs */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -12,7 +14,34 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const L = 'ABCD';
 
 /* The manual's styles, so both documents look the same. */
-const css = readFileSync(join(here, 'players-manual.html'), 'utf8').match(/<style>([\s\S]*?)<\/style>/)[1];
+const manualPath = join(here, 'players-manual.html');
+const manual = readFileSync(manualPath, 'utf8');
+const css = manual.match(/<style>([\s\S]*?)<\/style>/)[1];
+
+/* The players' copy of the bank: same numbers as the answer key, so
+   "12 B" means the same question to both sides. */
+const PER_PAGE = 20;
+const quizPages = [];
+for (let start = 0; start < ATAMI_QUIZ.length; start += PER_PAGE) {
+  const chunk = ATAMI_QUIZ.slice(start, start + PER_PAGE);
+  const first = start === 0;
+  quizPages.push(`
+<section class="page">
+  ${first ? `<div class="eyebrow">Game 3 · Atami quiz · ${ATAMI_QUIZ.length} questions</div>
+  <h2 style="margin:4px 0 4px">How well do you know Atami?</h2>
+  <p class="muted small">Answer only the 20 numbers Ariff sends you. Reply with the number and the letter, one per line, e.g. <i>12 B</i>. No searching online.</p>` : `<div class="eyebrow">Game 3 · Atami quiz · continued</div>`}
+  <table class="bank">
+    <tr><th>#</th><th>Question and choices</th></tr>
+    ${chunk.map((x, k) => `<tr><td class="n">${start + k + 1}</td><td>${esc(x.q)}<div class="opts">${x.options.map((o, j) => `<b>${L[j]}.</b> ${esc(o)}`).join(' &nbsp;·&nbsp; ')}</div></td></tr>`).join('')}
+  </table>
+  <div class="foot"><span>Atami Treasure Hunt · Paper version</span><span>Atami quiz ${start + 1}–${start + chunk.length}</span></div>
+</section>`);
+}
+writeFileSync(manualPath, manual.replace(
+  /<!-- quiz:start -->[\s\S]*?<!-- quiz:end -->/,
+  `<!-- quiz:start -->${quizPages.join('')}\n<!-- quiz:end -->`,
+));
+console.log(`players-manual.html quiz pages written (${quizPages.length} pages)`);
 
 const rows = ATAMI_QUIZ.map((x, i) => `
   <tr>
@@ -81,12 +110,13 @@ const html = `<!doctype html>
   <ul>
     <li>Reply <b>✅ Stamp N</b> as soon as you accept a game. Log it on the score sheet with the WhatsApp time.</li>
     <li><b>Bingo:</b> stamp only when every tile has a correct selfie. 1 point per tile.</li>
-    <li><b>Atami quiz:</b> call the leader, read 20 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
+    <li>Every message is captioned <b>GroupX_code</b> (photobingo_N, copythepose, atamiquiz_landmark, atamiquiz_roundN, buyittryit, lookaround, colleagues_ready, findtheboss). Ask for a resend if the code is missing.</li>
+    <li><b>Atami quiz:</b> after the landmark selfie, send 20 question numbers from the bank (the manual prints the same numbers, without answers). Note the time; they have 5 minutes to reply with all 20. Mark with the answer key. Pass = 10 right. Fewer, or late: send 20 new numbers they haven’t had. Points = 2 × right in the passing round.</li>
     <li><b>Buy it, try it:</b> stamp needs the video <b>and</b> the bosses’ rating. Points = 2 × rating.</li>
     <li><b>Look around you:</b> first message only. Mark at the finish.</li>
     <li><b>Know your colleagues:</b> call the leader, ask all questions, no pass mark. Points = 2 × right.</li>
     <li><b>Find the boss:</b> 20 for the photo with both bosses. 2 questions per group per spot.</li>
-    <li>Several groups ready for a call? Take them in the order their “Ready” messages arrived. Carmen or Kevin can run a quiz call with this pack.</li>
+    <li>Several groups sent <b>colleagues_ready</b>? Call them in the order the messages arrived. Carmen or Kevin can mark quiz answers with this pack.</li>
   </ul>
   <div class="foot"><span>Game Master pack</span><span>Setup</span></div>
 </section>

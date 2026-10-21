@@ -47,8 +47,14 @@
   .game .title { font-weight: 900; font-size: 12pt; }
   .game .pts { flex: none; font-weight: 800; color: var(--red); white-space: nowrap; font-size: 10pt; }
   .game p { margin: 2px 0 0; }
+  .game ol { margin: 2px 0 0; font-size: 9.8pt; line-height: 1.38; }
+  .game li { margin-bottom: 0; }
   .q { border-bottom: 1px dotted var(--soft); padding: 8px 0 18px; }
   .card td { height: 30px; vertical-align: middle; }
+  code { font: 700 9.5pt/1 "Consolas", monospace; background: var(--tint); border-radius: 4px; padding: 2px 5px; white-space: nowrap; }
+  .codes td { padding: 4px 7px; font-size: 10pt; }
+  .bank td { padding: 2px 6px; font-size: 9pt; line-height: 1.25; break-inside: avoid; }
+  .bank .opts { color: var(--soft); font-size: 8.5pt; }
 
   .ans { width: 32%; }
   .bank td { padding: 4px 6px; font-size: 9.3pt; }
@@ -90,12 +96,13 @@
   <ul>
     <li>Reply <b>✅ Stamp N</b> as soon as you accept a game. Log it on the score sheet with the WhatsApp time.</li>
     <li><b>Bingo:</b> stamp only when every tile has a correct selfie. 1 point per tile.</li>
-    <li><b>Atami quiz:</b> call the leader, read 20 questions from the bank (skip ones they’ve already had), 10 seconds each. A time-out restarts from question 1 with new questions. Pass = 10 right. Points = 2 × right in the passing round.</li>
+    <li>Every message is captioned <b>GroupX_code</b> (photobingo_N, copythepose, atamiquiz_landmark, atamiquiz_roundN, buyittryit, lookaround, colleagues_ready, findtheboss). Ask for a resend if the code is missing.</li>
+    <li><b>Atami quiz:</b> after the landmark selfie, send 20 question numbers from the bank (the manual prints the same numbers, without answers). Note the time; they have 5 minutes to reply with all 20. Mark with the answer key. Pass = 10 right. Fewer, or late: send 20 new numbers they haven’t had. Points = 2 × right in the passing round.</li>
     <li><b>Buy it, try it:</b> stamp needs the video <b>and</b> the bosses’ rating. Points = 2 × rating.</li>
     <li><b>Look around you:</b> first message only. Mark at the finish.</li>
     <li><b>Know your colleagues:</b> call the leader, ask all questions, no pass mark. Points = 2 × right.</li>
     <li><b>Find the boss:</b> 20 for the photo with both bosses. 2 questions per group per spot.</li>
-    <li>Several groups ready for a call? Take them in the order their “Ready” messages arrived. Carmen or Kevin can run a quiz call with this pack.</li>
+    <li>Several groups sent <b>colleagues_ready</b>? Call them in the order the messages arrived. Carmen or Kevin can mark quiz answers with this pack.</li>
   </ul>
   <div class="foot"><span>Game Master pack</span><span>Setup</span></div>
 </section>

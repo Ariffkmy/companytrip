@@ -53,7 +53,20 @@ const schedule = [
     meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement', dinner: 'In-flight (provided)' },
     transport: [],
     activities: [
-      { time: '08:00', activity: 'Arrive at office → vans to KLIA2', place: 'Orangeleaf Office', note: 'Everybody arrives at the office and boards the vans. You may buy food around the office area and bring it to the airport.' },
+      {
+        time: '08:00', activity: 'Arrive at office → vans to KLIA2', place: 'Orangeleaf Office',
+        note: 'Everybody arrives at the office and boards the vans. You may buy food around the office area and bring it to the airport.',
+        details: [
+          {
+            label: 'Van transport', value: '17 travellers',
+            sub: 'Huai Yu, Raf, Regina, Jay, Carmen, Hairul, Aina, Aidan, Amir, Eleora, Chiew, Ariff, Aiman, Asma’, Ashley, Helmi, Kevin',
+          },
+          {
+            label: 'Self-arranged', value: '5 travellers',
+            sub: 'Nicholas, Yu Han, Jord, Ruby, Liyana',
+          },
+        ],
+      },
       { time: '09:30', activity: 'Arrive KLIA2 · group photos', place: 'Starbucks, Departure Hall, KLIA2', note: 'Gather at Starbucks in the Departure Hall. Group photos before check-in.' },
       { time: '10:00', activity: 'Check-in luggage', place: 'KLIA2', note: 'Check in as a group. Reporting line by checkpoint.' },
       { time: '12:00', activity: 'Everybody completed check-in', place: 'KLIA2', note: 'Headcount checkpoint — confirm nobody is left at the counter.' },
