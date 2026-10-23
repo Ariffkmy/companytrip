@@ -198,7 +198,7 @@ const schedule = [
     meals: { breakfast: 'Own arrangement', lunch: 'Own arrangement (Minato Mirai)', dinner: 'Group dinner at Shirasu Ya (provided)' },
     transport: [
       { route: 'MyStays → Minato Mirai', yen: 373 },
-      { route: 'Minato Mirai → Enoshima Aquarium (approx. ¥700–900, confirm before departure)', yen: 800 },
+      { route: 'Minato Mirai → Enoshima Aquarium (estimate)', yen: 700, yenMax: 900 },
       { route: 'Enoshima Station → Shirasu Ya', yen: 200 },
       { route: 'Shirasu Ya → MyStays', yen: 880 },
     ],
@@ -226,7 +226,7 @@ const schedule = [
       { time: '21:30', activity: 'Walk back to the hotel', place: '5 min walk · 230 m', note: 'Arrive 21:40 — end of programme.' },
     ],
     participantPrep: [
-      'Top up ~¥2,500 on your Suica before leaving the hotel.',
+      'Top up ~¥2,400 on your Suica before leaving the hotel (day fares ≈ ¥2,153–2,353).',
       'Comfortable shoes — lots of walking around Minato Mirai and Enoshima.',
       'Do not miss the 17:20 meet at Enoshima Station; dinner is a group booking.',
     ],

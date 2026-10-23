@@ -7,7 +7,6 @@ const cashExpenses = [
   {
     day: 'D3',
     items: [
-      { activity: 'Hasedera Temple', amount: 11000 },
       { activity: 'Aquarium', amount: 77000 },
       { activity: 'Group dinner', amount: 67100 },
     ],

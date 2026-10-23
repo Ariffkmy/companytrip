@@ -319,13 +319,17 @@ function YenPart({ title, total, children, note }) {
 }
 
 /* Transport only: what to load on the Suica card. Own meals vary too
-   much from person to person to estimate. */
+   much from person to person to estimate. A leg with `yenMax` is an
+   estimate from `yen` to `yenMax`. */
 function YenBox({ transport = [] }) {
   if (!transport.length) return null;
-  const base = transport.filter((t) => !t.option).reduce((s, t) => s + t.yen, 0);
+  const fixed = transport.filter((t) => !t.option);
+  const base = fixed.reduce((s, t) => s + t.yen, 0);
+  const baseMax = fixed.reduce((s, t) => s + (t.yenMax ?? t.yen), 0);
   const options = transport.filter((t) => t.option).map((t) => t.yen);
   const tLow = base + (options.length ? Math.min(...options) : 0);
-  const tHigh = base + (options.length ? Math.max(...options) : 0);
+  const tHigh = baseMax + (options.length ? Math.max(...options) : 0);
+  const estimated = transport.some((t) => t.yenMax);
   const row = 'flex items-baseline gap-3 text-sm';
 
   return (
@@ -333,14 +337,14 @@ function YenBox({ transport = [] }) {
       <h4 className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">💴 Yen for the day</h4>
 
       <YenPart title="🚃 Transport · load on your Suica" total={yenRange(tLow, tHigh)}
-        note={`As per the actual receipts${options.length ? '. The way home is option A or B, not both' : ''}.`}>
+        note={`As per the actual receipts${estimated ? ', except the estimated ranges — confirm those before departure' : ''}${options.length ? '. The way home is option A or B, not both' : ''}.`}>
         {transport.map((t) => (
           <li key={t.route} className={row}>
             <span className="min-w-0 text-gray-600 leading-snug">
               {t.route}
               {t.option && <span className="text-xs text-gray-400"> · option {t.option}</span>}
             </span>
-            <span className="ml-auto shrink-0 font-mono text-gray-700">{yenFmt(t.yen)}</span>
+            <span className="ml-auto shrink-0 font-mono text-gray-700">{yenRange(t.yen, t.yenMax ?? t.yen)}</span>
           </li>
         ))}
       </YenPart>
