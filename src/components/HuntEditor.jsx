@@ -826,6 +826,7 @@ export default function HuntEditor() {
         <Sub>Video 2 · Atami Geographic</Sub>
         <Text label="What to film" value={val([...cp('cp3'), 'geoBrief'])} onChange={set([...cp('cp3'), 'geoBrief'])} />
         <Area label="Instructions" hint={TEXT_HINT} value={val([...cp('cp3'), 'geoBody'])} onChange={set([...cp('cp3'), 'geoBody'])} rows={4} />
+        <Photo label="Reference photo (optional)" hint="Shows the documentary style to aim for." value={val([...cp('cp3'), 'geoPhoto'])} onChange={set([...cp('cp3'), 'geoPhoto'])} />
       </Section>
 
       <Section title="5 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>

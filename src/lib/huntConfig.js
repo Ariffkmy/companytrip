@@ -141,13 +141,15 @@ export const DEFAULT_HUNT_CONFIG = {
       questions: ATAMI_QUIZ,
     },
     /* Two videos, each rated 1–10 by the bosses: brief and body are
-       Buy it, try it; geoBrief and geoBody are Atami Geographic. */
+       Buy it, try it; geoBrief, geoBody and geoPhoto (a still showing
+       the documentary style to aim for) are Atami Geographic. */
     cp3: {
       title: 'Atami Video Challenge', photo: null, stop: 'All areas',
       brief: 'Buy anything you like — then sell it to the bosses.',
       body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.\n\nYou can do this right after you take the selfie with them for **Find the boss**.',
       geoBrief: 'Make a nature documentary about an animal Atami is famous for — you pick which.',
       geoBody: 'Choose your animal, then film it like a wildlife programme: a hushed narrator, close-ups, one dramatic moment. The real animal, a statue or a sign of it all count.\n\nUp to 2 minutes. **Tim and Ellice** watch it and rate it from **1 to 10**.',
+      geoPhoto: '/hunt-geo-reference.webp',
       /* Points for each mark of the bosses' 1–10 rating, per video. */
       pointsPerRating: 2,
     },
@@ -441,7 +443,7 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
+    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, geoPhoto: cp.cp3.geoPhoto, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0 },
     map: config.map,
