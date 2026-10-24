@@ -335,6 +335,9 @@
 .hunt-area-5 { fill: #E9A82C; }
 .hunt-area-6 { fill: #5B7F3E; }
 .dark .hunt-area { stroke: var(--color-card); stroke-opacity: .4; fill-opacity: .26; }
+/* Areas that stand alone, with no field around them: each carries the
+   red edge itself. */
+.hunt-area.hunt-area-island, .dark .hunt-area.hunt-area-island { stroke: var(--color-red); stroke-opacity: 1; }
 .leaflet-tooltip.hunt-area-tip {
   background: none; border: 0; box-shadow: none; padding: 0;
   font: 700 13px/1 var(--font-display); letter-spacing: .04em;

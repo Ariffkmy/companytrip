@@ -50,15 +50,19 @@ export default function HuntMap({ map: cfg, onClose }) {
       attribution: ATTRIBUTION, maxZoom: 19, crossOrigin: 'anonymous',
     }).addTo(m);
 
-    /* The areas tile the field, so they are drawn as a patchwork rather
-       than as six outlined objects: a soft tint per area, hairline
-       dividers between neighbours, and one heavy line around the whole
-       field. Six identical heavy outlines read as six islands, which is
-       the opposite of what these are. */
+    /* The areas are separate islands, so each gets the heavy red edge
+       the committee drew round it, over a pale casing that keeps it
+       legible on the busy street render, and a soft tint inside. With a
+       field boundary set, the areas tile it instead: hairline dividers,
+       and the heavy line goes round the whole field. */
     areas.forEach((a) => {
       const label = a.label || `Area ${a.n}`;
       const note = String(a.note ?? '').trim();
-      const shape = L.polygon(a.ring, { className: `hunt-area hunt-area-${((a.n - 1) % 6) + 1}`, weight: 1.5 })
+      if (!boundary.length) {
+        L.polygon(a.ring, { className: 'hunt-field-casing', weight: 9, fill: false, interactive: false }).addTo(m);
+      }
+      const edge = boundary.length ? '' : ' hunt-area-island';
+      const shape = L.polygon(a.ring, { className: `hunt-area hunt-area-${((a.n - 1) % 6) + 1}${edge}`, weight: boundary.length ? 1.5 : 4 })
         .addTo(m)
         .bindTooltip(label, { permanent: true, direction: 'center', className: 'hunt-area-tip' });
       shape.bindPopup(note ? `<b>${label}</b><br>${note}` : `<b>${label}</b>`);
@@ -193,8 +197,8 @@ export default function HuntMap({ map: cfg, onClose }) {
           )}
           {areas.length > 0 && (
             <li className="flex items-center gap-1.5">
-              <span aria-hidden="true" className="w-5 h-3.5 rounded-sm bg-sea/25 border border-sea/40" />
-              The six areas — play them in any order
+              <span aria-hidden="true" className={`w-5 h-3.5 rounded-sm bg-sea/25 ${boundary.length ? 'border border-sea/40' : 'border-2 border-red'}`} />
+              The {areas.length} areas — play them in any order
             </li>
           )}
           {start && <li className="flex items-center gap-1.5"><span aria-hidden="true" className="w-3 h-3 rounded-full border-[3px] border-red bg-white" />{cfg?.start?.label || 'Start & finish'}</li>}
