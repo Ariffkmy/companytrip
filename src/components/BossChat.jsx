@@ -224,6 +224,8 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
    Each group sends two videos: the Buy it, try it pitch and the Atami
    Geographic documentary. The boss picks the video, the group and a
    mark; the group's phone collects the stamp once both are rated. */
+const VIDEO_ACCENT = { pitch: 'var(--gold)', geo: 'var(--sea)' };
+
 function PitchRating() {
   const { ratings, ready, loaded, rate } = usePitchRatings();
   const pv = usePitchVideos();
@@ -240,6 +242,20 @@ function PitchRating() {
     font: '800 17px/1 var(--body)',
     background: on ? 'var(--red)' : 'var(--card)', color: on ? '#fff' : 'var(--ink)',
   });
+  /* The selected group wears its own colour, so it never reads as the
+     selected video or the selected mark. */
+  const groupPick = (g, on) => ({
+    ...pick(false),
+    ...(on ? { background: g.colour, borderColor: g.colour, color: '#fff' } : {}),
+  });
+  const accent = VIDEO_ACCENT[challenge];
+  const ratedCount = (c) => huntGroups.filter((g) => ratings[g.id]?.[c]).length;
+  const step = (n, text) => (
+    <p className="text-[11px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: 'var(--ink-soft)' }}>
+      <span style={{ color: accent }}>{n}</span> · {text}
+    </p>
+  );
+  const switchTo = (c) => { setChallenge(c); setMark(null); setNote(''); };
 
   const give = async () => {
     if (!team || !mark || busy) return;
@@ -265,24 +281,52 @@ function PitchRating() {
         <p className="note" style={{ margin: '10px 0 0' }}>Not switched on yet — groups rate on their leader’s phone instead.</p>
       ) : (
         <>
-          <div role="tablist" aria-label="Which video" className="grid grid-cols-2 gap-2 mt-3">
-            {CHALLENGES.map((c) => (
-              <button key={c} type="button" role="tab" aria-selected={challenge === c}
-                onClick={() => { setChallenge(c); setMark(null); setNote(''); }} style={pick(challenge === c)}>
-                {CHALLENGE_INFO[c].emoji} {CHALLENGE_INFO[c].name}
-              </button>
-            ))}
+          {/* Tabs, not buttons: the video picked here decides everything
+              in the panel below it. */}
+          <div role="tablist" aria-label="Which video" className="grid grid-cols-2 mt-3"
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              const next = CHALLENGES[(CHALLENGES.indexOf(challenge) + 1) % CHALLENGES.length];
+              switchTo(next);
+              document.getElementById(`boss-video-tab-${next}`)?.focus();
+            }}>
+            {CHALLENGES.map((c, i) => {
+              const on = challenge === c;
+              return (
+                <button key={c} id={`boss-video-tab-${c}`} type="button" role="tab" aria-selected={on}
+                  aria-controls="boss-video-panel" tabIndex={on ? 0 : -1} onClick={() => switchTo(c)}
+                  className="text-left px-3 pt-2 pb-2.5 cursor-pointer"
+                  style={{
+                    border: 0, borderBottom: `${on ? 5 : 2}px solid ${on ? VIDEO_ACCENT[c] : 'var(--th-dash)'}`,
+                    borderRadius: '10px 10px 0 0',
+                    background: on ? 'var(--th-parchment)' : 'transparent',
+                    color: 'var(--ink)', opacity: on ? 1 : 0.65,
+                  }}>
+                  <span className="block text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--ink-soft)' }}>Video {i + 1}</span>
+                  <span className="block font-extrabold text-[16px] leading-tight mt-0.5">{CHALLENGE_INFO[c].emoji} {CHALLENGE_INFO[c].name}</span>
+                  <span className="block text-[12px] font-bold mt-1" style={{ color: VIDEO_ACCENT[c] }}>
+                    {ratedCount(c)} of {huntGroups.length} rated
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-3">
+
+          <div id="boss-video-panel" role="tabpanel" aria-labelledby={`boss-video-tab-${challenge}`}
+            className="px-3 pb-3 rounded-b-xl" style={{ border: `3px solid ${accent}`, borderTop: 0, background: 'var(--th-parchment)' }}>
+          {step(1, 'Which group')}
+          <div className="grid grid-cols-2 gap-2">
             {huntGroups.map((g) => (
-              <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => setTeam(g.id)} style={pick(team === g.id)}>
+              <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => setTeam(g.id)} style={groupPick(g, team === g.id)}>
                 <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style={{ background: g.colour, border: '1px solid #fff' }} />
                 {g.name}
+                {ratings[g.id]?.[challenge] ? ` · ${ratings[g.id][challenge].rating}/10` : ''}
               </button>
             ))}
           </div>
           {team && pv.ready && (
-            <div className="mt-3">
+            <div>
+              {step(2, `Watch their ${info.video}`)}
               {teamVideos.length ? teamVideos.map((v) => (
                 <div key={v.id} className="mb-2">
                   {v.src && (
@@ -296,7 +340,8 @@ function PitchRating() {
               )}
             </div>
           )}
-          <div role="radiogroup" aria-label="Rating from 1 to 10" className="grid grid-cols-5 gap-2 mt-3">
+          {step(team && pv.ready ? 3 : 2, `Rate the ${info.video}`)}
+          <div role="radiogroup" aria-label="Rating from 1 to 10" className="grid grid-cols-5 gap-2">
             {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
               <button key={n} type="button" role="radio" aria-checked={mark === n} onClick={() => setMark(n)} style={pick(mark === n)}>
                 {n}
@@ -307,7 +352,9 @@ function PitchRating() {
             {busy ? 'Sending…' : team && mark ? `Give ${huntGroupOf(team)?.name ?? team}’s ${info.video} ${mark}/10` : 'Pick a group and a rating'}
           </button>
           {note && <p className="note" style={{ margin: '8px 0 0' }} aria-live="polite">{note}</p>}
-          <div className="flex flex-wrap gap-1.5 mt-3">
+          </div>
+          <p className="text-[11px] text-gray-500 mt-3 mb-1.5">All groups, {info.name}:</p>
+          <div className="flex flex-wrap gap-1.5">
             {huntGroups.map((g) => {
               const r = ratings[g.id]?.[challenge];
               return (
