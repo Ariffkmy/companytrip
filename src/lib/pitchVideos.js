@@ -1,26 +1,28 @@
 /* ═══════════════════════════════════════════════════
-   Buy it, try it — the video of each group's pitch
+   Atami Video Challenge — each group's videos
    ═══════════════════════════════════════════════════
 
-   Any member of a group records the pitch to the bosses and uploads it
-   (20261028000000_pitch_videos.sql). Stored like the album and stories
+   Any member of a group records a video and uploads it
+   (20261028000000_pitch_videos.sql, 20261031000000_video_challenge.sql),
+   tagged with its part: `pitch` (Buy it, try it) or `geo` (Atami
+   Geographic). Stored like the album and stories
    (src/lib/album.js): shrunk on the phone, then a private bucket and a
    row. The group is stamped by the database from the uploader's
-   profile. The bosses watch it in the Boss inbox next to the rating. */
+   profile. The bosses watch them in the Boss inbox next to the rating. */
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { MEDIA_COLUMNS, deleteMedia, uploadMedia, withUrls } from './album';
 
 const PITCH = { bucket: 'pitch-videos', table: 'pitch_videos' };
-/* A pitch is short; this keeps the upload quick on roaming data. */
+/* Both videos are short; this keeps the upload quick on roaming data. */
 export const PITCH_MAX_SECONDS = 120;
 
-const notReady = (err) => /pitch_videos|pitch-videos|does not exist|schema cache|bucket not found/i.test(err?.message ?? '');
+const notReady = (err) => /pitch_videos|pitch-videos|challenge|does not exist|schema cache|bucket not found/i.test(err?.message ?? '');
 
 /**
- * Pitch videos, oldest first, with signed URLs (`src`, `thumb`). With
- * `team`, only that group's. `ready` is false until the SQL has been
+ * Challenge videos, oldest first, with signed URLs (`src`, `thumb`), each
+ * with its `challenge`. With `team`, only that group's. `ready` is false until the SQL has been
  * run, so the stamp doesn't wait for a video nobody can upload.
  */
 export function usePitchVideos({ team = null, enabled = true } = {}) {
@@ -30,7 +32,7 @@ export function usePitchVideos({ team = null, enabled = true } = {}) {
 
   const reload = useCallback(async () => {
     if (!supabase || !enabled) return;
-    let q = supabase.from(PITCH.table).select(`${MEDIA_COLUMNS}, team`).order('created_at');
+    let q = supabase.from(PITCH.table).select(`${MEDIA_COLUMNS}, team, challenge`).order('created_at');
     if (team) q = q.eq('team', team);
     const { data, error } = await q;
     setLoaded(true);
@@ -62,13 +64,14 @@ export function usePitchVideos({ team = null, enabled = true } = {}) {
   return { videos, ready, loaded, reload };
 }
 
-/** Shrink and upload one pitch video for the signed-in member's group.
+/** Shrink and upload one video of `challenge` ('pitch' | 'geo') for the
+    signed-in member's group.
     `onProgress({ stage: 'shrink' | 'upload', progress })`. */
-export async function uploadPitchVideo(file, onProgress) {
+export async function uploadPitchVideo(file, challenge, onProgress) {
   const { data } = await supabase.auth.getSession();
   const userId = data?.session?.user?.id;
   if (!userId) throw new Error('not signed in');
-  return uploadMedia(PITCH, file, userId, { onProgress, maxSeconds: PITCH_MAX_SECONDS });
+  return uploadMedia(PITCH, file, userId, { onProgress, maxSeconds: PITCH_MAX_SECONDS, extra: { challenge } });
 }
 
 export const deletePitchVideo = (video) => deleteMedia(PITCH, video);

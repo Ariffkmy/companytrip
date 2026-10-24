@@ -18,7 +18,7 @@ import huntGroups, { huntGroupOf } from '../data/huntGroups';
 import {
   QUESTION_LIMIT, QUESTION_MAX, ping, questionsUsed, unlockSound, useBossMoves, useBossQuestions, useWakeLock,
 } from '../lib/bossChat';
-import { usePitchRatings } from '../lib/pitchRatings';
+import { CHALLENGES, CHALLENGE_INFO, usePitchRatings } from '../lib/pitchRatings';
 import { usePitchVideos } from '../lib/pitchVideos';
 
 const ROSTER_SHORT = new Map(groupRoster.flatMap((t) => t.members)
@@ -220,14 +220,18 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
   );
 }
 
-/* ── Buy it, try it: rating a pitch ──────────────────
-   The boss who heard a group's pitch picks the group and a mark; the
-   group's phone collects the stamp with it as soon as it lands. */
+/* ── Atami Video Challenge: rating the videos ────────
+   Each group sends two videos: the Buy it, try it pitch and the Atami
+   Geographic documentary. The boss picks the video, the group and a
+   mark; the group's phone collects the stamp once both are rated. */
 function PitchRating() {
   const { ratings, ready, loaded, rate } = usePitchRatings();
   const pv = usePitchVideos();
+  const [challenge, setChallenge] = useState('pitch');
   const [team, setTeam] = useState(null);
-  const teamVideos = team ? pv.videos.filter((v) => v.team === team) : [];
+  const info = CHALLENGE_INFO[challenge];
+  const videosOf = (t, c) => pv.videos.filter((v) => v.team === t && (v.challenge ?? 'pitch') === c);
+  const teamVideos = team ? videosOf(team, challenge) : [];
   const [mark, setMark] = useState(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -242,8 +246,8 @@ function PitchRating() {
     setBusy(true);
     setNote('');
     try {
-      await rate(team, mark);
-      setNote(`Sent — ${huntGroupOf(team)?.name ?? team}: ${mark}/10.`);
+      await rate(team, challenge, mark);
+      setNote(`Sent — ${huntGroupOf(team)?.name ?? team}, ${info.name}: ${mark}/10.`);
       setTeam(null);
       setMark(null);
     } catch (err) {
@@ -255,12 +259,20 @@ function PitchRating() {
 
   return (
     <div className="card mt-4">
-      <b>Buy it, try it</b>
-      <p className="text-sm text-gray-500 mt-1">After a group’s pitch: pick the group, watch their video, then rate how convincing it was.</p>
+      <b>Atami Video Challenge</b>
+      <p className="text-sm text-gray-500 mt-1">Every group sends two videos. Pick the video and the group, watch it, then rate it.</p>
       {loaded && !ready ? (
         <p className="note" style={{ margin: '10px 0 0' }}>Not switched on yet — groups rate on their leader’s phone instead.</p>
       ) : (
         <>
+          <div role="tablist" aria-label="Which video" className="grid grid-cols-2 gap-2 mt-3">
+            {CHALLENGES.map((c) => (
+              <button key={c} type="button" role="tab" aria-selected={challenge === c}
+                onClick={() => { setChallenge(c); setMark(null); setNote(''); }} style={pick(challenge === c)}>
+                {CHALLENGE_INFO[c].emoji} {CHALLENGE_INFO[c].name}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-2 mt-3">
             {huntGroups.map((g) => (
               <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => setTeam(g.id)} style={pick(team === g.id)}>
@@ -280,7 +292,7 @@ function PitchRating() {
                   <span className="text-[11px] text-gray-500">🎥 {shortName(v.uploader_name)} · {clock(v.created_at)}</span>
                 </div>
               )) : (
-                <p className="note" style={{ margin: 0 }}>🎥 No pitch video from {huntGroupOf(team)?.name ?? team} yet. Their stamp waits for one.</p>
+                <p className="note" style={{ margin: 0 }}>🎥 No {info.video} from {huntGroupOf(team)?.name ?? team} yet. Their stamp waits for one.</p>
               )}
             </div>
           )}
@@ -292,18 +304,18 @@ function PitchRating() {
             ))}
           </div>
           <button type="button" className="btn block mt-3" disabled={!team || !mark || busy} onClick={give}>
-            {busy ? 'Sending…' : team && mark ? `Give ${huntGroupOf(team)?.name ?? team} ${mark}/10` : 'Pick a group and a rating'}
+            {busy ? 'Sending…' : team && mark ? `Give ${huntGroupOf(team)?.name ?? team}’s ${info.video} ${mark}/10` : 'Pick a group and a rating'}
           </button>
           {note && <p className="note" style={{ margin: '8px 0 0' }} aria-live="polite">{note}</p>}
           <div className="flex flex-wrap gap-1.5 mt-3">
             {huntGroups.map((g) => {
-              const r = ratings[g.id];
+              const r = ratings[g.id]?.[challenge];
               return (
                 <span key={g.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border-2 border-ink text-[12px] font-bold"
                   style={{ opacity: r ? 1 : 0.5 }}>
                   <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: g.colour }} />
                   {g.name}: {r ? `${r.rating}/10${r.rater_name ? ` · ${shortName(r.rater_name)}` : ''}` : 'not rated'}
-                  {pv.ready && pv.videos.some((v) => v.team === g.id) ? ' · 🎥' : ''}
+                  {pv.ready && videosOf(g.id, challenge).length ? ' · 🎥' : ''}
                 </span>
               );
             })}
@@ -408,7 +420,7 @@ export function BossInbox({ onClose }) {
           <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
           <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
           <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
-          <li><b>Buy it, try it:</b> when a group finds you, they will try to convince you to buy something they have bought. Give their pitch a rating from <b>1 to 10</b> on this page, in <b>Buy it, try it</b> at the bottom.</li>
+          <li><b>Atami Video Challenge:</b> every group sends two videos — <b>Buy it, try it</b> (they try to sell you something they bought) and <b>Atami Geographic</b> (a nature documentary about an Atami animal of their choice). Rate each from <b>1 to 10</b> on this page, in <b>Atami Video Challenge</b> at the bottom.</li>
           <li>Keep the app open on this page. Sound on, phone charged.</li>
         </ol>
       </details>
@@ -528,7 +540,7 @@ export function BossInboxCard({ onOpen }) {
         {error || (waiting ? `${waiting} question${waiting === 1 ? '' : 's'} waiting for a Yes or No.` : 'Groups’ yes/no questions to you arrive here live.')}
       </p>
       <p className="text-sm text-gray-500 mt-1.5">
-        Also rate each group’s <b>Buy it, try it</b> pitch from 1 to 10 here — their stamp lands once you rate.
+        Also rate each group’s two <b>Atami Video Challenge</b> videos from 1 to 10 here — their stamp lands once both are rated.
       </p>
       <button type="button" onClick={onOpen} className="btn block mt-3">Open inbox</button>
     </section>

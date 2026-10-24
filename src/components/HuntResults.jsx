@@ -154,7 +154,7 @@ export function PointsTable({ CONFIG, rows, onPick }) {
         Games 1–6: {pts.checkpoint} a stamp, plus bingo {CONFIG.bingo.tilePts} for every correct photo ·
         Atami quiz {CONFIG.atami.pts} for every right answer · Look around you {pts.quizPerAnswer} for every right answer ·
         Know your colleagues {CONFIG.trivia.pts} for every right answer. Find the boss: {pts.boss ?? 20} for the selfie.
-        Buy it, try it: {CONFIG.buy?.ratingPts ?? 0} a mark of the bosses’ 1–10 rating. Best pose and funniest boss photo: {pts.judged ?? 5} each. First to complete all 7: {pts.first ?? 15}. – means not played.
+        Atami Video Challenge: {CONFIG.buy?.ratingPts ?? 0} a mark of the bosses’ 1–10 rating for each of the two videos. Best pose and funniest boss photo: {pts.judged ?? 5} each. First to complete all 7: {pts.first ?? 15}. – means not played.
         {onPick && ' Tap a group or a score to open its game page.'}
       </p>
     </div>
@@ -293,7 +293,12 @@ export function GroupDetails({
       <>
         {subs.cp3?.rating != null && (
           <p style={{ margin: '0 0 8px', fontSize: 14 }}>
-            Pitch rated <b>{subs.cp3.rating}/10</b>{subs.cp3.ratedBy ? ` by ${subs.cp3.ratedBy}` : ''}
+            Buy it, try it rated <b>{subs.cp3.rating}/10</b>{subs.cp3.ratedBy ? ` by ${subs.cp3.ratedBy}` : ''}
+          </p>
+        )}
+        {subs.cp3?.geoRating != null && (
+          <p style={{ margin: '0 0 8px', fontSize: 14 }}>
+            Atami Geographic rated <b>{subs.cp3.geoRating}/10</b>{subs.cp3.geoRatedBy ? ` by ${subs.cp3.geoRatedBy}` : ''}
           </p>
         )}
         {subs.cp3?.item && <p style={{ margin: '0 0 8px', fontSize: 14 }}>Bought: <b>{subs.cp3.item}</b></p>}

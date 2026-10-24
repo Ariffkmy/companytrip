@@ -1,11 +1,12 @@
 /* ═══════════════════════════════════════════════════
-   Buy it, try it — the bosses' rating of each pitch
+   Atami Video Challenge — the bosses' rating of each video
    ═══════════════════════════════════════════════════
 
-   The boss who heard a group's pitch rates it 1–10 in the Boss inbox
-   (20261027000000_pitch_ratings.sql); the group's phone hears it live
-   and collects the stamp with it. One row per group, so rating again
-   replaces the last one.
+   The bosses rate each of a group's two videos 1–10 in the Boss inbox
+   (20261027000000_pitch_ratings.sql, 20261031000000_video_challenge.sql):
+   `pitch` for Buy it, try it and `geo` for Atami Geographic. The group's
+   phone hears them live and collects the stamp once both are in. One
+   row per group per video, so rating again replaces the last one.
 
    Like the boss chat, the list is re-read whenever the channel
    (re)connects, the app comes back to the front, or the phone is back
@@ -15,12 +16,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { chatErrorMessage } from './bossChat';
 
-const notReady = (err) => /pitch_ratings|does not exist|schema cache/i.test(err?.message ?? '');
+const notReady = (err) => /pitch_ratings|challenge|does not exist|schema cache/i.test(err?.message ?? '');
+const COLUMNS = 'team, challenge, rating, rater_name, updated_at';
+
+/* The two videos of the Atami Video Challenge, in the order they are
+   shown. */
+export const CHALLENGES = ['pitch', 'geo'];
+export const CHALLENGE_INFO = {
+  pitch: { name: 'Buy it, try it', emoji: '🛍️', title: 'Pitch video', video: 'pitch video', film: 'record the pitch to Tim and Ellice' },
+  geo: { name: 'Atami Geographic', emoji: '🐾', title: 'Documentary', video: 'documentary', film: 'film the documentary' },
+};
+
+const withRow = (m, row) => ({ ...m, [row.team]: { ...m[row.team], [row.challenge ?? 'pitch']: row } });
 
 /**
- * Ratings by team: `{ 'group-a': row, … }`. With `team`, only that
- * group's. `ready` is false until the SQL has been run (or while it
- * can't be reached), so callers can fall back to rating on the phone.
+ * Ratings by team and video: `{ 'group-a': { pitch: row, geo: row }, … }`.
+ * With `team`, only that group's. `ready` is false until both SQL files
+ * have been run (or while it can't be reached), so callers can fall
+ * back to rating on the phone.
  */
 export function usePitchRatings({ team = null, enabled = true } = {}) {
   const [ratings, setRatings] = useState({});
@@ -29,13 +42,13 @@ export function usePitchRatings({ team = null, enabled = true } = {}) {
 
   const reload = useCallback(async () => {
     if (!supabase || !enabled) return;
-    let q = supabase.from('pitch_ratings').select('*');
+    let q = supabase.from('pitch_ratings').select(COLUMNS);
     if (team) q = q.eq('team', team);
     const { data, error } = await q;
     setLoaded(true);
     if (error) { if (notReady(error)) setReady(false); return; }
     setReady(true);
-    setRatings(Object.fromEntries((data ?? []).map((r) => [r.team, r])));
+    setRatings((data ?? []).reduce(withRow, {}));
   }, [team, enabled]);
 
   useEffect(() => {
@@ -49,7 +62,7 @@ export function usePitchRatings({ team = null, enabled = true } = {}) {
       }, (payload) => {
         if (payload.eventType === 'DELETE') { reload(); return; }
         const row = payload.new;
-        if (row?.team) setRatings((m) => ({ ...m, [row.team]: row }));
+        if (row?.team) setRatings((m) => withRow(m, row));
       })
       .subscribe((s) => { if (s === 'SUBSCRIBED') reload(); });
     const onVisible = () => { if (document.visibilityState === 'visible') reload(); };
@@ -63,13 +76,13 @@ export function usePitchRatings({ team = null, enabled = true } = {}) {
   }, [team, enabled, reload]);
 
   /* Bosses and admins only (RLS). Throws a readable Error. */
-  const rate = useCallback(async (forTeam, rating) => {
+  const rate = useCallback(async (forTeam, challenge, rating) => {
     const { data, error } = await supabase.from('pitch_ratings')
-      .upsert({ team: forTeam, rating }).select().single();
+      .upsert({ team: forTeam, challenge, rating }, { onConflict: 'team,challenge' }).select(COLUMNS).single();
     if (error) {
-      throw new Error(notReady(error) ? 'Run 20261027000000_pitch_ratings.sql in Supabase first.' : chatErrorMessage(error));
+      throw new Error(notReady(error) ? 'Run 20261031000000_video_challenge.sql in Supabase first.' : chatErrorMessage(error));
     }
-    setRatings((m) => ({ ...m, [data.team]: data }));
+    setRatings((m) => withRow(m, data));
     return data;
   }, []);
 

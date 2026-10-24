@@ -89,7 +89,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo: 1 for every correct photo.',
     '- Copy the pose: best pose photo, 5 more.',
     '- Atami quiz: 2 for every right answer, at least 10 of 20 right for the stamp, 10 seconds a question.',
-    '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.',
+    '- Atami Video Challenge: two videos, Buy it, try it and Atami Geographic; the bosses rate each 1 to 10, 2 points a mark.',
     '- Look around you: 2 for every right answer.',
     '- Know your colleagues: questions about the other groups, mixed; 2 for every right answer.',
     '- Find the boss: 20 for the selfie with Tim and Ellice, 5 more for the funniest group photo.',
@@ -140,11 +140,15 @@ export const DEFAULT_HUNT_CONFIG = {
       pointsPerRight: 2,
       questions: ATAMI_QUIZ,
     },
+    /* Two videos, each rated 1–10 by the bosses: brief and body are
+       Buy it, try it; geoBrief and geoBody are Atami Geographic. */
     cp3: {
-      title: 'Buy it, try it', photo: null, stop: 'All areas',
+      title: 'Atami Video Challenge', photo: null, stop: 'All areas',
       brief: 'Buy anything you like — then sell it to the bosses.',
       body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.\n\nYou can do this right after you take the selfie with them for **Find the boss**.',
-      /* Points for each mark of the bosses' 1–10 rating. */
+      geoBrief: 'Make a nature documentary about an animal Atami is famous for — you pick which.',
+      geoBody: 'Choose your animal, then film it like a wildlife programme: a hushed narrator, close-ups, one dramatic moment. The real animal, a statue or a sign of it all count.\n\nUp to 2 minutes. **Tim and Ellice** watch it and rate it from **1 to 10**.',
+      /* Points for each mark of the bosses' 1–10 rating, per video. */
       pointsPerRating: 2,
     },
     cp4: {
@@ -280,6 +284,11 @@ export function withDefaults(stored) {
   }
   merged.rules = String(merged.rules ?? '').replace(/^- Buy it, try it: most interesting buy, 5 more\.?$/m,
     '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.');
+  /* Saved before Buy it, try it became the Atami Video Challenge, with
+     Atami Geographic as its second video. */
+  if (merged.checkpoints.cp3.title === 'Buy it, try it') merged.checkpoints.cp3.title = DEFAULT_HUNT_CONFIG.checkpoints.cp3.title;
+  merged.rules = merged.rules.replace(/^- Buy it, try it: the bosses rate your pitch 1 to 10; (\d+) points? a mark\.?$/m,
+    '- Atami Video Challenge: two videos, Buy it, try it and Atami Geographic; the bosses rate each 1 to 10, $1 points a mark.');
   /* The old placeholder finish text: nothing is shown instead. */
   if (merged.finishPoint === 'The committee will point you to the finish at the briefing.') merged.finishPoint = '';
   /* Find the boss's longer text, saved before it was cut down. */
@@ -432,7 +441,7 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { brief: cp.cp3.brief, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
+    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0 },
     map: config.map,

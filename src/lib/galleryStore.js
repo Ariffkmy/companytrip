@@ -71,7 +71,7 @@ const CP_LABELS = {
   cp1: 'Copy the pose',
   cp2a: 'Find the spot',
   cp2b: 'The riddle',
-  cp3: 'Buy it, try it',
+  cp3: 'Atami Video Challenge',
   boss: 'Find the boss',
   cp4: 'Look around you',
   ask: 'Ask a stranger',

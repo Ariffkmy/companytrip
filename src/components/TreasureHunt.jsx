@@ -12,7 +12,7 @@ import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhoto
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
 import { BossThread, shortName } from './BossChat';
-import { usePitchRatings } from '../lib/pitchRatings';
+import { CHALLENGES, CHALLENGE_INFO, usePitchRatings } from '../lib/pitchRatings';
 import { usePitchVideos } from '../lib/pitchVideos';
 import PitchVideo from './PitchVideo';
 import { framedImgStyle } from './FramedPhoto';
@@ -294,7 +294,7 @@ const GAMES = [
   { key: 'bingo', short: 'Photo bingo', emoji: '📸' },
   { key: 'cp1', short: 'Pose photo', emoji: '🤸' },
   { key: 'cp2', short: 'Selfie + Atami quiz', emoji: '🧠' },
-  { key: 'cp3', short: 'Buy & try', emoji: '🛍️' },
+  { key: 'cp3', short: 'Video challenge', emoji: '🎬' },
   { key: 'cp4', short: 'Observation quiz', emoji: '👀' },
   { key: 'guess', short: 'Know your colleagues', emoji: '🤝' },
   { key: 'boss', short: 'Find the boss', emoji: '🕵️' },
@@ -1051,30 +1051,39 @@ export default function TreasureHunt({
   }, []);
   onDeviceFull.current = () => showToast(DEVICE_FULL_MESSAGE, 6000);
 
-  /* Buy it, try it: the bosses rate the pitch in their inbox, and the
-     leader's phone collects the stamp with that rating the moment it
-     lands, whichever page it's on. A changed rating replaces the old
-     one. Before the SQL is run (`ready` false) the bosses rate on the
-     leader's phone instead. */
+  /* Atami Video Challenge: the bosses rate each of the group's two
+     videos in their inbox, and the leader's phone collects the stamp the
+     moment the second rating lands, whichever page it's on. A changed
+     rating replaces the old one. Before the SQL is run (`ready` false)
+     the bosses rate both on the leader's phone instead. */
   const pitch = usePitchRatings({ team: activeTeamId, enabled: !preview && Boolean(activeTeamId) });
-  const pitchRow = pitch.ratings[activeTeamId] ?? null;
-  /* The pitch video, uploaded by anyone in the group. Once its SQL is
-     run, the stamp also waits for a video. */
+  const teamRatings = pitch.ratings[activeTeamId];
+  /* The videos, uploaded by anyone in the group. Once their SQL is run,
+     the stamp also waits for one of each. */
   const pitchVideos = usePitchVideos({ team: activeTeamId, enabled: !preview && Boolean(activeTeamId) });
-  const needVideo = pitchVideos.ready && !pitchVideos.videos.length;
+  const missingVideos = pitchVideos.ready
+    ? CHALLENGES.filter((c) => !pitchVideos.videos.some((v) => (v.challenge ?? 'pitch') === c))
+    : [];
+  const needVideo = missingVideos.length > 0;
   useEffect(() => {
-    if (!pitchRow || needVideo || preview || readOnly || !canPlay || !S?.teamId || S.teamId !== activeTeamId || !S.startedAt) return;
+    const p = teamRatings?.pitch;
+    const g = teamRatings?.geo;
+    if (!p || !g || needVideo || preview || readOnly || !canPlay || !S?.teamId || S.teamId !== activeTeamId || !S.startedAt) return;
     /* A rating from a rehearsal, before this run began, isn't theirs. */
-    if ((Date.parse(pitchRow.updated_at) || 0) < S.startedAt) return;
-    const ratedBy = shortName(pitchRow.rater_name) || null;
+    const at = (r) => Date.parse(r.updated_at) || 0;
+    if (at(p) < S.startedAt || at(g) < S.startedAt) return;
+    const next = {
+      rating: p.rating, ratedBy: shortName(p.rater_name) || null,
+      geoRating: g.rating, geoRatedBy: shortName(g.rater_name) || null,
+    };
     const prev = S.subs?.cp3;
-    if (prev && prev.rating === pitchRow.rating && prev.ratedBy === ratedBy) return;
-    const newS = { ...S, subs: { ...(S.subs || {}), cp3: { rating: pitchRow.rating, ratedBy, at: Date.parse(pitchRow.updated_at) || Date.now() } } };
+    if (prev && Object.keys(next).every((k) => prev[k] === next[k])) return;
+    const newS = { ...S, subs: { ...(S.subs || {}), cp3: { ...next, at: Math.max(at(p), at(g)) || Date.now() } } };
     delete newS.buy;
     store.save(newS.teamId, newS);
     setS(newS);
-    showToast(prev ? `Pitch rating changed to ${pitchRow.rating}/10.` : `Stamp collected — your pitch got ${pitchRow.rating}/10.`, 4000);
-  }, [pitchRow, needVideo, preview, readOnly, canPlay, S, activeTeamId, store, showToast]);
+    showToast(prev ? `Video ratings changed — ${p.rating}/10 and ${g.rating}/10.` : `Stamp collected — your videos got ${p.rating}/10 and ${g.rating}/10.`, 4000);
+  }, [teamRatings, needVideo, preview, readOnly, canPlay, S, activeTeamId, store, showToast]);
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -1438,7 +1447,7 @@ export default function TreasureHunt({
       [STAMP_NO.bingo, title('bingo'), `${stamp} for the stamp + ${CONFIG.bingo.tilePts} for every correct photo`],
       [STAMP_NO.cp1, title('cp1'), `${stamp} for the stamp · best pose photo +${judged}`],
       [STAMP_NO.cp2a, title('cp2a'), `${stamp} for the stamp + ${atamiPts} for every right answer`],
-      [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp + ${CONFIG.buy.ratingPts} a mark of the bosses’ 1–10 rating for your pitch (up to ${stamp + CONFIG.buy.ratingPts * 10})`],
+      [STAMP_NO.cp3, title('cp3'), `${stamp} for the stamp + ${CONFIG.buy.ratingPts} a mark of the bosses’ 1–10 rating for each of your two videos (up to ${stamp + CONFIG.buy.ratingPts * 20})`],
       [STAMP_NO.cp4, title('cp4'), `${stamp} for the stamp + ${per4} for every right answer${n4 ? ` (up to ${stamp + per4 * n4})` : ''}`],
       [STAMP_NO.guess, title('guess'), `${stamp} for the stamp + ${CONFIG.trivia.pts} for every right answer`],
       [STAMP_NO.boss, title('boss'), `${Number(p.boss ?? 20) || 0} for the selfie with the bosses · +${judged} for the funniest group photo`],
@@ -1921,8 +1930,8 @@ export default function TreasureHunt({
     [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
     [STAMP_NO.cp3]: pitch.ready
-      ? 'the stamp lands on the group leader’s phone when the bosses rate your pitch.'
-      : 'the bosses rate your pitch on the group leader’s phone.',
+      ? 'anyone can upload the videos; the stamp lands on the group leader’s phone when the bosses have rated both.'
+      : 'anyone can upload the videos; the bosses rate both on the group leader’s phone.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
     [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
     [STAMP_NO.boss]: 'only the leader asks the bosses and sends the photo.',
@@ -1964,12 +1973,13 @@ export default function TreasureHunt({
         'Then tap “Collect the stamp”.',
       ],
       cp3: [
-        'Buy anything you like — any amount.',
-        'Find Tim and Ellice and convince them to buy it from you.',
-        ...(pitchVideos.ready ? ['Anyone in the group records the pitch and uploads the video here.'] : []),
+        'Two videos, in any order.',
+        'Buy it, try it: buy anything you like, find Tim and Ellice and convince them to buy it from you on camera.',
+        'Atami Geographic: pick an animal Atami is famous for and film a nature documentary about it.',
+        ...(pitchVideos.ready ? ['Anyone in the group uploads each video here.'] : []),
         pitch.ready
-          ? 'They rate your pitch from 1 to 10 — the stamp lands here by itself.'
-          : 'Hand the leader’s phone to them: they rate your pitch from 1 to 10 and tap “Give”.',
+          ? 'Tim and Ellice rate each video from 1 to 10 — the stamp lands here once both are rated.'
+          : 'Hand the leader’s phone to them: they rate each video from 1 to 10 and tap “Give”.',
       ],
       cp4: [
         'Work the answers out together.',
@@ -2450,12 +2460,18 @@ export default function TreasureHunt({
     );
   };
 
-  /* ── Stamp 4 — Buy it, try it ──────────────────────
-     The team buys anything, finds Tim and Ellice and tries to sell it to
-     them. Whichever boss heard the pitch rates it 1–10 on the leader's
-     phone; that rating, and who gave it, is the stamp. */
+  /* ── Stamp 4 — Atami Video Challenge ───────────────
+     Two videos, each rated 1–10 by the bosses: Buy it, try it (buy
+     anything, then sell it to Tim and Ellice) and Atami Geographic (a
+     nature documentary about an animal Atami is famous for, the team's
+     pick). Both ratings, and who gave them, are the stamp. */
+  const VIDEO_PARTS = [
+    { c: 'pitch', brief: CONFIG.buy.brief, body: CONFIG.cp.cp3.body },
+    { c: 'geo', brief: CONFIG.buy.geoBrief, body: CONFIG.buy.geoBody },
+  ];
   const renderCp3 = () => {
     const rating = draft.rating ?? null;
+    const geoRating = draft.geoRating ?? null;
     const ratedBy = draft.ratedBy ?? null;
     const per = CONFIG.buy.ratingPts;
     const pick = (on) => ({
@@ -2466,52 +2482,81 @@ export default function TreasureHunt({
     });
     const give = () => {
       const newS = { ...S };
-      newS.subs = { ...(newS.subs || {}), cp3: { rating, ratedBy, at: Date.now() } };
+      newS.subs = { ...(newS.subs || {}), cp3: { rating, ratedBy, geoRating, geoRatedBy: ratedBy, at: Date.now() } };
       delete newS.buy;
       newS.open = null;
       store.save(newS.teamId, newS);
       setS(newS);
       setDraft({});
-      showToast(`Stamp collected — ${rating}/10.`);
+      showToast(`Stamp collected — ${rating}/10 and ${geoRating}/10.`);
     };
+    const nRated = CHALLENGES.filter((c) => teamRatings?.[c]).length;
+    const missingNames = missingVideos.map((c) => CHALLENGE_INFO[c].video).join(' and ');
 
     return (
       <div className="card flag">
         {renderCpHead(STAMP_NO.cp3, CONFIG.cp.cp3.title, CONFIG.cp.cp3.stop)}
         {renderHowTo('cp3')}
         <div className="task">
-          {CONFIG.buy.brief && <p><b>{CONFIG.buy.brief}</b></p>}
-          <Rich text={CONFIG.cp.cp3.body} />
+          <p>Two videos, each rated <b>1 to 10</b> by <b>Tim and Ellice</b>. Make them in any order.</p>
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
 
-        {!preview && <PitchVideo pv={pitchVideos} />}
+        {VIDEO_PARTS.map(({ c, brief, body }) => {
+          const info = CHALLENGE_INFO[c];
+          const row = pitch.ready ? teamRatings?.[c] : null;
+          return (
+            <section key={c} aria-label={info.name} style={{ marginTop: 16, paddingTop: 14, borderTop: '3px dashed var(--th-dash)' }}>
+              <div className="eyebrow" style={{ color: 'var(--red)' }}>{info.emoji} {info.name}</div>
+              <div className="task">
+                {brief && <p><b>{brief}</b></p>}
+                <Rich text={body} />
+              </div>
+              {!preview && <PitchVideo pv={pitchVideos} challenge={c} />}
+              {row && (
+                <p style={{ margin: '8px 0 0', fontWeight: 800 }}>
+                  Rated {row.rating}/10{row.rater_name ? <span className="note" style={{ fontSize: 13 }}> · by {shortName(row.rater_name)}</span> : null}
+                </p>
+              )}
+            </section>
+          );
+        })}
 
         {pitch.ready ? (
-          <div role="status" style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '3px dashed var(--th-dash)', background: 'var(--th-parchment)', textAlign: 'center' }}>
+          <div role="status" style={{ marginTop: 16, padding: 14, borderRadius: 10, border: '3px dashed var(--th-dash)', background: 'var(--th-parchment)', textAlign: 'center' }}>
             <div style={{ fontSize: 26 }}>⏳</div>
             <p style={{ margin: '4px 0 4px', fontWeight: 800, fontSize: 17 }}>
-              {pitchRow && needVideo ? `Rated ${pitchRow.rating}/10 — upload the video to collect` : 'Waiting for Tim or Ellice’s rating'}
+              {nRated === 2 && needVideo ? `Both rated — upload the ${missingNames} to collect` : `Waiting for Tim or Ellice’s ratings · ${nRated} of 2`}
             </p>
             <p className="note" style={{ margin: 0 }}>
-              {needVideo ? 'The stamp needs the pitch video and the bosses’ rating. ' : ''}
-              They rate your pitch 1 to 10; the stamp lands here by itself.
+              {needVideo ? `Still to upload: the ${missingNames}. ` : ''}
+              They rate each video 1 to 10; the stamp lands here by itself once both are rated.
               {per ? ` Each mark is worth ${per} points.` : ''}
             </p>
           </div>
         ) : (
-        <div style={{ marginTop: 14, padding: 14, borderRadius: 10, border: '3px solid var(--red)' }}>
+        <div style={{ marginTop: 16, padding: 14, borderRadius: 10, border: '3px solid var(--red)' }}>
           <div className="eyebrow" style={{ color: 'var(--red)' }}>For Tim or Ellice</div>
-          <p style={{ margin: '4px 0 12px', fontWeight: 800, fontSize: 17 }}>How convincing was their pitch?</p>
-          <div role="radiogroup" aria-label="Rating from 1 to 10"
-            style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
-            {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
-              <button key={n} type="button" role="radio" aria-checked={rating === n}
-                onClick={() => setDraft((d) => ({ ...d, rating: n }))} style={pick(rating === n)}>
-                {n}
-              </button>
-            ))}
-          </div>
+          {VIDEO_PARTS.map(({ c }) => {
+            const key = c === 'pitch' ? 'rating' : 'geoRating';
+            const val = draft[key] ?? null;
+            return (
+              <Fragment key={c}>
+                <p style={{ margin: '8px 0 10px', fontWeight: 800, fontSize: 17 }}>
+                  {c === 'pitch' ? 'How convincing was their pitch?' : 'How good was their documentary?'}
+                </p>
+                <div role="radiogroup" aria-label={`${CHALLENGE_INFO[c].name}: rating from 1 to 10`}
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+                  {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
+                    <button key={n} type="button" role="radio" aria-checked={val === n}
+                      onClick={() => setDraft((d) => ({ ...d, [key]: n }))} style={pick(val === n)}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </Fragment>
+            );
+          })}
           <p className="note" style={{ margin: '12px 0 6px' }}>Who is rating?</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {['Tim', 'Ellice'].map((who) => (
@@ -2521,8 +2566,8 @@ export default function TreasureHunt({
               </button>
             ))}
           </div>
-          <button className="btn block" type="button" style={{ marginTop: 14 }} disabled={!rating || !ratedBy} onClick={give}>
-            {rating ? `Give ${rating}/10` : 'Pick a rating'}
+          <button className="btn block" type="button" style={{ marginTop: 14 }} disabled={!rating || !geoRating || !ratedBy} onClick={give}>
+            {rating && geoRating ? `Give ${rating}/10 and ${geoRating}/10` : 'Rate both videos'}
           </button>
           <p className="note" style={{ margin: '10px 0 0' }}>
             Team: hand this phone to the boss. {per ? `Each mark is worth ${per} points.` : ''}
@@ -3107,19 +3152,18 @@ export default function TreasureHunt({
         <div className="card flag">
           {head(STAMP_NO.cp3, 'cp3')}
           <div className="task">
-            {CONFIG.buy.brief && <p><b>{CONFIG.buy.brief}</b></p>}
-            <Rich text={CONFIG.cp.cp3.body} />
+            {VIDEO_PARTS.map(({ c, brief }) => brief && <p key={c}>{CHALLENGE_INFO[c].emoji} <b>{CHALLENGE_INFO[c].name}:</b> {brief}</p>)}
           </div>
           {sub ? (
             <>
-              {sub.rating != null && (
-                <>
-                  {theirs(readOnly ? 'The bosses’ rating' : 'The bosses’ rating · stamp collected')}
+              {[['pitch', sub.rating, sub.ratedBy], ['geo', sub.geoRating, sub.geoRatedBy]].filter(([, r]) => r != null).map(([c, r, by]) => (
+                <Fragment key={c}>
+                  {theirs(`${CHALLENGE_INFO[c].name} · the bosses’ rating${readOnly ? '' : ' · stamp collected'}`)}
                   <p className="display" style={{ fontSize: 28, margin: 0 }}>
-                    {sub.rating}/10{sub.ratedBy ? <span className="note" style={{ fontSize: 13 }}> · by {sub.ratedBy}</span> : null}
+                    {r}/10{by ? <span className="note" style={{ fontSize: 13 }}> · by {by}</span> : null}
                   </p>
-                </>
-              )}
+                </Fragment>
+              ))}
               {sub.item && (
                 <>
                   {theirs('What they bought')}
@@ -3346,7 +3390,8 @@ export default function TreasureHunt({
           {pitchVideos.ready && (
             <div className="card flag" style={{ marginTop: 14 }}>
               <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.cp3} · {CONFIG.cp.cp3.title}</div>
-              <PitchVideo pv={pitchVideos} />
+              <p className="note" style={{ margin: '4px 0 0' }}>Anyone can upload the two videos — not just the leader.</p>
+              {CHALLENGES.map((c) => <PitchVideo key={c} pv={pitchVideos} challenge={c} />)}
             </div>
           )}
           <div className="card flag" style={{ marginTop: 14 }}>

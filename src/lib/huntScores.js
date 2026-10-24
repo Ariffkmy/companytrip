@@ -95,7 +95,12 @@ export function scoreBreakdown(run, CONFIG, judging = {}, firstTeam = null) {
     let p = stamp;
     if (key === 'bingo') p += Number(sub.points) || 0;
     else if (key === 'cp2') p += (Number(sub.right) || 0) * CONFIG.atami.pts;
-    else if (key === 'cp3') p += Math.min(10, Math.max(0, Number(sub.rating) || 0)) * (CONFIG.buy?.ratingPts ?? 0);
+    else if (key === 'cp3') {
+      /* Two videos, each rated 1–10; a stamp from before Atami
+         Geographic has only the pitch. */
+      const mark = (r) => Math.min(10, Math.max(0, Number(r) || 0));
+      p += (mark(sub.rating) + mark(sub.geoRating)) * (CONFIG.buy?.ratingPts ?? 0);
+    }
     else if (key === 'guess') p += (Number(sub.right) || 0) * CONFIG.trivia.pts;
     else if (key === 'cp4') {
       const per = Number(CONFIG.points?.quizPerAnswer) || 0;

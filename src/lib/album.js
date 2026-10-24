@@ -120,14 +120,15 @@ async function store({ bucket, table }, userId, { blob, contentType, ext, thumb,
 
 /** Upload one photo or video to a { bucket, table } target and record
     it. Returns the row. Videos report
-    `onProgress({ stage: 'shrink' | 'upload', progress })`. */
-export async function uploadMedia(target, file, userId, { onProgress = () => {}, maxSeconds } = {}) {
+    `onProgress({ stage: 'shrink' | 'upload', progress })`. `extra` adds
+    columns to the row (a pitch video's challenge). */
+export async function uploadMedia(target, file, userId, { onProgress = () => {}, maxSeconds, extra = {} } = {}) {
   if (isVideoFile(file)) {
     const v = await prepareVideo(file, (p) => onProgress({ stage: 'shrink', progress: p }), { maxSeconds });
     onProgress({ stage: 'upload', progress: 0 });
     return store(target, userId, {
       blob: v.blob, contentType: v.contentType, ext: v.ext, thumb: v.thumb,
-      row: { width: v.width, height: v.height, kind: 'video', duration: v.duration },
+      row: { width: v.width, height: v.height, kind: 'video', duration: v.duration, ...extra },
     });
   }
   const img = await loadImage(file);
@@ -137,7 +138,7 @@ export async function uploadMedia(target, file, userId, { onProgress = () => {},
   const thumb = await compressPhoto(img, PHOTO_PRESETS.thumb);
   return store(target, userId, {
     blob: full.blob, contentType: 'image/jpeg', ext: 'jpg', thumb: thumb.blob,
-    row: { width: full.width, height: full.height },
+    row: { width: full.width, height: full.height, ...extra },
   });
 }
 

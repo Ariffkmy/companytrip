@@ -811,14 +811,21 @@ export default function HuntEditor() {
         <AtamiQuestions items={val([...cp('cp2b'), 'questions'])} onChange={set([...cp('cp2b'), 'questions'])} />
       </Section>
 
-      <Section title="4 · Buy it, try it" sub={val([...cp('cp3'), 'title'])}>
+      <Section title="4 · Atami Video Challenge" sub={val([...cp('cp3'), 'title'])}>
         <Sub>The game</Sub>
-        <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
-        <p className="note -mt-1">No budget — teams buy anything, find Tim and Ellice and try to sell it to them. The boss rates the pitch from 1 to 10 on the group leader’s phone.</p>
+        <p className="note -mt-1">Two videos, uploaded by anyone in the group. Tim and Ellice rate each from 1 to 10 in the Boss inbox; the stamp lands once both are rated.</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Num label="Points per rating mark" value={val([...cp('cp3'), 'pointsPerRating'])} onChange={set([...cp('cp3'), 'pointsPerRating'])} />
+          <Num label="Points per rating mark" hint="For each video." value={val([...cp('cp3'), 'pointsPerRating'])} onChange={set([...cp('cp3'), 'pointsPerRating'])} />
         </div>
-        {commonFields('cp3')}
+        {commonFields('cp3', { body: false })}
+
+        <Sub>Video 1 · Buy it, try it</Sub>
+        <Text label="What to buy" value={val([...cp('cp3'), 'brief'])} onChange={set([...cp('cp3'), 'brief'])} />
+        <Area label="Instructions" hint={TEXT_HINT} value={val([...cp('cp3'), 'body'])} onChange={set([...cp('cp3'), 'body'])} rows={4} />
+
+        <Sub>Video 2 · Atami Geographic</Sub>
+        <Text label="What to film" value={val([...cp('cp3'), 'geoBrief'])} onChange={set([...cp('cp3'), 'geoBrief'])} />
+        <Area label="Instructions" hint={TEXT_HINT} value={val([...cp('cp3'), 'geoBody'])} onChange={set([...cp('cp3'), 'geoBody'])} rows={4} />
       </Section>
 
       <Section title="5 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>
