@@ -280,7 +280,7 @@ function PitchRating() {
   return (
     <div className="card mt-4">
       <b>Atami Video Challenge</b>
-      <p className="text-sm text-gray-500 mt-1">Every group sends two videos. You and the other boss each rate every video — a group scores the average of your two marks.</p>
+      <p className="text-sm text-gray-500 mt-1">Every group sends two videos. Tim and Ellice each rate every video — a group scores the average of the two marks.</p>
       {loaded && !ready ? (
         <p className="note" style={{ margin: '10px 0 0' }}>Not switched on yet — groups rate on their leader’s phone instead.</p>
       ) : (
@@ -473,7 +473,7 @@ export function BossInbox({ onClose }) {
           <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
           <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
           <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
-          <li><b>Atami Video Challenge:</b> every group sends two videos — <b>Buy it, try it</b> (they try to sell you something they bought) and <b>Atami Geographic</b> (a nature documentary about an Atami animal of their choice). You and the other boss <b>each</b> rate every video from <b>1 to 10</b> on this page, in <b>Atami Video Challenge</b> at the bottom; the group scores the average.</li>
+          <li><b>Atami Video Challenge:</b> every group sends two videos — <b>Buy it, try it</b> (they try to sell you something they bought) and <b>Atami Geographic</b> (a nature documentary about an Atami animal of their choice). Tim and Ellice <b>each</b> rate every video from <b>1 to 10</b> on this page, in <b>Atami Video Challenge</b> at the bottom; the group scores the average.</li>
           <li>Keep the app open on this page. Sound on, phone charged.</li>
         </ol>
       </details>
@@ -593,7 +593,7 @@ export function BossInboxCard({ onOpen }) {
         {error || (waiting ? `${waiting} question${waiting === 1 ? '' : 's'} waiting for a Yes or No.` : 'Groups’ yes/no questions to you arrive here live.')}
       </p>
       <p className="text-sm text-gray-500 mt-1.5">
-        Also rate each group’s two <b>Atami Video Challenge</b> videos from 1 to 10 here — their stamp lands once you have both rated both.
+        Also rate each group’s two <b>Atami Video Challenge</b> videos from 1 to 10 here — their stamp lands once Tim and Ellice have both rated both.
       </p>
       <button type="button" onClick={onOpen} className="btn block mt-3">Open inbox</button>
     </section>
