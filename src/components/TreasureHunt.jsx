@@ -1014,6 +1014,8 @@ export default function TreasureHunt({
   const [busyTile, setBusyTile] = useState(null);
   /* The bingo tile opened full-size: its photo to find, and the team's shot. */
   const [openTile, setOpenTile] = useState(null);
+  /* Which of the Atami Video Challenge's two videos is showing. */
+  const [videoTab, setVideoTab] = useState('pitch');
   const [bingoMissing, setBingoMissing] = useState(null);
   const [bingoChecking, setBingoChecking] = useState(false);
   /* The card locks once collected, so the leader confirms first. */
@@ -2465,10 +2467,56 @@ export default function TreasureHunt({
      anything, then sell it to Tim and Ellice) and Atami Geographic (a
      nature documentary about an animal Atami is famous for, the team's
      pick). Both ratings, and who gave them, are the stamp. */
+  const VIDEO_ACCENT = { pitch: 'var(--gold)', geo: 'var(--sea)' };
   const VIDEO_PARTS = [
     { c: 'pitch', brief: CONFIG.buy.brief, body: CONFIG.cp.cp3.body },
     { c: 'geo', brief: CONFIG.buy.geoBrief, body: CONFIG.buy.geoBody, photo: CONFIG.buy.geoPhoto, link: CONFIG.buy.geoLink, caption: 'For reference: the style to aim for. Up close, talking straight to the camera.' },
   ];
+  /* The two videos as tabs, so it is always clear which one the brief,
+     reference and upload below belong to. Each tab says where that
+     video stands. */
+  const videoStatus = (c) => {
+    const row = pitch.ready ? teamRatings?.[c] : null;
+    if (row) return `✓ ${row.rating}/10`;
+    if (pitchVideos.ready && pitchVideos.videos.some((v) => (v.challenge ?? 'pitch') === c)) return '🎥 Uploaded';
+    return 'To do';
+  };
+  const renderVideoTabs = () => (
+    <div role="tablist" aria-label="The two videos"
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        const next = CHALLENGES[(CHALLENGES.indexOf(videoTab) + 1) % CHALLENGES.length];
+        setVideoTab(next);
+        document.getElementById(`video-tab-${next}`)?.focus();
+      }}
+      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+      {CHALLENGES.map((c, i) => {
+        const on = videoTab === c;
+        const info = CHALLENGE_INFO[c];
+        return (
+          <button key={c} id={`video-tab-${c}`} type="button" role="tab" aria-selected={on} aria-controls={`video-panel-${c}`}
+            tabIndex={on ? 0 : -1} onClick={() => setVideoTab(c)}
+            style={{
+              minWidth: 0, padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+              border: `3px solid ${on ? VIDEO_ACCENT[c] : 'var(--th-dash)'}`,
+              background: on ? 'var(--card)' : 'var(--th-parchment)',
+              boxShadow: on ? 'var(--hard-sm)' : 'none', color: 'var(--ink)', opacity: on ? 1 : 0.8,
+            }}>
+            <span style={{ display: 'block', font: '700 11px/1.2 var(--mono)', letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>
+              Video {i + 1}
+            </span>
+            <span style={{ display: 'block', font: '800 16px/1.2 var(--body)', marginTop: 2 }}>
+              {info.emoji} {info.name}
+            </span>
+            <span style={{ display: 'block', fontSize: 12, marginTop: 4, fontWeight: 700, color: VIDEO_ACCENT[c] }}>
+              {videoStatus(c)}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   const renderCp3 = () => {
     const rating = draft.rating ?? null;
     const geoRating = draft.geoRating ?? null;
@@ -2502,12 +2550,14 @@ export default function TreasureHunt({
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
 
-        {VIDEO_PARTS.map(({ c, brief, body, photo, link, caption }) => {
+        {renderVideoTabs()}
+        {VIDEO_PARTS.filter(({ c }) => c === videoTab).map(({ c, brief, body, photo, link, caption }) => {
           const info = CHALLENGE_INFO[c];
           const row = pitch.ready ? teamRatings?.[c] : null;
           return (
-            <section key={c} aria-label={info.name} style={{ marginTop: 16, paddingTop: 14, borderTop: '3px dashed var(--th-dash)' }}>
-              <div className="eyebrow" style={{ color: 'var(--red)' }}>{info.emoji} {info.name}</div>
+            <section key={c} id={`video-panel-${c}`} role="tabpanel" aria-labelledby={`video-tab-${c}`}
+              style={{ marginTop: 10, padding: '14px 12px 12px', borderRadius: 10, border: `3px solid ${VIDEO_ACCENT[c]}`, borderTopWidth: 6 }}>
+              <div className="eyebrow" style={{ color: VIDEO_ACCENT[c] }}>{info.emoji} {info.name}</div>
               <div className="task">
                 {brief && <p><b>{brief}</b></p>}
                 <Rich text={body} />
@@ -3407,7 +3457,10 @@ export default function TreasureHunt({
             <div className="card flag" style={{ marginTop: 14 }}>
               <div className="eyebrow" style={{ color: 'var(--red)' }}>Game {STAMP_NO.cp3} · {CONFIG.cp.cp3.title}</div>
               <p className="note" style={{ margin: '4px 0 0' }}>Anyone can upload the two videos — not just the leader.</p>
-              {CHALLENGES.map((c) => <PitchVideo key={c} pv={pitchVideos} challenge={c} />)}
+              {renderVideoTabs()}
+              <div id={`video-panel-${videoTab}`} role="tabpanel" aria-labelledby={`video-tab-${videoTab}`}>
+                <PitchVideo pv={pitchVideos} challenge={videoTab} />
+              </div>
             </div>
           )}
           <div className="card flag" style={{ marginTop: 14 }}>
