@@ -4,8 +4,8 @@
 
    The hunt is played in four groups, not the five trip teams in
    groupRoster (Ruby, Sapphire, …), which stay for everything else on
-   the trip. Names are groupRoster's short names. Ariff, Carmen and
-   Kevin are the committee and don't play.
+   the trip. Names are groupRoster's short names. Ariff, Carmen, Kevin,
+   Ragina, Yu Han and Chiew are the committee and don't play.
 
    Who is in which group in the app comes from allowed_emails.hunt_group
    (set in Admin → Trip members); this list is the committee's grouping
@@ -20,7 +20,7 @@ const huntGroups = [
     name: 'Group A',
     colour: 'var(--red)',
     rival: 'group-b',
-    members: ['Helmi', 'Ruby', 'Aidan', "Asma'", 'Jay'],
+    members: ['Helmi', 'Ruby', 'Aidan', 'Jay'],
     leader: 'Jay',
   },
   {
@@ -28,7 +28,7 @@ const huntGroups = [
     name: 'Group B',
     colour: 'var(--sea)',
     rival: 'group-a',
-    members: ['Aina', 'Ashley', 'Hairul', 'Raf', 'Shahrul'],
+    members: ['Aina', 'Ashley', 'Raf', 'Shahrul'],
     leader: 'Raf',
   },
   {
@@ -36,7 +36,7 @@ const huntGroups = [
     name: 'Group C',
     colour: '#E9A82C',
     rival: 'group-d',
-    members: ['Aiman', 'Huai Yu', 'Ragina', 'Eleora', 'Yu Han'],
+    members: ['Aiman', 'Huai Yu', 'Eleora', "Asma'"],
     leader: 'Huai Yu',
   },
   {
@@ -44,7 +44,7 @@ const huntGroups = [
     name: 'Group D',
     colour: '#5B7F3E',
     rival: 'group-c',
-    members: ['Nicholas', 'Amir', 'Jord', 'Liyana', 'Chiew'],
+    members: ['Nicholas', 'Amir', 'Jord', 'Liyana', 'Hairul'],
     leader: 'Jord',
   },
 ];
