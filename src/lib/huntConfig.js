@@ -150,6 +150,8 @@ export const DEFAULT_HUNT_CONFIG = {
       geoBrief: 'Make a nature documentary about an animal Atami is famous for — you pick which.',
       geoBody: 'Choose your animal, then film it like a wildlife programme: a hushed narrator, close-ups, one dramatic moment. The real animal, a statue or a sign of it all count.\n\nUp to 2 minutes. **Tim and Ellice** watch it and rate it from **1 to 10**.',
       geoPhoto: '/hunt-geo-reference.webp',
+      /* The clip the photo is from, opened by tapping it. */
+      geoLink: 'https://youtu.be/wu9LERe-Lr0',
       /* Points for each mark of the bosses' 1–10 rating, per video. */
       pointsPerRating: 2,
     },
@@ -443,7 +445,7 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, geoPhoto: cp.cp3.geoPhoto, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
+    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, geoPhoto: cp.cp3.geoPhoto, geoLink: String(cp.cp3.geoLink ?? '').trim(), ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0 },
     map: config.map,

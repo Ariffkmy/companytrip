@@ -2467,7 +2467,7 @@ export default function TreasureHunt({
      pick). Both ratings, and who gave them, are the stamp. */
   const VIDEO_PARTS = [
     { c: 'pitch', brief: CONFIG.buy.brief, body: CONFIG.cp.cp3.body },
-    { c: 'geo', brief: CONFIG.buy.geoBrief, body: CONFIG.buy.geoBody, photo: CONFIG.buy.geoPhoto, caption: 'For reference: the style to aim for. Up close, talking straight to the camera.' },
+    { c: 'geo', brief: CONFIG.buy.geoBrief, body: CONFIG.buy.geoBody, photo: CONFIG.buy.geoPhoto, link: CONFIG.buy.geoLink, caption: 'For reference: the style to aim for. Up close, talking straight to the camera.' },
   ];
   const renderCp3 = () => {
     const rating = draft.rating ?? null;
@@ -2502,7 +2502,7 @@ export default function TreasureHunt({
         </div>
         <CheckpointPhoto src={CONFIG.cp.cp3.photo} />
 
-        {VIDEO_PARTS.map(({ c, brief, body, photo, caption }) => {
+        {VIDEO_PARTS.map(({ c, brief, body, photo, link, caption }) => {
           const info = CHALLENGE_INFO[c];
           const row = pitch.ready ? teamRatings?.[c] : null;
           return (
@@ -2514,9 +2514,19 @@ export default function TreasureHunt({
               </div>
               {photo && (
                 <figure style={{ margin: '0 0 4px' }}>
-                  <CheckpointPhoto src={photo} />
+                  {link ? (
+                    <a href={link} target="_blank" rel="noopener noreferrer" aria-label="Watch the reference video on YouTube" style={{ display: 'block' }}>
+                      <CheckpointPhoto src={photo} />
+                    </a>
+                  ) : <CheckpointPhoto src={photo} />}
                   {caption && <figcaption className="note" style={{ margin: '-8px 0 0', fontSize: 13 }}>{caption}</figcaption>}
                 </figure>
+              )}
+              {link && (
+                <a href={link} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'inline-block', margin: '8px 0 4px', fontWeight: 800, color: 'var(--red)' }}>
+                  ▶ Watch the reference on YouTube ↗
+                </a>
               )}
               {!preview && <PitchVideo pv={pitchVideos} challenge={c} />}
               {row && (

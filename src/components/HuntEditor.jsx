@@ -827,6 +827,8 @@ export default function HuntEditor() {
         <Text label="What to film" value={val([...cp('cp3'), 'geoBrief'])} onChange={set([...cp('cp3'), 'geoBrief'])} />
         <Area label="Instructions" hint={TEXT_HINT} value={val([...cp('cp3'), 'geoBody'])} onChange={set([...cp('cp3'), 'geoBody'])} rows={4} />
         <Photo label="Reference photo (optional)" hint="Shows the documentary style to aim for." value={val([...cp('cp3'), 'geoPhoto'])} onChange={set([...cp('cp3'), 'geoPhoto'])} />
+        <Text label="Reference video link (optional)" hint="Opens when the photo or the “Watch the reference” link is tapped. Leave blank to hide."
+          value={val([...cp('cp3'), 'geoLink'])} onChange={set([...cp('cp3'), 'geoLink'])} />
       </Section>
 
       <Section title="5 · Look around you" sub={`${val([...cp('cp4'), 'questions']).length} questions`}>
