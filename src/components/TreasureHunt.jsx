@@ -12,7 +12,7 @@ import { DEVICE_FULL_MESSAGE, PHOTO_PRESETS, STORAGE_FULL_MESSAGE, compressPhoto
 import confetti from '../lib/confetti';
 import HuntMapLoader from './HuntMapLoader';
 import { BossThread, shortName } from './BossChat';
-import { CHALLENGES, CHALLENGE_INFO, usePitchRatings } from '../lib/pitchRatings';
+import { BOSS_RATERS, CHALLENGES, CHALLENGE_INFO, combineRatings, usePitchRatings } from '../lib/pitchRatings';
 import { usePitchVideos } from '../lib/pitchVideos';
 import PitchVideo from './PitchVideo';
 import { framedImgStyle } from './FramedPhoto';
@@ -1053,9 +1053,10 @@ export default function TreasureHunt({
   }, []);
   onDeviceFull.current = () => showToast(DEVICE_FULL_MESSAGE, 6000);
 
-  /* Atami Video Challenge: the bosses rate each of the group's two
-     videos in their inbox, and the leader's phone collects the stamp the
-     moment the second rating lands, whichever page it's on. A changed
+  /* Atami Video Challenge: Tim and Ellice each rate each of the group's
+     two videos in their inbox; a video scores the average of their
+     marks. The leader's phone collects the stamp the moment the last of
+     the four marks lands, whichever page it's on. A changed
      rating replaces the old one. Before the SQL is run (`ready` false)
      the bosses rate both on the leader's phone instead. */
   const pitch = usePitchRatings({ team: activeTeamId, enabled: !preview && Boolean(activeTeamId) });
@@ -1068,23 +1069,19 @@ export default function TreasureHunt({
     : [];
   const needVideo = missingVideos.length > 0;
   useEffect(() => {
-    const p = teamRatings?.pitch;
-    const g = teamRatings?.geo;
-    if (!p || !g || needVideo || preview || readOnly || !canPlay || !S?.teamId || S.teamId !== activeTeamId || !S.startedAt) return;
-    /* A rating from a rehearsal, before this run began, isn't theirs. */
-    const at = (r) => Date.parse(r.updated_at) || 0;
-    if (at(p) < S.startedAt || at(g) < S.startedAt) return;
-    const next = {
-      rating: p.rating, ratedBy: shortName(p.rater_name) || null,
-      geoRating: g.rating, geoRatedBy: shortName(g.rater_name) || null,
-    };
+    if (needVideo || preview || readOnly || !canPlay || !S?.teamId || S.teamId !== activeTeamId || !S.startedAt) return;
+    /* Marks from a rehearsal, before this run began, aren't theirs. */
+    const p = combineRatings(teamRatings?.pitch, S.startedAt);
+    const g = combineRatings(teamRatings?.geo, S.startedAt);
+    if (!p.done || !g.done) return;
+    const next = { rating: p.avg, ratedBy: p.by, geoRating: g.avg, geoRatedBy: g.by };
     const prev = S.subs?.cp3;
     if (prev && Object.keys(next).every((k) => prev[k] === next[k])) return;
-    const newS = { ...S, subs: { ...(S.subs || {}), cp3: { ...next, at: Math.max(at(p), at(g)) || Date.now() } } };
+    const newS = { ...S, subs: { ...(S.subs || {}), cp3: { ...next, at: Math.max(p.at, g.at) || Date.now() } } };
     delete newS.buy;
     store.save(newS.teamId, newS);
     setS(newS);
-    showToast(prev ? `Video ratings changed — ${p.rating}/10 and ${g.rating}/10.` : `Stamp collected — your videos got ${p.rating}/10 and ${g.rating}/10.`, 4000);
+    showToast(prev ? `Video ratings changed — ${p.avg}/10 and ${g.avg}/10.` : `Stamp collected — your videos averaged ${p.avg}/10 and ${g.avg}/10.`, 4000);
   }, [teamRatings, needVideo, preview, readOnly, canPlay, S, activeTeamId, store, showToast]);
 
   const handleFile = useCallback(async (file) => {
@@ -1932,7 +1929,7 @@ export default function TreasureHunt({
     [STAMP_NO.cp1]: 'only the group leader takes and sends the pose photo.',
     [STAMP_NO.cp2a]: 'only the group leader sends the selfie and answers the questions.',
     [STAMP_NO.cp3]: pitch.ready
-      ? 'anyone can upload the videos; the stamp lands on the group leader’s phone when the bosses have rated both.'
+      ? 'anyone can upload the videos; the stamp lands on the group leader’s phone once Tim and Ellice have both rated both.'
       : 'anyone can upload the videos; the bosses rate both on the group leader’s phone.',
     [STAMP_NO.cp4]: 'only the group leader types in the answers. Work them out together.',
     [STAMP_NO.guess]: 'only the group leader answers. Everyone else views it on the leader’s phone — decide together first.',
@@ -1980,7 +1977,7 @@ export default function TreasureHunt({
         'Atami Geographic: pick an animal Atami is famous for and film a nature documentary about it.',
         ...(pitchVideos.ready ? ['Anyone in the group uploads each video here.'] : []),
         pitch.ready
-          ? 'Tim and Ellice rate each video from 1 to 10 — the stamp lands here once both are rated.'
+          ? 'Tim and Ellice each rate every video from 1 to 10; you score the average. The stamp lands here once both have rated both.'
           : 'Hand the leader’s phone to them: they rate each video from 1 to 10 and tap “Give”.',
       ],
       cp4: [
@@ -2476,8 +2473,9 @@ export default function TreasureHunt({
      reference and upload below belong to. Each tab says where that
      video stands. */
   const videoStatus = (c) => {
-    const row = pitch.ready ? teamRatings?.[c] : null;
-    if (row) return `✓ ${row.rating}/10`;
+    const r = pitch.ready ? combineRatings(teamRatings?.[c], S?.startedAt) : null;
+    if (r?.done) return `✓ avg ${r.avg}/10`;
+    if (r?.n) return `${r.n} of ${BOSS_RATERS} bosses rated`;
     if (pitchVideos.ready && pitchVideos.videos.some((v) => (v.challenge ?? 'pitch') === c)) return '🎥 Uploaded';
     return 'To do';
   };
@@ -2538,7 +2536,7 @@ export default function TreasureHunt({
       setDraft({});
       showToast(`Stamp collected — ${rating}/10 and ${geoRating}/10.`);
     };
-    const nRated = CHALLENGES.filter((c) => teamRatings?.[c]).length;
+    const nRated = CHALLENGES.filter((c) => combineRatings(teamRatings?.[c], S?.startedAt).done).length;
     const missingNames = missingVideos.map((c) => CHALLENGE_INFO[c].video).join(' and ');
 
     return (
@@ -2553,7 +2551,7 @@ export default function TreasureHunt({
         {renderVideoTabs()}
         {VIDEO_PARTS.filter(({ c }) => c === videoTab).map(({ c, brief, body, photo, link, caption }) => {
           const info = CHALLENGE_INFO[c];
-          const row = pitch.ready ? teamRatings?.[c] : null;
+          const r = pitch.ready ? combineRatings(teamRatings?.[c], S?.startedAt) : null;
           return (
             <section key={c} id={`video-panel-${c}`} role="tabpanel" aria-labelledby={`video-tab-${c}`}
               style={{ marginTop: 10, padding: '14px 12px 12px', borderRadius: 10, border: `3px solid ${VIDEO_ACCENT[c]}`, borderTopWidth: 6 }}>
@@ -2579,9 +2577,10 @@ export default function TreasureHunt({
                 </a>
               )}
               {!preview && <PitchVideo pv={pitchVideos} challenge={c} />}
-              {row && (
+              {r?.n > 0 && (
                 <p style={{ margin: '8px 0 0', fontWeight: 800 }}>
-                  Rated {row.rating}/10{row.rater_name ? <span className="note" style={{ fontSize: 13 }}> · by {shortName(row.rater_name)}</span> : null}
+                  {r.done ? `Average ${r.avg}/10` : `${r.n} of ${BOSS_RATERS} bosses rated`}
+                  <span className="note" style={{ fontSize: 13 }}> · {r.by}</span>
                 </p>
               )}
             </section>
@@ -2592,11 +2591,11 @@ export default function TreasureHunt({
           <div role="status" style={{ marginTop: 16, padding: 14, borderRadius: 10, border: '3px dashed var(--th-dash)', background: 'var(--th-parchment)', textAlign: 'center' }}>
             <div style={{ fontSize: 26 }}>⏳</div>
             <p style={{ margin: '4px 0 4px', fontWeight: 800, fontSize: 17 }}>
-              {nRated === 2 && needVideo ? `Both rated — upload the ${missingNames} to collect` : `Waiting for Tim or Ellice’s ratings · ${nRated} of 2`}
+              {nRated === 2 && needVideo ? `Both rated — upload the ${missingNames} to collect` : `Waiting for Tim and Ellice’s marks · ${nRated} of 2 videos done`}
             </p>
             <p className="note" style={{ margin: 0 }}>
               {needVideo ? `Still to upload: the ${missingNames}. ` : ''}
-              They rate each video 1 to 10; the stamp lands here by itself once both are rated.
+              Tim and Ellice each rate every video 1 to 10 and you score the average; the stamp lands here by itself once both have rated both.
               {per ? ` Each mark is worth ${per} points.` : ''}
             </p>
           </div>

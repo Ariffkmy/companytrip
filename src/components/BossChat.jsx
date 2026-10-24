@@ -18,7 +18,7 @@ import huntGroups, { huntGroupOf } from '../data/huntGroups';
 import {
   QUESTION_LIMIT, QUESTION_MAX, ping, questionsUsed, unlockSound, useBossMoves, useBossQuestions, useWakeLock,
 } from '../lib/bossChat';
-import { CHALLENGES, CHALLENGE_INFO, usePitchRatings } from '../lib/pitchRatings';
+import { BOSS_RATERS, CHALLENGES, CHALLENGE_INFO, combineRatings, usePitchRatings } from '../lib/pitchRatings';
 import { usePitchVideos } from '../lib/pitchVideos';
 
 const ROSTER_SHORT = new Map(groupRoster.flatMap((t) => t.members)
@@ -223,11 +223,12 @@ export function BossThread({ team, canAsk = true, readOnly = false, offNote = nu
 /* ── Atami Video Challenge: rating the videos ────────
    Each group sends two videos: the Buy it, try it pitch and the Atami
    Geographic documentary. The boss picks the video, the group and a
-   mark; the group's phone collects the stamp once both are rated. */
+   mark. Tim and Ellice each give their own mark; a video scores the
+   average, and the group's stamp lands once both have rated both. */
 const VIDEO_ACCENT = { pitch: 'var(--gold)', geo: 'var(--sea)' };
 
 function PitchRating() {
-  const { ratings, ready, loaded, rate } = usePitchRatings();
+  const { ratings, ready, loaded, rate, me } = usePitchRatings();
   const pv = usePitchVideos();
   const [challenge, setChallenge] = useState('pitch');
   const [team, setTeam] = useState(null);
@@ -249,7 +250,10 @@ function PitchRating() {
     ...(on ? { background: g.colour, borderColor: g.colour, color: '#fff' } : {}),
   });
   const accent = VIDEO_ACCENT[challenge];
-  const ratedCount = (c) => huntGroups.filter((g) => ratings[g.id]?.[c]).length;
+  const mine = (t, c) => (ratings[t]?.[c] ?? []).find((r) => r.rated_by === me) ?? null;
+  const ratedCount = (c) => huntGroups.filter((g) => mine(g.id, c)).length;
+  /* Picking a group shows the mark you already gave it, to change. */
+  const pickTeam = (t) => { setTeam(t); setMark(mine(t, challenge)?.rating ?? null); setNote(''); };
   const step = (n, text) => (
     <p className="text-[11px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: 'var(--ink-soft)' }}>
       <span style={{ color: accent }}>{n}</span> · {text}
@@ -276,7 +280,7 @@ function PitchRating() {
   return (
     <div className="card mt-4">
       <b>Atami Video Challenge</b>
-      <p className="text-sm text-gray-500 mt-1">Every group sends two videos. Pick the video and the group, watch it, then rate it.</p>
+      <p className="text-sm text-gray-500 mt-1">Every group sends two videos. You and the other boss each rate every video — a group scores the average of your two marks.</p>
       {loaded && !ready ? (
         <p className="note" style={{ margin: '10px 0 0' }}>Not switched on yet — groups rate on their leader’s phone instead.</p>
       ) : (
@@ -305,7 +309,7 @@ function PitchRating() {
                   <span className="block text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--ink-soft)' }}>Video {i + 1}</span>
                   <span className="block font-extrabold text-[16px] leading-tight mt-0.5">{CHALLENGE_INFO[c].emoji} {CHALLENGE_INFO[c].name}</span>
                   <span className="block text-[12px] font-bold mt-1" style={{ color: VIDEO_ACCENT[c] }}>
-                    {ratedCount(c)} of {huntGroups.length} rated
+                    {ratedCount(c)} of {huntGroups.length} rated by you
                   </span>
                 </button>
               );
@@ -317,10 +321,10 @@ function PitchRating() {
           {step(1, 'Which group')}
           <div className="grid grid-cols-2 gap-2">
             {huntGroups.map((g) => (
-              <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => setTeam(g.id)} style={groupPick(g, team === g.id)}>
+              <button key={g.id} type="button" aria-pressed={team === g.id} onClick={() => pickTeam(g.id)} style={groupPick(g, team === g.id)}>
                 <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full mr-1.5 align-middle" style={{ background: g.colour, border: '1px solid #fff' }} />
                 {g.name}
-                {ratings[g.id]?.[challenge] ? ` · ${ratings[g.id][challenge].rating}/10` : ''}
+                {mine(g.id, challenge) ? ` · you: ${mine(g.id, challenge).rating}` : ''}
               </button>
             ))}
           </div>
@@ -349,19 +353,21 @@ function PitchRating() {
             ))}
           </div>
           <button type="button" className="btn block mt-3" disabled={!team || !mark || busy} onClick={give}>
-            {busy ? 'Sending…' : team && mark ? `Give ${huntGroupOf(team)?.name ?? team}’s ${info.video} ${mark}/10` : 'Pick a group and a rating'}
+            {busy ? 'Sending…' : team && mark
+              ? `${mine(team, challenge) ? 'Change your mark to' : 'Give'} ${mark}/10 for ${huntGroupOf(team)?.name ?? team}’s ${info.video}`
+              : 'Pick a group and a rating'}
           </button>
           {note && <p className="note" style={{ margin: '8px 0 0' }} aria-live="polite">{note}</p>}
           </div>
-          <p className="text-[11px] text-gray-500 mt-3 mb-1.5">All groups, {info.name}:</p>
+          <p className="text-[11px] text-gray-500 mt-3 mb-1.5">All groups, {info.name} — both bosses’ marks and the average:</p>
           <div className="flex flex-wrap gap-1.5">
             {huntGroups.map((g) => {
-              const r = ratings[g.id]?.[challenge];
+              const r = combineRatings(ratings[g.id]?.[challenge]);
               return (
                 <span key={g.id} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border-2 border-ink text-[12px] font-bold"
-                  style={{ opacity: r ? 1 : 0.5 }}>
+                  style={{ opacity: r.done ? 1 : r.n ? 0.8 : 0.5 }}>
                   <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: g.colour }} />
-                  {g.name}: {r ? `${r.rating}/10${r.rater_name ? ` · ${shortName(r.rater_name)}` : ''}` : 'not rated'}
+                  {g.name}: {r.n ? `${r.by}${r.done ? ` · avg ${r.avg}/10` : ` · ${BOSS_RATERS - r.n} more to rate`}` : 'not rated'}
                   {pv.ready && videosOf(g.id, challenge).length ? ' · 🎥' : ''}
                 </span>
               );
@@ -467,7 +473,7 @@ export function BossInbox({ onClose }) {
           <li>Each group gets only <b>{QUESTION_LIMIT} questions</b> while you stay in one spot. After that they have to search with what they know.</li>
           <li>Want to move somewhere else? Answer any waiting questions first, then tap <b>We’re moving</b>. Every group gets {QUESTION_LIMIT} new questions — answer those about your new spot.</li>
           <li>When a group finds you, pose with the whole group for one funny photo. Their leader sends it from their phone to earn the stamp.</li>
-          <li><b>Atami Video Challenge:</b> every group sends two videos — <b>Buy it, try it</b> (they try to sell you something they bought) and <b>Atami Geographic</b> (a nature documentary about an Atami animal of their choice). Rate each from <b>1 to 10</b> on this page, in <b>Atami Video Challenge</b> at the bottom.</li>
+          <li><b>Atami Video Challenge:</b> every group sends two videos — <b>Buy it, try it</b> (they try to sell you something they bought) and <b>Atami Geographic</b> (a nature documentary about an Atami animal of their choice). You and the other boss <b>each</b> rate every video from <b>1 to 10</b> on this page, in <b>Atami Video Challenge</b> at the bottom; the group scores the average.</li>
           <li>Keep the app open on this page. Sound on, phone charged.</li>
         </ol>
       </details>
@@ -587,7 +593,7 @@ export function BossInboxCard({ onOpen }) {
         {error || (waiting ? `${waiting} question${waiting === 1 ? '' : 's'} waiting for a Yes or No.` : 'Groups’ yes/no questions to you arrive here live.')}
       </p>
       <p className="text-sm text-gray-500 mt-1.5">
-        Also rate each group’s two <b>Atami Video Challenge</b> videos from 1 to 10 here — their stamp lands once both are rated.
+        Also rate each group’s two <b>Atami Video Challenge</b> videos from 1 to 10 here — their stamp lands once you have both rated both.
       </p>
       <button type="button" onClick={onOpen} className="btn block mt-3">Open inbox</button>
     </section>

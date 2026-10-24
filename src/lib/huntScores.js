@@ -99,7 +99,9 @@ export function scoreBreakdown(run, CONFIG, judging = {}, firstTeam = null) {
       /* Two videos, each rated 1–10; a stamp from before Atami
          Geographic has only the pitch. */
       const mark = (r) => Math.min(10, Math.max(0, Number(r) || 0));
-      p += (mark(sub.rating) + mark(sub.geoRating)) * (CONFIG.buy?.ratingPts ?? 0);
+      /* Each mark is the average of the bosses' marks, so it can be a
+         fraction; the points are rounded. */
+      p += Math.round((mark(sub.rating) + mark(sub.geoRating)) * (CONFIG.buy?.ratingPts ?? 0));
     }
     else if (key === 'guess') p += (Number(sub.right) || 0) * CONFIG.trivia.pts;
     else if (key === 'cp4') {
