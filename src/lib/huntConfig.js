@@ -17,7 +17,7 @@
 import { supabase } from './supabase';
 import { PHOTO_PRESETS, compressPhoto } from './photos';
 import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
-import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, OLD_HUNT_MAP_LINK, ROUTE_STATS, START } from '../data/huntRoute';
+import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, OLD_HUNT_MAP_LINK, OLD_ROUTE_STATS, ROUTE_STATS, START } from '../data/huntRoute';
 import ATAMI_QUIZ from '../data/atamiQuiz';
 
 export const HUNT_ID = 'atami';
@@ -89,7 +89,7 @@ export const DEFAULT_HUNT_CONFIG = {
     '- Photo bingo: 1 for every correct photo.',
     '- Copy the pose: best pose photo, 5 more.',
     '- Atami quiz: 2 for every right answer, at least 10 of 20 right for the stamp, 10 seconds a question.',
-    '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.',
+    '- Atami Video Challenge: two videos, Buy it, try it and Atami Geographic; the bosses rate each 1 to 10, 2 points a mark.',
     '- Look around you: 2 for every right answer.',
     '- Know your colleagues: questions about the other groups, mixed; 2 for every right answer.',
     '- Find the boss: 20 for the selfie with Tim and Ellice, 5 more for the funniest group photo.',
@@ -104,9 +104,8 @@ export const DEFAULT_HUNT_CONFIG = {
     bingo: [],
   }])),
 
-  /* Area map. The areas tile the playing field side by side, sharing
-     borders and covering it completely, so a team is always inside
-     exactly one. There is no walking line — the order is the team's to
+  /* Area map. Three separate areas around the station, each outlined on
+     its own. There is no walking line — the order is the team's to
      choose. Outlines are fixed in ../data/huntRoute, which explains how
      they are derived; admins edit the labels and notes. */
   map: {
@@ -141,11 +140,19 @@ export const DEFAULT_HUNT_CONFIG = {
       pointsPerRight: 2,
       questions: ATAMI_QUIZ,
     },
+    /* Two videos, each rated 1–10 by the bosses: brief and body are
+       Buy it, try it; geoBrief, geoBody and geoPhoto (a still showing
+       the documentary style to aim for) are Atami Geographic. */
     cp3: {
-      title: 'Buy it, try it', photo: null, stop: 'All areas',
+      title: 'Atami Video Challenge', photo: null, stop: 'All areas',
       brief: 'Buy anything you like — then sell it to the bosses.',
       body: 'Spend any amount. Take what you bought to **Tim and Ellice** when you find them, and convince them to buy it from you. They rate your pitch from **1 to 10**.\n\nYou can do this right after you take the selfie with them for **Find the boss**.',
-      /* Points for each mark of the bosses' 1–10 rating. */
+      geoBrief: 'Make a nature documentary about an animal Atami is famous for — you pick which.',
+      geoBody: 'Choose your animal, then film it like a wildlife programme: a hushed narrator, close-ups, one dramatic moment. The real animal, a statue or a sign of it all count.\n\nUp to 2 minutes. **Tim and Ellice** watch it and rate it from **1 to 10**.',
+      geoPhoto: '/hunt-geo-reference.webp',
+      /* The clip the photo is from, opened by tapping it. */
+      geoLink: 'https://youtu.be/wu9LERe-Lr0',
+      /* Points for each mark of the bosses' 1–10 rating, per video. */
       pointsPerRating: 2,
     },
     cp4: {
@@ -281,6 +288,11 @@ export function withDefaults(stored) {
   }
   merged.rules = String(merged.rules ?? '').replace(/^- Buy it, try it: most interesting buy, 5 more\.?$/m,
     '- Buy it, try it: the bosses rate your pitch 1 to 10; 2 points a mark.');
+  /* Saved before Buy it, try it became the Atami Video Challenge, with
+     Atami Geographic as its second video. */
+  if (merged.checkpoints.cp3.title === 'Buy it, try it') merged.checkpoints.cp3.title = DEFAULT_HUNT_CONFIG.checkpoints.cp3.title;
+  merged.rules = merged.rules.replace(/^- Buy it, try it: the bosses rate your pitch 1 to 10; (\d+) points? a mark\.?$/m,
+    '- Atami Video Challenge: two videos, Buy it, try it and Atami Geographic; the bosses rate each 1 to 10, $1 points a mark.');
   /* The old placeholder finish text: nothing is shown instead. */
   if (merged.finishPoint === 'The committee will point you to the finish at the briefing.') merged.finishPoint = '';
   /* Find the boss's longer text, saved before it was cut down. */
@@ -350,10 +362,10 @@ export function withDefaults(stored) {
   if (!Array.isArray(merged.map.areas) || !merged.map.areas.length) {
     merged.map.areas = structuredClone(DEFAULT_HUNT_CONFIG.map.areas);
   }
-  /* Saved before the areas tiled the field: the old outlines were
-     separate islands, and there was no field boundary at all. */
+  /* Saved with outlines missing, or before the field had a boundary
+     (from the six tiled areas back to the first islands). */
   if (merged.map.areas.some((a) => !Array.isArray(a.polygon) || a.polygon.length < 3)
-    || !Array.isArray(merged.map.boundary) || merged.map.boundary.length < 3) {
+    || !Array.isArray(merged.map.boundary)) {
     merged.map.boundary = structuredClone(DEFAULT_HUNT_CONFIG.map.boundary);
     /* Rebuilt from the defaults rather than from what was stored:
        deepMerge replaces arrays whole, so a document saved with a
@@ -379,6 +391,21 @@ export function withDefaults(stored) {
   const [a4, a5] = [merged.map.areas[3], merged.map.areas[4]];
   if (a4?.polygon?.[0]?.[0] === 35.100396 && a4.polygon[0][1] === 139.076286 && a5?.polygon) {
     [a4.polygon, a5.polygon] = [a5.polygon, a4.polygon];
+  }
+  /* Saved with the six areas that tiled the field: replaced by the
+     committee's three loops round the station, with no field edge.
+     Labels and notes don't carry over — they described the old patches —
+     and a pose place set to area 4, 5 or 6 goes back to not set. */
+  if (merged.map.areas.length === 6 && merged.map.areas[0]?.polygon?.[0]?.[0] === 35.102141) {
+    merged.map.areas = structuredClone(DEFAULT_HUNT_CONFIG.map.areas);
+    merged.map.boundary = structuredClone(DEFAULT_HUNT_CONFIG.map.boundary);
+    if (merged.map.km === OLD_ROUTE_STATS.km && merged.map.walkMin === OLD_ROUTE_STATS.walkMin) {
+      merged.map.km = ROUTE_STATS.km;
+      merged.map.walkMin = ROUTE_STATS.walkMin;
+    }
+    Object.values(merged.teams).forEach((t) => {
+      if (Number(t?.pose?.area) > merged.map.areas.length) t.pose.area = '';
+    });
   }
   return merged;
 }
@@ -418,7 +445,7 @@ export function toRuntime(config) {
       spot: config.teams[g.id]?.spot ?? { hint: '', photo: null },
       bingo: bingoTiles(config.teams[g.id]?.bingo).slice(0, BINGO_MAX),
     })),
-    buy: { brief: cp.cp3.brief, ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
+    buy: { brief: cp.cp3.brief, geoBrief: cp.cp3.geoBrief, geoBody: cp.cp3.geoBody, geoPhoto: cp.cp3.geoPhoto, geoLink: String(cp.cp3.geoLink ?? '').trim(), ratingPts: Math.max(0, Number(cp.cp3.pointsPerRating) || 0) },
     quiz: { questions: cp.cp4.questions },
     bingo: { tilePts: Number(cp.bingo.tilePts) || 0 },
     map: config.map,

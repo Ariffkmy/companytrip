@@ -1,20 +1,24 @@
 /* ═══════════════════════════════════════════════════
-   Buy it, try it — the group's pitch video
+   Atami Video Challenge — one of the group's videos
    ═══════════════════════════════════════════════════
 
    On the hunt page, for every member of the group (not only the
-   leader): record the pitch to the bosses, or pick the clip from the
-   phone, and upload it. `pv` is usePitchVideos() for the group, owned
-   by the hunt page so the stamp can wait for a video too. */
+   leader): record the video for `challenge` ('pitch' for Buy it, try
+   it, 'geo' for Atami Geographic), or pick the clip from the phone, and
+   upload it. `pv` is usePitchVideos() for the group, owned by the hunt
+   page so the stamp can wait for both videos too. */
 
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { PITCH_MAX_SECONDS, deletePitchVideo, uploadPitchVideo } from '../lib/pitchVideos';
+import { CHALLENGE_INFO } from '../lib/pitchRatings';
 import { formatDuration, isVideoFile, mediaErrorMessage } from '../lib/video';
 import { shortName } from './BossChat';
 
-export default function PitchVideo({ pv, canUpload = true }) {
-  const { videos, ready, loaded, reload } = pv;
+export default function PitchVideo({ pv, challenge = 'pitch', canUpload = true }) {
+  const { ready, loaded, reload } = pv;
+  const info = CHALLENGE_INFO[challenge];
+  const videos = pv.videos.filter((v) => (v.challenge ?? 'pitch') === challenge);
   const [me, setMe] = useState(null);
   const [step, setStep] = useState(null);
   const [error, setError] = useState('');
@@ -34,7 +38,7 @@ export default function PitchVideo({ pv, canUpload = true }) {
     if (!isVideoFile(file)) { setError('Pick a video, not a photo.'); return; }
     setStep({ stage: 'shrink', progress: 0 });
     try {
-      await uploadPitchVideo(file, setStep);
+      await uploadPitchVideo(file, challenge, setStep);
       await reload();
     } catch (err) {
       setError(mediaErrorMessage(err, { maxSeconds: PITCH_MAX_SECONDS }));
@@ -56,11 +60,11 @@ export default function PitchVideo({ pv, canUpload = true }) {
   return (
     <div style={{ marginTop: 14 }}>
       <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 6 }}>
-        🎥 Pitch video {videos.length ? <span style={{ color: 'var(--sea)' }}>✓</span> : null}
+        {info.emoji} {info.title} {videos.length ? <span style={{ color: 'var(--sea)' }}>✓</span> : null}
       </div>
       {!videos.length && (
         <p className="note" style={{ margin: '0 0 10px' }}>
-          Anyone in the group can record the pitch to Tim and Ellice and upload it here. Up to {formatDuration(PITCH_MAX_SECONDS)}.
+          Anyone in the group can {info.film} and upload it here. Up to {formatDuration(PITCH_MAX_SECONDS)}.
         </p>
       )}
 
@@ -89,7 +93,7 @@ export default function PitchVideo({ pv, canUpload = true }) {
           justifyContent: 'center', cursor: step ? 'wait' : 'pointer', opacity: step ? 0.6 : 1,
           ...(videos.length ? { background: 'var(--card)', color: 'var(--ink)' } : {}),
         }}>
-          {label ?? (videos.length ? 'Upload another video' : 'Record or upload the pitch video')}
+          {label ?? (videos.length ? 'Upload another video' : `Record or upload the ${info.video}`)}
           <input type="file" accept="video/*" className="sr-only" disabled={Boolean(step)}
             onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
