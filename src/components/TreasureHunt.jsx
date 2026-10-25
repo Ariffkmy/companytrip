@@ -930,7 +930,7 @@ export function HuntOrganiser({ config }) {
       ) : (
         <>
           {renderBoard()}
-          <PointsTable CONFIG={CONFIG} rows={rows} onPick={jump} />
+          <PointsTable CONFIG={CONFIG} rows={rows} onPick={jump} resetAt={resetAt} />
           {renderAwards()}
           {renderMarking()}
           <GroupDetails CONFIG={CONFIG} rows={rows} judging={judging} resetAt={resetAt} firstTeam={firstTeam}

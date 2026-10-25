@@ -16,6 +16,7 @@ import {
 } from '../lib/huntScores';
 import { listShots } from '../lib/bingo';
 import { supabase } from '../lib/supabase';
+import { BOSS_RATERS, CHALLENGES, CHALLENGE_INFO, combineRatings, usePitchRatings } from '../lib/pitchRatings';
 
 export const TH = {
   fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
@@ -98,10 +99,29 @@ export const linkBtn = {
   cursor: 'pointer', textAlign: 'inherit',
 };
 
+/* The bosses' marks for a group's two videos, read live from the Boss
+   inbox, so they show as each one lands — before the group's phone has
+   all four and collects the stamp. Marks from before this run (or the
+   last restart) are a rehearsal's and don't show. */
+function VideoMarks({ marks, since }) {
+  const lines = CHALLENGES.map((c) => ({ c, ...combineRatings(marks?.[c], since) })).filter((m) => m.n > 0);
+  if (!lines.length) return null;
+  return (
+    <div style={{ font: '700 10px/1.35 var(--body)', color: 'var(--ink-soft)', marginTop: 2, whiteSpace: 'nowrap' }}>
+      {lines.map((m) => (
+        <div key={m.c} title={`${CHALLENGE_INFO[m.c].name}: ${m.by}`}>
+          {CHALLENGE_INFO[m.c].emoji} {m.avg}/10{!m.done && <span style={{ color: 'var(--red)' }}> · {m.n}/{BOSS_RATERS}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── Every game for every group ────────────────────── */
-export function PointsTable({ CONFIG, rows, onPick }) {
+export function PointsTable({ CONFIG, rows, onPick, resetAt = 0 }) {
   const cell = (v) => (v == null ? <span style={{ color: 'var(--ink-soft)' }}>–</span> : <b>{v}</b>);
   const pts = CONFIG.points ?? {};
+  const { ratings } = usePitchRatings();
   return (
     <div className="card">
       <div className="eyebrow" style={{ color: 'var(--red)', marginBottom: 8 }}>Points by game</div>
@@ -139,6 +159,9 @@ export function PointsTable({ CONFIG, rows, onPick }) {
                         {cell(score.games[g.key])}
                       </button>
                     ) : cell(score?.games[g.key])}
+                    {g.key === 'cp3' && (
+                      <VideoMarks marks={ratings[team.id]} since={Math.max(resetAt || 0, rows.find((r) => r.team.id === team.id)?.run?.startedAt || 0)} />
+                    )}
                     {g.key === 'cp4' && score?.toMark > 0 && (
                       <div style={{ font: '700 10px/1.2 var(--body)', color: 'var(--red)' }}>{score.toMark} to mark</div>
                     )}
@@ -174,6 +197,7 @@ export function PointsTable({ CONFIG, rows, onPick }) {
         Atami quiz {CONFIG.atami.pts} for every right answer · Look around you {pts.quizPerAnswer} for every right answer ·
         Know your colleagues {CONFIG.trivia.pts} for every right answer. Find the boss: {pts.boss ?? 20} for the selfie.
         Atami Video Challenge: {CONFIG.buy?.ratingPts ?? 0} a mark of the bosses’ 1–10 rating for each of the two videos. Best pose and funniest boss photo: {pts.judged ?? 5} each. First to complete all 7: {pts.first ?? 15}. – means not played.
+        Under the Video Challenge: the bosses’ marks so far, live from the Boss inbox — 🛍️ Buy it, try it, 🐾 Atami Geographic; 1/2 means one boss has rated. The points come once both bosses have rated both videos.
         {onPick && ' Tap a group or a score to open its game page.'}
       </p>
     </div>
@@ -525,7 +549,7 @@ export function LiveHuntProgress({ config, onOpenGroup }) {
 /* Home, once published. A group, or one of its scores, opens that
    group's own game page, read only (`onOpenGroup(teamId, game)`). */
 export default function HuntResults({ config, onOpenGroup }) {
-  const { CONFIG, remote, ranked, rows } = useHuntBoard(config, { every: 60000 });
+  const { CONFIG, remote, ranked, rows, resetAt } = useHuntBoard(config, { every: 60000 });
   return (
     <section className="mt-9" aria-labelledby="hunt-results-h">
       <h2 id="hunt-results-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
@@ -538,7 +562,7 @@ export default function HuntResults({ config, onOpenGroup }) {
       ) : (
         <>
           <Standings ranked={ranked} onPick={onOpenGroup} />
-          <PointsTable CONFIG={CONFIG} rows={rows} onPick={onOpenGroup} />
+          <PointsTable CONFIG={CONFIG} rows={rows} onPick={onOpenGroup} resetAt={resetAt} />
         </>
       )}
     </section>
