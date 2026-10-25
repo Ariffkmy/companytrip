@@ -15,6 +15,7 @@ import {
   SCORED_GAMES, buildRows, cp4Verdicts, fetchJudging, fetchRuns, gameTitleOf, photoPathsOf, signPhotos,
 } from '../lib/huntScores';
 import { listShots } from '../lib/bingo';
+import { supabase } from '../lib/supabase';
 
 export const TH = {
   fontFamily: '"DM Mono", monospace', fontSize: 10, letterSpacing: '.08em',
@@ -34,8 +35,9 @@ export function GroupDot({ colour, size = 11 }) {
 }
 
 /* Loads and polls everything the board needs. `loadLocal` is the
-   organiser's fallback to runs played on its own device. */
-export function useHuntBoard(config, { loadLocal = null, every = 15000 } = {}) {
+   organiser's fallback to runs played on its own device. `live` also
+   reloads as soon as any group's row changes, over realtime. */
+export function useHuntBoard(config, { loadLocal = null, every = 15000, live = false } = {}) {
   const CONFIG = useMemo(() => toRuntime(config ?? withDefaults(null)), [config]);
   /* undefined while loading; null when hunt_scores can't be read. */
   const [remote, setRemote] = useState(undefined);
@@ -56,6 +58,23 @@ export function useHuntBoard(config, { loadLocal = null, every = 15000 } = {}) {
     const id = setInterval(() => { if (!document.hidden) refresh(); }, every);
     return () => clearInterval(id);
   }, [refresh, every]);
+
+  useEffect(() => {
+    if (!live || !supabase) return undefined;
+    const channel = supabase
+      .channel(`hunt-board:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hunt_scores' }, () => refresh())
+      .subscribe();
+    /* Atami's signal drops the socket: catch up on the way back. */
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', refresh);
+      supabase.removeChannel(channel);
+    };
+  }, [live, refresh]);
 
   const board = buildRows(CONFIG, remote, judging, resetAt, loadLocal);
   return { CONFIG, remote, judging, setJudging, resetAt, setResetAt, loadedAt, refresh, ...board };
@@ -405,6 +424,101 @@ function Standings({ ranked, onPick }) {
         ) : <div key={team.id} style={line}>{inner}</div>;
       })}
     </div>
+  );
+}
+
+/* ── Live progress, admins only ───────────────────────
+   Home's read-only view of the race while it runs: who has which
+   stamps, time left and points, ranked. The controls stay in
+   Admin → Organiser. A group opens its game page, read only. */
+const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+const ago = (ms) => {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  return clockTime(ms);
+};
+
+export function LiveHuntProgress({ config, onOpenGroup }) {
+  const { CONFIG, remote, ranked, loadedAt } = useHuntBoard(config, { live: true });
+  /* The countdowns tick on their own between reloads. */
+  const [, setNow] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => { if (!document.hidden) setNow(Date.now()); }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const started = ranked.filter((r) => r.run).length;
+  const finished = ranked.filter((r) => r.run?.finishedAt).length;
+
+  return (
+    <section className="mt-9" aria-labelledby="hunt-live-h">
+      <h2 id="hunt-live-h" className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700 mb-2.5">
+        Hunt progress · live{' '}
+        <span className="normal-case tracking-normal font-normal text-gray-400">(admin only, view only)</span>
+      </h2>
+      {remote === undefined ? (
+        <div className="card"><p className="note" style={{ margin: 0 }}>Loading every group’s progress…</p></div>
+      ) : remote === null ? (
+        <div className="card"><p className="note" style={{ margin: 0 }}>Couldn’t load the groups’ progress. Try again with signal.</p></div>
+      ) : (
+        <div className="card">
+          <p className="note" style={{ margin: '0 0 6px' }}>
+            {started === 0
+              ? 'No group has started yet.'
+              : `${started} of ${ranked.length} groups started · ${finished} finished`}
+          </p>
+          {ranked.map(({ team, leader, run, score }, i) => {
+            const left = run?.startedAt
+              ? Math.max(0, Math.round(((run.startedAt + CONFIG.raceMinutes * 60000) - (run.finishedAt || Date.now())) / 1000))
+              : 0;
+            const stamps = SCORED_GAMES.filter((g) => score?.games[g.key] != null);
+            const line = {
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', width: '100%',
+              borderBottom: i < ranked.length - 1 ? '1px dashed var(--th-rule)' : 'none',
+            };
+            const inner = (
+              <>
+                <span className="display" style={{ width: 18, fontSize: 18, textAlign: 'center' }}>{run ? i + 1 : '–'}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <GroupDot colour={team.colour} />
+                    <b style={{ fontSize: 15 }}>{team.name}</b>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 5 }}
+                    aria-label={`${stamps.length} of ${SCORED_GAMES.length} games done`}>
+                    {SCORED_GAMES.map((g) => (
+                      <span key={g.key} title={gameTitleOf(g.key, CONFIG.cp)} style={{
+                        display: 'inline-block', width: 10, height: 10, borderRadius: '50%', border: '2px solid var(--ink)',
+                        background: score?.games[g.key] != null ? 'var(--red)' : 'var(--th-slot)',
+                      }} />
+                    ))}
+                    <span className="note" style={{ marginLeft: 4 }}>{stamps.length}/{SCORED_GAMES.length}</span>
+                  </span>
+                  <span className="note" style={{ display: 'block', marginTop: 3 }}>
+                    {!run ? 'Not started' : run.finishedAt ? `Finished ${clockTime(run.finishedAt)}` : `${mmss(left)} left`}
+                    {leader ? ` · ${leader}` : ''}
+                    {run?.syncedAt ? ` · synced ${ago(new Date(run.syncedAt).getTime())}` : ''}
+                  </span>
+                </span>
+                <b className="display" style={{ fontSize: 22 }}>{score ? score.total : '–'}</b>
+                {onOpenGroup && run && <span aria-hidden="true" style={{ width: 12, color: 'var(--ink-soft)' }}>›</span>}
+              </>
+            );
+            return onOpenGroup && run ? (
+              <button key={team.id} type="button" onClick={() => onOpenGroup(team.id)}
+                aria-label={`${team.name}, ${score?.total ?? 0} points — open its game page`}
+                style={{ ...linkBtn, ...line }}>{inner}</button>
+            ) : <div key={team.id} style={line}>{inner}</div>;
+          })}
+          {loadedAt > 0 && (
+            <p className="note" style={{ margin: '10px 0 0' }}>
+              Updates as groups sync · last checked {new Date(loadedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
