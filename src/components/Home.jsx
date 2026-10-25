@@ -12,7 +12,7 @@ import schedule from '../data/schedule';
 import cashExpenses, { itemTotal } from '../data/cashExpenses';
 import { cachedPolicy, certificateUrl, fetchMyPolicy, formatDate } from '../lib/insurance';
 import { fetchResultsPublished } from '../lib/huntScores';
-import HuntResults, { LiveHuntProgress } from './HuntResults';
+import HuntResults from './HuntResults';
 import { BossInboxCard } from './BossChat';
 
 /* ── Treasure hunt results ──────────────────────────
@@ -342,8 +342,6 @@ export default function Home({ onGo, userName, userEmail, isAdmin, onSignOut, hu
       <Greeting userName={userName} userEmail={userEmail} />
       {/* The bosses (and admins, as a backup) answer Find the boss here. */}
       {showBossInbox && <BossInboxCard onOpen={onOpenBossInbox} />}
-      {/* Admins follow the race from here; the controls stay in Admin → Organiser. */}
-      {isAdmin && <LiveHuntProgress config={huntConfig} onOpenGroup={onOpenGroupGame} />}
       <PublishedHuntResults config={huntConfig} onOpenGroupGame={onOpenGroupGame} />
       <PhotoCarousel onOpenAlbum={() => onGo('album')} />
       <WeatherWidget />
