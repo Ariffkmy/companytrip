@@ -202,6 +202,55 @@ function Photo({ label, hint, value, onChange }) {
   );
 }
 
+/* One upload, every card: each photo picked here is appended as a tile
+   to every group's card. From then on it is an ordinary tile on each
+   card — caption, replace or remove it per group as usual. */
+function AddToEveryCard({ onAdd }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [note, setNote] = useState('');
+  const id = useFieldId();
+
+  /* One at a time, adding as each lands, so a failure part-way keeps
+     the ones that made it. */
+  async function onFiles(files) {
+    const picked = Array.from(files ?? []).slice(0, BINGO_MAX);
+    if (!picked.length) return;
+    setBusy(true);
+    setError('');
+    setNote('');
+    let added = 0;
+    const full = new Set();
+    try {
+      for (const file of picked) {
+        const skipped = await onAdd(await uploadHuntPhoto(file));
+        skipped.forEach((name) => full.add(name));
+        added += 1;
+      }
+    } catch (e) {
+      setError(photoErrorMessage(e));
+    } finally {
+      setBusy(false);
+      if (added) {
+        setNote(`Added ${added} photo${added === 1 ? '' : 's'} to every group’s card.`
+          + (full.size ? ` Skipped where the card was full (${BINGO_MAX}): ${[...full].join(', ')}.` : ''));
+      }
+    }
+  }
+
+  return (
+    <div>
+      <label htmlFor={id} className="flex h-14 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white text-sm text-gray-500 cursor-pointer hover:border-gray-400">
+        {busy ? 'Uploading…' : '+ Add photos to every group'}
+      </label>
+      <input id={id} type="file" accept="image/*" multiple className="sr-only" disabled={busy}
+        onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+      {error && <p role="alert" className="text-xs text-red mt-1">{error}</p>}
+      {note && <p className="note mt-1">{note}</p>}
+    </div>
+  );
+}
+
 /* A team's bingo tiles, three to a row, laid out as players see them:
    the photo to find, and an optional caption under it. The card is
    however many photos are added here; the last slot adds more. */
@@ -691,6 +740,19 @@ export default function HuntEditor() {
     const same = new Set(await samePhotos(src, framed.map((t) => t.photo)));
     return framed.find((t) => same.has(t.photo))?.frame ?? null;
   }
+  /* Appends one tile to every group's card; returns the names of the
+     groups skipped because their card is already full. */
+  async function addToEveryCard(photo) {
+    const frame = await frameOfSame(photo);
+    const tile = { prompt: '', photo, ...(frame ? { frame } : {}) };
+    const full = huntGroups.filter((g) => (draftRef.current.teams[g.id]?.bingo ?? []).length >= BINGO_MAX);
+    setSaveMsg('');
+    setDraft((d) => huntGroups.reduce((acc, g) => {
+      const card = acc.teams[g.id]?.bingo ?? [];
+      return card.length >= BINGO_MAX ? acc : setIn(acc, ['teams', g.id, 'bingo'], [...card, tile]);
+    }, d));
+    return full.map((g) => g.name);
+  }
 
   async function onSave() {
     if (errors.length) return;
@@ -759,6 +821,12 @@ export default function HuntEditor() {
         <div className="grid grid-cols-2 gap-3">
           <Num label="Points per photo" value={val([...cp('bingo'), 'tilePts'])} onChange={set([...cp('bingo'), 'tilePts'])} />
         </div>
+        <Sub>Same photo for every group</Sub>
+        <p className="note -mt-2">
+          Upload once and the photo is added to the end of every group’s card below. Each copy is then an ordinary
+          tile — caption, adjust or remove it per group.
+        </p>
+        <AddToEveryCard onAdd={addToEveryCard} />
         <Sub>Each group’s card</Sub>
         <p className="note -mt-2">
           Each team’s card is the photos you add here (left to right, top to bottom, up to {BINGO_MAX}) of spots around the
