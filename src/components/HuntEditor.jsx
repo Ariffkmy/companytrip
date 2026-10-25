@@ -4,8 +4,9 @@ import TreasureHunt from './TreasureHunt';
 import { FrameDialog, framedImgStyle, samePhotos } from './FramedPhoto';
 import huntGroups from '../data/huntGroups';
 import {
-  BINGO_MAX, DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, setHuntOpen, uploadHuntPhoto, validate,
+  BINGO_MAX, DEFAULT_HUNT_CONFIG, fetchHuntConfig, saveHuntConfig, setHuntOpen, switchMapLayout, uploadHuntPhoto, validate,
 } from '../lib/huntConfig';
+import { DEFAULT_MAP_LAYOUT, MAP_LAYOUTS } from '../data/huntRoute';
 import {
   buildWrongOptions, fetchColleagueAnswers, importFormAnswers, saveColleagueAnswers,
 } from '../lib/colleagueQuiz';
@@ -543,12 +544,32 @@ function MapSection({ val, set }) {
   const m = ['map'];
   const areas = val([...m, 'areas']) ?? [];
   const start = val([...m, 'start']) ?? {};
+  const layout = val([...m, 'layout']) ?? DEFAULT_MAP_LAYOUT;
+  const pickLayout = (key) => set(m)(switchMapLayout(val(m), key));
 
   return (
-    <Section title="Area map" sub={`${areas.length} area${areas.length === 1 ? '' : 's'}`}>
+    <Section title="Area map" sub={`${MAP_LAYOUTS[layout]?.name ?? ''} · ${areas.length} area${areas.length === 1 ? '' : 's'}`}>
       <p className="note">
         What participants see on the “Hunt areas” screen. Teams roam these in any order, so there is no
         walking line and no numbering to keep in step with the games.
+      </p>
+
+      <Sub>Which map</Sub>
+      <div role="radiogroup" aria-label="Which map" className="grid grid-cols-2 gap-2">
+        {Object.entries(MAP_LAYOUTS).map(([key, l]) => {
+          const on = key === layout;
+          return (
+            <button key={key} type="button" role="radio" aria-checked={on} onClick={() => pickLayout(key)}
+              className={`rounded-lg p-3 text-left cursor-pointer ${on ? 'border-2 border-ink bg-white' : 'border border-gray-200'}`}>
+              <span className="block font-display text-base tracking-wide">{l.name}</span>
+              <span className="block text-xs text-gray-400">{l.sub}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="note -mt-2">
+        Players get the chosen map once you press Save. Each map keeps its own area names and notes. A group’s
+        “Area the place is in” under Copy the pose should be checked after switching, since the areas differ.
       </p>
 
       <Sub>Start &amp; finish</Sub>

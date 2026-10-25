@@ -98,10 +98,8 @@ export const AREAS = [
    centres and so do not follow streets. Areas 4 and 5 are already in
    the committee's swapped order (the south-west tip is 5).
 
-   Shaped like `map` in DEFAULT_HUNT_CONFIG minus link and start, which
-   stay the same. Note that withDefaults in ../lib/huntConfig migrates a
-   stored six-area map to the three areas, so switching to this one means
-   lifting that migration too. [lat, lng] pairs. */
+   Admins switch to it from the Area map section of the hunt editor
+   (MAP_LAYOUTS below). [lat, lng] pairs. */
 export const GOOD_WEATHER_MAP = {
   km: OLD_ROUTE_STATS.km,
   walkMin: OLD_ROUTE_STATS.walkMin,
@@ -172,3 +170,19 @@ export const GOOD_WEATHER_MAP = {
     },
   ],
 };
+
+/* The maps an admin can switch between in the hunt editor. The key is
+   what the hunt config stores as map.layout. */
+export const MAP_LAYOUTS = {
+  station: {
+    name: 'Three areas',
+    sub: 'Round the station — the usual map',
+    km: ROUTE_STATS.km, walkMin: ROUTE_STATS.walkMin, boundary: FIELD_BOUNDARY, areas: AREAS,
+  },
+  wide: {
+    name: 'Six areas',
+    sub: 'The wider field — for good weather',
+    ...GOOD_WEATHER_MAP,
+  },
+};
+export const DEFAULT_MAP_LAYOUT = 'station';

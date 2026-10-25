@@ -17,7 +17,9 @@
 import { supabase } from './supabase';
 import { PHOTO_PRESETS, compressPhoto } from './photos';
 import huntGroups, { HUNT_GROUP_IDS } from '../data/huntGroups';
-import { AREAS, FIELD_BOUNDARY, HUNT_MAP_LINK, OLD_HUNT_MAP_LINK, OLD_ROUTE_STATS, ROUTE_STATS, START } from '../data/huntRoute';
+import {
+  AREAS, DEFAULT_MAP_LAYOUT, FIELD_BOUNDARY, HUNT_MAP_LINK, MAP_LAYOUTS, OLD_HUNT_MAP_LINK, OLD_ROUTE_STATS, ROUTE_STATS, START,
+} from '../data/huntRoute';
 import ATAMI_QUIZ from '../data/atamiQuiz';
 
 export const HUNT_ID = 'atami';
@@ -107,8 +109,16 @@ export const DEFAULT_HUNT_CONFIG = {
   /* Area map. Three separate areas around the station, each outlined on
      its own. There is no walking line — the order is the team's to
      choose. Outlines are fixed in ../data/huntRoute, which explains how
-     they are derived; admins edit the labels and notes. */
+     they are derived; admins edit the labels and notes.
+
+     layout picks which of MAP_LAYOUTS is in play (the three areas, or
+     the six-area field for good weather); areas, boundary, km and
+     walkMin are always the chosen one's. stash keeps the names, notes
+     and distances of the layout not in use, so switching back and forth
+     loses nothing. */
   map: {
+    layout: DEFAULT_MAP_LAYOUT,
+    stash: {},
     link: HUNT_MAP_LINK,
     km: ROUTE_STATS.km,
     walkMin: ROUTE_STATS.walkMin,
@@ -359,22 +369,26 @@ export function withDefaults(stored) {
   delete merged.unlocks;
   delete merged.map.checkpoints;
   delete merged.map.route;
+  if (!MAP_LAYOUTS[merged.map.layout]) merged.map.layout = DEFAULT_MAP_LAYOUT;
+  if (!isPlainObject(merged.map.stash)) merged.map.stash = {};
+  const layout = MAP_LAYOUTS[merged.map.layout];
+  const layoutAreas = () => layout.areas.map((a) => ({ n: a.n, label: a.label, note: a.note, polygon: structuredClone(a.polygon) }));
   if (!Array.isArray(merged.map.areas) || !merged.map.areas.length) {
-    merged.map.areas = structuredClone(DEFAULT_HUNT_CONFIG.map.areas);
+    merged.map.areas = layoutAreas();
   }
   /* Saved with outlines missing, or before the field had a boundary
      (from the six tiled areas back to the first islands). */
   if (merged.map.areas.some((a) => !Array.isArray(a.polygon) || a.polygon.length < 3)
     || !Array.isArray(merged.map.boundary)) {
-    merged.map.boundary = structuredClone(DEFAULT_HUNT_CONFIG.map.boundary);
+    merged.map.boundary = structuredClone(layout.boundary);
     /* Rebuilt from the defaults rather than from what was stored:
        deepMerge replaces arrays whole, so a document saved with a
        different number of areas would otherwise drop the rest of the
        tiling and leave holes in the field. Labels and notes the
        committee wrote are carried across by position. */
     const stored = merged.map.areas;
-    merged.map.areas = DEFAULT_HUNT_CONFIG.map.areas.map((fresh, i) => ({
-      ...structuredClone(fresh),
+    merged.map.areas = layoutAreas().map((fresh, i) => ({
+      ...fresh,
       label: stored[i]?.label ?? fresh.label,
       note: stored[i]?.note ?? fresh.note,
     }));
@@ -395,8 +409,9 @@ export function withDefaults(stored) {
   /* Saved with the six areas that tiled the field: replaced by the
      committee's three loops round the station, with no field edge.
      Labels and notes don't carry over — they described the old patches —
-     and a pose place set to area 4, 5 or 6 goes back to not set. */
-  if (merged.map.areas.length === 6 && merged.map.areas[0]?.polygon?.[0]?.[0] === 35.102141) {
+     and a pose place set to area 4, 5 or 6 goes back to not set. Not
+     when an admin has picked the six-area field on purpose. */
+  if (merged.map.layout === DEFAULT_MAP_LAYOUT && merged.map.areas.length === 6 && merged.map.areas[0]?.polygon?.[0]?.[0] === 35.102141) {
     merged.map.areas = structuredClone(DEFAULT_HUNT_CONFIG.map.areas);
     merged.map.boundary = structuredClone(DEFAULT_HUNT_CONFIG.map.boundary);
     if (merged.map.km === OLD_ROUTE_STATS.km && merged.map.walkMin === OLD_ROUTE_STATS.walkMin) {
@@ -452,6 +467,38 @@ export function toRuntime(config) {
     trivia: { pts: Math.max(0, Number(cp.guess.pointsPerRight) || 0) },
     atami: atamiRules(cp.cp2b),
     cp,
+  };
+}
+
+/* The map with another of MAP_LAYOUTS in play. The outgoing layout's
+   names, notes and distances go into the stash, and the incoming one's
+   come back out of it (or from the code, the first time), drawn over the
+   outlines in ../data/huntRoute. */
+export function switchMapLayout(map, key) {
+  const next = MAP_LAYOUTS[key];
+  if (!next || map.layout === key) return map;
+  const stash = {
+    ...map.stash,
+    [map.layout]: {
+      km: map.km, walkMin: map.walkMin,
+      areas: (map.areas ?? []).map((a) => ({ label: a.label, note: a.note })),
+    },
+  };
+  const kept = stash[key] ?? {};
+  delete stash[key];
+  return {
+    ...map,
+    layout: key,
+    stash,
+    km: kept.km ?? next.km,
+    walkMin: kept.walkMin ?? next.walkMin,
+    boundary: structuredClone(next.boundary),
+    areas: next.areas.map((a, i) => ({
+      n: a.n,
+      label: kept.areas?.[i]?.label ?? a.label,
+      note: kept.areas?.[i]?.note ?? a.note,
+      polygon: structuredClone(a.polygon),
+    })),
   };
 }
 

@@ -2116,7 +2116,9 @@ export default function TreasureHunt({
     const n = Number(t?.pose?.area);
     if (!n) return '';
     const a = (CONFIG.map?.areas ?? []).find((x, i) => (x.n ?? i + 1) === n);
-    return a?.label || `Area ${n}`;
+    /* Not on this map (set under the other layout): no tag. */
+    if (!a) return '';
+    return a.label || `Area ${n}`;
   };
 
   /* Two photos, in the order you act on them: the place tells you where
