@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isStorageFull } from '../lib/photos';
-import { PAGE_SIZE, cachedPhotos, deletePhoto, fetchAlbumFile, formatUploaded, listPhotos, saveFile, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
+import { PAGE_SIZE, cachedPhotos, deletePhoto, fetchAlbumFile, formatUploaded, isHuntMedia, listPhotos, saveFile, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
 import { formatDuration, isVideoFile, mediaErrorMessage } from '../lib/video';
 import StoriesBar from './StoriesBar';
 import schedule from '../data/schedule';
@@ -81,7 +81,7 @@ function Lightbox({ photos, index, onIndex, onClose, canDelete, onDelete }) {
       <div className="flex items-center gap-3 px-4 h-14 shrink-0 text-onscrim">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{photo.uploader_name}</p>
-          <p className="font-mono text-[11px] opacity-70">{formatUploaded(photo.created_at)}</p>
+          <p className="font-mono text-[11px] opacity-70">{isHuntMedia(photo) ? '🧭 Treasure hunt · ' : ''}{formatUploaded(photo.created_at)}</p>
         </div>
         <span className="font-mono text-[11px] opacity-60 tick">{index + 1}/{photos.length}</span>
         <button ref={closeRef} type="button" onClick={onClose} aria-label="Close"
@@ -226,7 +226,8 @@ export default function Album({ userId, isAdmin }) {
     if (failed) setError(`${failed} of ${files.length} didn’t upload. ${mediaErrorMessage(lastErr)}`);
   }
 
-  const canDelete = (p) => isAdmin || p.uploader_id === userId;
+  /* Hunt photos and videos belong to the game: cleared from the hunt, not here. */
+  const canDelete = (p) => !isHuntMedia(p) && (isAdmin || p.uploader_id === userId);
 
   async function onDelete(photo) {
     try {
@@ -278,6 +279,9 @@ export default function Album({ userId, isAdmin }) {
                       <button type="button" onClick={() => setOpen(photos.indexOf(p))}
                         className="relative block w-full h-full cursor-pointer bg-gray-100 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red">
                         {p.thumb && <img src={p.thumb} crossOrigin="anonymous" alt={`${p.kind === 'video' ? 'Video' : 'Photo'} by ${p.uploader_name}`} loading="lazy" className="w-full h-full object-cover" />}
+                        {isHuntMedia(p) && (
+                          <span aria-hidden="true" className="absolute left-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[11px] leading-none">🧭</span>
+                        )}
                         {p.kind === 'video' && (
                           <span className="absolute right-1 bottom-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] text-onscrim">
                             ▶ {formatDuration(p.duration)}

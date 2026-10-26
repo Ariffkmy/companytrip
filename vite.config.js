@@ -58,13 +58,13 @@ export default defineConfig({
             },
           },
           {
-            // Album and story photos (private buckets, signed URLs). Every list load
+            // Album, story and treasure hunt photos (private buckets, signed URLs). Every list load
             // mints a new ?token=, so key the cache on the path alone —
             // files are uuid-named and never overwritten. The token only
             // matters on the first fetch. JPEGs only (photos and video
             // posters): video plays by range request, which a cached
             // whole-file response breaks, and would blow the cache.
-            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/sign\/(album|stories)\/[^?]+\.jpg(\?|$)/,
+            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/sign\/(album|stories|bingo|hunt-photos|pitch-videos)\/[^?]+\.jpg(\?|$)/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'album-photos',

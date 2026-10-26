@@ -16,13 +16,22 @@
 import { supabase } from './supabase';
 import { PHOTO_PRESETS, compressPhoto, loadImage } from './photos';
 import { isVideoFile, prepareVideo } from './video';
+import { photoPathsOf } from './huntScores';
 
 const ALBUM = { bucket: 'album', table: 'album_photos' };
 /* Stories show in the album too, every one ever posted, not only the
    last day's (src/lib/stories.js lists those). Each row carries
    `source`, so saving and deleting go to the right place. */
 const STORIES = { bucket: 'stories', table: 'stories' };
+/* The treasure hunt's photos and videos show here too, each group's to
+   whoever can see them on the hunt page (its members and admins, and
+   everyone once the results are published). They stay the hunt's:
+   saved from here, but never deleted from here. */
+const PITCH = { bucket: 'pitch-videos', table: 'pitch_videos' };
+const BUCKET_OF = { album: 'album', story: 'stories', pitch: 'pitch-videos', bingo: 'bingo', hunt: 'hunt-photos' };
 const targetOf = (item) => (item.source === 'story' ? STORIES : ALBUM);
+/** Only the album's own photos and stories can be deleted from the album. */
+export const isHuntMedia = (item) => item.source === 'pitch' || item.source === 'bingo' || item.source === 'hunt';
 export const MEDIA_COLUMNS = 'id, path, thumb_path, width, height, kind, duration, uploader_id, uploader_name, created_at';
 const URL_TTL = 60 * 60; // 1h — long enough to browse, short enough to not leak
 export const PAGE_SIZE = 48;
@@ -48,7 +57,7 @@ function remember(rows) {
 /** Attach signed URLs to rows: { ...row, src, thumb }. */
 export async function withUrls(bucket, rows) {
   if (!rows.length) return [];
-  const paths = rows.flatMap((r) => [r.path, r.thumb_path]);
+  const paths = rows.flatMap((r) => [r.path, r.thumb_path]).filter(Boolean);
   const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, URL_TTL);
   if (error) throw error;
   const url = Object.fromEntries(data.filter((d) => d.signedUrl).map((d) => [d.path, d.signedUrl]));
@@ -68,15 +77,62 @@ async function listFrom({ bucket, table }, source, before, limit) {
   return (await withUrls(bucket, data)).map((r) => ({ ...r, source }));
 }
 
-/** Album photos and stories together, newest first. Pass the last
-    item's created_at to get the next page. */
+/* Photo bingo shots (src/lib/bingo.js). No thumbnail: the shot is
+   already small. */
+async function listBingo(before, limit) {
+  let q = supabase
+    .from('bingo_shots')
+    .select('path, uploader_id, uploader_name, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (before) q = q.lt('created_at', before);
+  const { data, error } = await q;
+  if (error) throw error;
+  const rows = data.map((r) => ({ ...r, id: `bingo:${r.path}`, thumb_path: null, kind: 'photo' }));
+  return (await withUrls('bingo', rows)).map((r) => ({ ...r, source: 'bingo' }));
+}
+
+/* The games' photos (pose, selfie, boss…) live in each group's synced
+   run as `{ path }` (src/lib/huntScores.js), timed by when the game was
+   sent. There are only a handful of groups, so all runs are read and
+   paged here. */
+async function listHuntPhotos(before, limit) {
+  const { data, error } = await supabase.from('hunt_scores').select('team_id, run');
+  if (error) throw error;
+  const rows = new Map();
+  for (const { team_id: team, run } of data) {
+    Object.values(run?.subs ?? {}).forEach((sub) => {
+      const at = Number(sub?.at);
+      if (!Number.isFinite(at)) return;
+      const created = new Date(at).toISOString();
+      if (before && created >= before) return;
+      photoPathsOf({ subs: [sub] }).forEach((path) => rows.has(path) || rows.set(path, {
+        id: `hunt:${path}`, path, thumb_path: null, kind: 'photo',
+        uploader_id: null, uploader_name: `${run.teamName || team} · Treasure hunt`, created_at: created,
+      }));
+    });
+  }
+  const newest = [...rows.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+  return (await withUrls('hunt-photos', newest)).map((r) => ({ ...r, source: 'hunt' }));
+}
+
+/* A hunt source that can't be read (its SQL not run yet) adds nothing,
+   and a file this member may not open is left out, not shown broken. */
+const huntSource = (p) => p.then((rows) => rows.filter((r) => r.src)).catch(() => []);
+
+/** Album photos, stories and the treasure hunt's photos and videos
+    together, newest first. Pass the last item's created_at to get the
+    next page. */
 export async function listPhotos({ before = null, limit = PAGE_SIZE } = {}) {
-  /* The newest `limit` of both is within the newest `limit` of each. */
-  const [album, stories] = await Promise.all([
+  /* The newest `limit` of all is within the newest `limit` of each. */
+  const [album, stories, pitch, bingo, hunt] = await Promise.all([
     listFrom(ALBUM, 'album', before, limit),
     listFrom(STORIES, 'story', before, limit),
+    huntSource(listFrom(PITCH, 'pitch', before, limit)),
+    huntSource(listBingo(before, limit)),
+    huntSource(listHuntPhotos(before, limit)),
   ]);
-  const rows = [...album, ...stories]
+  const rows = [...album, ...stories, ...pitch, ...bingo, ...hunt]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
   /* Only a full first page is a trustworthy "newest" snapshot. */
@@ -154,12 +210,12 @@ export async function deleteMedia({ bucket, table }, item) {
     save. Fetched through the API rather than the signed URL, which may
     have expired on a cached row. */
 export async function fetchAlbumFile(item) {
-  const { data, error } = await supabase.storage.from(targetOf(item).bucket).download(item.path);
+  const { data, error } = await supabase.storage.from(BUCKET_OF[item.source] ?? ALBUM.bucket).download(item.path);
   if (error) throw error;
   const ext = item.path.split('.').pop();
   const d = new Date(item.created_at);
   const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  const name = `atami-trip-${day}-${item.id.slice(0, 6)}.${ext}`;
+  const name = `atami-trip-${day}-${item.path.split('/').pop().slice(0, 6)}.${ext}`;
   return new File([data], name, { type: data.type || (item.kind === 'video' ? 'video/mp4' : 'image/jpeg') });
 }
 
