@@ -16,17 +16,15 @@
 import { supabase } from './supabase';
 import { PHOTO_PRESETS, compressPhoto, loadImage } from './photos';
 import { isVideoFile, prepareVideo } from './video';
-import { photoPathsOf } from './huntScores';
 
 const ALBUM = { bucket: 'album', table: 'album_photos' };
 /* Stories show in the album too, every one ever posted, not only the
    last day's (src/lib/stories.js lists those). Each row carries
    `source`, so saving and deleting go to the right place. */
 const STORIES = { bucket: 'stories', table: 'stories' };
-/* The treasure hunt's photos and videos show here too, each group's to
-   whoever can see them on the hunt page (its members and admins, and
-   everyone once the results are published). They stay the hunt's:
-   saved from here, but never deleted from here. */
+/* The treasure hunt's photos and videos show here too, every group's to
+   every member. They stay the hunt's: saved from here, but never
+   deleted from here. */
 const PITCH = { bucket: 'pitch-videos', table: 'pitch_videos' };
 const BUCKET_OF = { album: 'album', story: 'stories', pitch: 'pitch-videos', bingo: 'bingo', hunt: 'hunt-photos' };
 const targetOf = (item) => (item.source === 'story' ? STORIES : ALBUM);
@@ -93,23 +91,20 @@ async function listBingo(before, limit) {
 }
 
 /* The games' photos (pose, selfie, boss…) live in each group's synced
-   run as `{ path }` (src/lib/huntScores.js), timed by when the game was
-   sent. There are only a handful of groups, so all runs are read and
-   paged here. */
+   run as `{ path }` (src/lib/huntScores.js). hunt_album_photos() hands
+   back just those paths, timed by when the game was sent, for every
+   group (20261102000000_hunt_photos_everyone.sql). There are only a
+   handful, so they are all read and paged here. */
 async function listHuntPhotos(before, limit) {
-  const { data, error } = await supabase.from('hunt_scores').select('team_id, run');
+  const { data, error } = await supabase.rpc('hunt_album_photos');
   if (error) throw error;
   const rows = new Map();
-  for (const { team_id: team, run } of data) {
-    Object.values(run?.subs ?? {}).forEach((sub) => {
-      const at = Number(sub?.at);
-      if (!Number.isFinite(at)) return;
-      const created = new Date(at).toISOString();
-      if (before && created >= before) return;
-      photoPathsOf({ subs: [sub] }).forEach((path) => rows.has(path) || rows.set(path, {
-        id: `hunt:${path}`, path, thumb_path: null, kind: 'photo',
-        uploader_id: null, uploader_name: `${run.teamName || team} · Treasure hunt`, created_at: created,
-      }));
+  for (const r of data) {
+    const created = new Date(Number(r.sent_at)).toISOString();
+    if ((before && created >= before) || rows.has(r.path)) continue;
+    rows.set(r.path, {
+      id: `hunt:${r.path}`, path: r.path, thumb_path: null, kind: 'photo',
+      uploader_id: null, uploader_name: `${r.team_name || r.team_id} · Treasure hunt`, created_at: created,
     });
   }
   const newest = [...rows.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
