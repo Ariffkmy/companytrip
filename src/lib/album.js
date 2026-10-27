@@ -135,6 +135,59 @@ export async function listPhotos({ before = null, limit = PAGE_SIZE } = {}) {
   return rows;
 }
 
+/** Every photo and video in the album, newest first, page by page. */
+export async function listAllPhotos() {
+  const all = [];
+  for (;;) {
+    const rows = await listPhotos({ before: all.length ? all[all.length - 1].created_at : null });
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) return all;
+  }
+}
+
+/* One archive stays well inside what a phone can hold in memory and
+   hand to the share sheet; a bigger album comes in several parts. */
+const PART_BYTES = 300 * 1024 * 1024;
+
+/** Download the whole album as one or more .zip files.
+    `onProgress({ done, total, failed })` as files arrive; `save(file,
+    { part, last })` is handed each finished archive and may wait (for a
+    tap, say) before the next part starts. Returns { total, failed }. */
+export async function downloadAlbum({ onProgress = () => {}, save }) {
+  const { ZipWriter } = await import('./zip');
+  const items = await listAllPhotos();
+  const total = items.length;
+  let done = 0;
+  let failed = 0;
+  let part = 1;
+  let zip = new ZipWriter();
+  onProgress({ done, total, failed });
+
+  const finish = async (last) => {
+    if (!zip.count) return;
+    const name = last && part === 1 ? 'atami-trip-album.zip' : `atami-trip-album-part${part}.zip`;
+    await save(new File([zip.blob()], name, { type: 'application/zip' }), { part, last });
+    part += 1;
+    zip = new ZipWriter();
+  };
+
+  /* A few at a time: quicker than one by one, kinder than all at once. */
+  const AT_ONCE = 4;
+  for (let i = 0; i < items.length; i += AT_ONCE) {
+    const batch = items.slice(i, i + AT_ONCE);
+    const files = await Promise.all(batch.map((item) => fetchAlbumFile(item).catch(() => null)));
+    for (let k = 0; k < batch.length; k++) {
+      if (files[k]) await zip.add(files[k], files[k].name, new Date(batch[k].created_at));
+      else failed += 1;
+      done += 1;
+    }
+    onProgress({ done, total, failed });
+    if (zip.size >= PART_BYTES && i + AT_ONCE < items.length) await finish(false);
+  }
+  await finish(true);
+  return { total, failed };
+}
+
 /** Keep the device copy in step with an upload or delete. */
 export function updateCachedPhotos(fn) {
   const rows = cachedPhotos();

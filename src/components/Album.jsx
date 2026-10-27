@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isStorageFull } from '../lib/photos';
-import { PAGE_SIZE, cachedPhotos, deletePhoto, fetchAlbumFile, formatUploaded, isHuntMedia, listPhotos, saveFile, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
+import { PAGE_SIZE, cachedPhotos, deletePhoto, downloadAlbum, fetchAlbumFile, formatUploaded, isHuntMedia, listPhotos, saveFile, updateCachedPhotos, uploadAlbumMedia } from '../lib/album';
 import { formatDuration, isVideoFile, mediaErrorMessage } from '../lib/video';
 import StoriesBar from './StoriesBar';
 import schedule from '../data/schedule';
@@ -158,6 +158,64 @@ function SaveButton({ photo }) {
   );
 }
 
+/* Everything in the album, as .zip files. A big album comes in parts,
+   and the share sheet only opens straight after a tap — so when a part
+   is ready too long after one, the button asks for another tap, with
+   the part already in hand, before it carries on. */
+function DownloadAllButton() {
+  const [state, setState] = useState(null); // null | { done, total, failed } | { file, part, last } | { error } | { result }
+  const tapRef = useRef(null);
+  const running = state && !state.error && !state.result;
+
+  async function onClick() {
+    if (state?.file) {
+      const resume = tapRef.current;
+      try { await saveFile(state.file); } catch { /* the share sheet still refused: carry on rather than stall */ }
+      resume?.();
+      return;
+    }
+    if (running) return;
+    if (!window.confirm('Download every photo and video in the album? On mobile data this can be a lot — Wi‑Fi is best.')) return;
+    setState({ done: 0, total: 0, failed: 0 });
+    try {
+      const result = await downloadAlbum({
+        onProgress: (p) => setState(p),
+        save: async (file, info) => {
+          try {
+            await saveFile(file);
+          } catch (e) {
+            if (e?.name !== 'NotAllowedError') throw e;
+            await new Promise((resolve) => { tapRef.current = resolve; setState({ file, ...info }); });
+            tapRef.current = null;
+          }
+        },
+      });
+      setState({ result });
+    } catch (e) {
+      setState({ error: friendly(e) });
+    }
+  }
+
+  const label = !state ? '⬇ Download all'
+    : state.file ? (state.last && state.part === 1 ? 'Tap to save' : `Tap to save part ${state.part}`)
+    : state.error ? 'Couldn’t download — try again'
+    : state.result ? (state.result.failed
+      ? `Saved · ${state.result.failed} couldn’t download`
+      : `Saved ${state.result.total} ✓`)
+    : state.total ? `Downloading ${state.done} of ${state.total}…`
+    : 'Getting the list…';
+
+  return (
+    <button type="button" onClick={onClick} aria-live="polite"
+      disabled={running && !state.file}
+      className={`h-9 px-3 rounded-lg border text-[13px] font-medium cursor-pointer disabled:cursor-wait tick ${
+        state?.file ? 'bg-red text-paper border-red' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400'
+      }`}>
+      {label}
+    </button>
+  );
+}
+
 /* ── Album page ───────────────────────────────────── */
 export default function Album({ userId, isAdmin }) {
   /* Last copy on this phone first; load() swaps in the fresh list. */
@@ -250,7 +308,10 @@ export default function Album({ userId, isAdmin }) {
       {/* Stories are separate from the album: their own uploads, their own viewer. */}
       <StoriesBar userId={userId} isAdmin={isAdmin} onChange={load} />
 
-      <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700">Album</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-mono text-[13px] font-bold tracking-[.14em] uppercase text-gray-700">Album</h2>
+        {photos?.length > 0 && <DownloadAllButton />}
+      </div>
       {error && <p role="alert" className="text-sm text-red mt-2">{error}</p>}
 
       {photos === null ? (
